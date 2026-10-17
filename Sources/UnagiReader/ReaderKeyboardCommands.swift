@@ -29,6 +29,11 @@ enum ReaderCommand: String {
         while let current = view { if current is OriginalReaderWebView { return true }; view = current.superview }
         return false
     }
+    /// The open original page's view that takes the keyboard: its web view, or the failure pane.
+    static func originalPage(in view: NSView) -> NSView? {
+        if view is OriginalReaderWebView || view is OriginalFailureHostingView<AnyView> { return view }
+        return view.subviews.lazy.compactMap { originalPage(in: $0) }.first
+    }
     static func hasMarkedText(_ responder: NSResponder?) -> Bool {
         (responder as? NSTextInputClient)?.hasMarkedText() == true
     }
