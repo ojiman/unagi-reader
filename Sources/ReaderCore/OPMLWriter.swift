@@ -63,9 +63,11 @@ public enum OPMLWriter {
 
 extension ReaderStore {
     /// The subscriptions as the OPML file lists them: in the sidebar's order of names, each with its folder. A subscription without a
-    /// usable address (none in a normal library) is left out.
-    public func opmlFeeds() -> [OPMLFeed] {
-        feeds.compactMap { feed in
+    /// usable address (none in a normal library) is left out. A pending reload runs first, so a list that failed to load again after a
+    /// save is not written out of date; when that reload fails, the error is thrown and nothing is written.
+    public func opmlFeeds() throws -> [OPMLFeed] {
+        try reloadIfNeeded()
+        return feeds.compactMap { feed in
             guard let address = feed.sourceURL, let url = ArticleURL.validated(address) else { return nil }
             return OPMLFeed(title: feed.title, url: url, siteURL: feed.siteURL.flatMap { ArticleURL.validated($0) }, folder: feed.folder)
         }

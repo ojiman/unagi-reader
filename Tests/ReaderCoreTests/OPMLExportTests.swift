@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import ReaderCore
 
@@ -20,7 +21,7 @@ import Testing
             OPMLFeed(title: "Atom", url: URL(string: "https://atom.example/atom")!, siteURL: nil, folder: "Tech"),
         ])
         defer { library.cleanup() }
-        let text = String(decoding: OPMLWriter.data(feeds: store.opmlFeeds(), createdAt: start), as: UTF8.self)
+        let text = String(decoding: try OPMLWriter.data(feeds: store.opmlFeeds(), createdAt: start), as: UTF8.self)
         #expect(text.hasPrefix(#"<?xml version="1.0" encoding="UTF-8"?>"#) && text.contains(#"<opml version="2.0">"#))
         #expect(text.contains(#"<outline text="Tech" title="Tech">"#))
         #expect(text.contains(#"<outline type="rss" text="Alone" title="Alone" xmlUrl="https://alone.example/feed" htmlUrl="https://alone.example/"/>"#))
@@ -50,7 +51,7 @@ import Testing
         ]
         let (first, store) = try library(original)
         defer { first.cleanup() }
-        let data = OPMLWriter.data(feeds: store.opmlFeeds(), createdAt: start)
+        let data = try OPMLWriter.data(feeds: store.opmlFeeds(), createdAt: start)
         let (second, empty) = try library([])
         defer { second.cleanup() }
         _ = try empty.importSubscriptions(OPMLParser.parse(data).feeds)
@@ -82,5 +83,30 @@ import Testing
         let working = OPMLExportFlow(store: store, chooseDestination: { _ in URL(fileURLWithPath: "/tmp/x.opml") }, write: { data, _ in written = data })
         #expect(await working.start() == true && working.failure == nil)
         #expect(try OPMLParser.parse(try #require(written)).feeds.map(\.title) == ["A"])
+    }
+
+    private final class ReloadSwitch: @unchecked Sendable { nonisolated(unsafe) var failing = false }
+
+    /// From Codex's review of this PR: a library that saved but failed to load again is loaded before the export reads it.
+    @Test(arguments: [true, false]) func aSavedImportIsReloadedBeforeExport(recoverySucceeds: Bool) async throws {
+        let library = try TestLibrary(); defer { library.cleanup() }
+        let schema = ReaderStore.schema
+        let container = try ModelContainer(for: schema, configurations: [ModelConfiguration("Reader", schema: schema, url: library.url, cloudKitDatabase: .none)])
+        let reload = ReloadSwitch()
+        let store = try ReaderStore(container: container, reloadHook: { if reload.failing { throw CocoaError(.fileReadUnknown) } })
+        reload.failing = true
+        let result = try store.importSubscriptions([OPMLFeed(title: "Saved", url: URL(string: "https://saved.example/feed")!, siteURL: nil, folder: "Tech")])
+        #expect(result.listRefreshFailed && result.addedFeedIDs.count == 1)
+        reload.failing = !recoverySucceeds
+        var written: Data?
+        let flow = OPMLExportFlow(store: store, chooseDestination: { _ in library.directory.appending(path: "out.opml") }, write: { data, _ in written = data })
+        #expect(await flow.start() == recoverySucceeds)
+        if recoverySucceeds {
+            let feeds = try OPMLParser.parse(try #require(written)).feeds
+            #expect(feeds.map(\.title) == ["Saved"] && feeds.map(\.folder) == ["Tech"])
+            #expect(flow.failure == nil)
+        } else {
+            #expect(written == nil && flow.failure != nil)
+        }
     }
 }

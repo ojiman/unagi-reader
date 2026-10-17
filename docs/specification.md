@@ -330,7 +330,7 @@ The **note** is the app's **one** plain-text Markdown document ([decision 0049](
 **Exporting OPML**
 
 - File ▸ 「OPMLを書き出す…」, under the import. No shortcut. The save panel suggests 「Unagi Reader Subscriptions YYYY-MM-DD.opml」.
-- The file holds the subscriptions and their folders, nothing else: each folder holds its subscriptions, in the order of folder names, and the unfiled ones follow at the top level. Nothing is fetched. Importing the file into an empty library gives the same subscriptions and folders (decision 0063).
+- The file holds the subscriptions and their folders, nothing else: each folder holds its subscriptions, in the order of folder names, and the unfiled ones follow at the top level. Nothing is fetched, and there is no limit on the number of subscriptions. Importing the file into an empty library gives the same subscriptions and folders (decision 0063).
 - A written file shows no message; a file that cannot be written shows 「購読を書き出せませんでした」 and the reason.
 
 **Managing subscriptions**
