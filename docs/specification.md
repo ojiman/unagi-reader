@@ -67,7 +67,7 @@ These words mean the same thing in this specification, the user guide, the decis
 | add sheet | The sheet that adds a subscription from a URL | `SubscriptionSheet` |
 | check (確認) | Fetching and parsing the URL being typed to see if it can be added | `FeedChecker`, `FeedCheckRequest` |
 | feed discovery | Finding the feed a site's page announces | `FeedDiscovery` |
-| OPML | The file format that carries a list of subscriptions. Import only (export: #130) | `OPMLParser`, `OPMLImporter`, `OPMLImportFlow` |
+| OPML | The file format that carries a list of subscriptions, for import and export | `OPMLParser`, `OPMLImporter`, `OPMLImportFlow`, `OPMLWriter`, `OPMLExportFlow` |
 
 **The note and screen parts**
 
@@ -326,6 +326,12 @@ The **note** is the app's **one** plain-text Markdown document ([decision 0049](
 
 - File ▸ 「OPMLを取り込む…」. No shortcut.
 - Subscriptions are added at once in one save; articles arrive afterwards. Folders are one level: deeper levels go into the top folder. Existing subscriptions are neither added again nor moved. The result is an alert (decision 0041). Its title is the result: 「N件の購読を追加しました」, or 「新しい購読はありませんでした」 when nothing was added (「このファイルに購読は見つかりませんでした」 for an empty file). Below it, one line for each of these that is not zero, and nothing when all went well: 「・登録済み: N件」 (already subscribed, left as they are), 「・通信安全化: N件」 (plain `http://` addresses changed to `https://`), 「・失敗: N件」 (addresses that could not be used). A file that cannot be read gives the title 「OPMLを取り込めませんでした」 and the reason below it.
+
+**Exporting OPML**
+
+- File ▸ 「OPMLを書き出す…」, under the import. No shortcut. The save panel suggests 「Unagi Reader Subscriptions YYYY-MM-DD.opml」.
+- The file holds the subscriptions and their folders, nothing else: each folder holds its subscriptions, in the order of folder names, and the unfiled ones follow at the top level. Nothing is fetched, and there is no limit on the number of subscriptions. Importing the file into an empty library gives the same subscriptions and folders (decision 0063).
+- A written file shows no message; a file that cannot be written shows 「購読を書き出せませんでした」 and the reason.
 
 **Managing subscriptions**
 

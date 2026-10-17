@@ -14,7 +14,7 @@ Everything that must be done before the beta is an issue in the milestone [Beta]
 
 ## Next
 
-**Not scheduled.** OPML export ([#130](https://github.com/ojiman/unagi-reader/issues/130)) is an enhancement issue with no place in the order; whoever has room can take it.
+Nothing is scheduled.
 
 ## Candidates
 

@@ -56,6 +56,57 @@ import SwiftData
         _ = try store.importFeed(parsed(), receivedAt: deadline.addingTimeInterval(day))
         #expect(try store.content(articleID: article.id, at: deadline) == nil)
     }
+    @Test func aRemovedEntryIsCleanedAgainWithoutTouchingOtherContentOrSavingTwice() throws {
+        let library = try TestLibrary(); defer { library.cleanup() }
+        let schema = ReaderStore.schema
+        let container = try ModelContainer(for: schema, configurations: [ModelConfiguration("Reader", schema: schema, url: library.url, cloudKitDatabase: .none)])
+        var saves = 0
+        let store = try ReaderStore(container: container, now: start, saveHook: { saves += 1 })
+        let parsed = try parsed()
+        let feed = try store.importFeed(parsed, receivedAt: start)
+        let article = try #require(store.articles.first)
+        let at = start.addingTimeInterval(31 * day)
+        try store.purgeExpired(at: at)
+        let deletedAt = article.contentDeletedAt
+        // A deletion marker alone must not hide bytes left in an inconsistent store.
+        article.summary = "Leftover"; article.imageURL = "https://example.test/old.png"
+        store.context.insert(ContentSnapshot(articleID: article.id, text: "Leftover body"))
+        let other = Article(feedID: feed.id, title: "Other", summary: "Kept", publisher: "example", publishedAt: at, receivedAt: at)
+        store.context.insert(other)
+        store.context.insert(ContentSnapshot(articleID: other.id, text: "Kept body"))
+        try store.save(); try store.reload()
+        saves = 0
+        for _ in 0..<2 {
+            let failed = store.applyRefreshes([FetchedFeed(feedID: feed.id, sourceURL: parsed.sourceURL.absoluteString, result: .modified(parsed, etag: nil, lastModified: nil))], at: at)
+            #expect(failed.isEmpty)
+        }
+        #expect(saves == 2) // One save per refresh batch, even when an entry's content is already gone.
+        #expect(article.contentDeletedAt == deletedAt && article.summary.isEmpty && article.imageURL == nil)
+        let snapshots = try store.context.fetch(FetchDescriptor<ContentSnapshot>())
+        #expect(snapshots.count == 1 && snapshots.first?.articleID == other.id)
+        #expect(try store.content(articleID: other.id, at: at)?.text == "Kept body")
+    }
+    @Test func anExpiredRefreshWhoseSavesFailRestoresTheContentUntilRetry() throws {
+        let library = try TestLibrary(); defer { library.cleanup() }
+        let schema = ReaderStore.schema
+        let container = try ModelContainer(for: schema, configurations: [ModelConfiguration("Reader", schema: schema, url: library.url, cloudKitDatabase: .none)])
+        var fail = false
+        let store = try ReaderStore(container: container, now: start, saveHook: { if fail { throw CocoaError(.fileWriteUnknown) } })
+        let parsed = try parsed()
+        let feed = try store.importFeed(parsed, receivedAt: start)
+        let id = try #require(store.articles.first).id
+        let at = start.addingTimeInterval(31 * day)
+        let fetched = FetchedFeed(feedID: feed.id, sourceURL: parsed.sourceURL.absoluteString, result: .modified(parsed, etag: nil, lastModified: nil))
+        fail = true
+        #expect(store.applyRefreshes([fetched], at: at)[feed.id] != nil)
+        #expect(store.article(id: id)?.contentDeletedAt == nil)
+        #expect(store.article(id: id)?.summary.isEmpty == false)
+        #expect(try store.context.fetchCount(FetchDescriptor<ContentSnapshot>()) == 1)
+        fail = false
+        #expect(store.applyRefreshes([fetched], at: at).isEmpty)
+        #expect(store.article(id: id)?.contentDeletedAt == at && store.article(id: id)?.summary == "")
+        #expect(try store.context.fetchCount(FetchDescriptor<ContentSnapshot>()) == 0)
+    }
     @Test func deletionKeepsTheNoteAcrossReopen() throws {
         let library = try TestLibrary(); defer { library.cleanup() }
         try autoreleasepool {
