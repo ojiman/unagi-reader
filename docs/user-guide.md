@@ -15,16 +15,16 @@ This makes `.build/Unagi Reader.app`; open it from Finder. It is ad hoc signed, 
 To look around without your real library, start a separate copy with synthetic subscriptions:
 
 ```sh
-open -n '.build/Unagi Reader.app' --args --data-directory /private/tmp/unagi-reader-demo --seed-demo
+bash scripts/make-synthetic-copy.sh
 ```
 
-Use `open -n`: without it, macOS can reuse a running Unagi Reader and ignore the arguments. Check that the window shows the demo subscriptions (their addresses end in `.example`) before you do anything.
+Run the launch command it prints. It uses a temporary app with its own bundle ID and a fresh data directory. Keep `open -n`: without it, macOS can reuse a running Unagi Reader and ignore the arguments. Before using it, check `pgrep -fl UnagiReader` for that temporary `--data-directory` and check the demo subscriptions in the window: 「開発ノート」, 「テクノロジー」 and 「週末の読み物」.
 
 ## 2. Your data
 
 - The library is `~/Library/Application Support/UnagiReader/Reader.store`. A new library starts empty. Restarting the same version keeps everything.
 - **During the beta, a new version may not open an older library.** The app then shows 「ライブラリを開けませんでした」 (Could not open the library) and never deletes or recreates it by itself. From 1.0, data is kept across updates.
-- Builds before the one-note version kept themes, daily and weekly notes, or several notes. The first start of a newer build keeps your subscriptions, articles, read times and Stars, keeps only the note you edited last, and deletes the rest. This cannot be undone.
+- If an older library with several notes can be opened, the app keeps only the note you edited last and deletes the other notes. This cannot be undone; back up before updating. This does not guarantee that every older beta library can be opened.
 
 ### Back up the library by hand
 
@@ -43,10 +43,10 @@ The window has four areas: the sidebar, the list, the article and the note. Norm
 
 ### Subscriptions and folders
 
-- **Add:** click ＋ at the top right of the sidebar and type an RSS or Atom address, or a site's address (the app finds the feed the page announces). An `http://` address is checked as `https://`. When you stop typing, the line under the field shows 「✓」 and the feed's name, or why it could not be read. 「追加」 (Add) works only when the feed was read; Return also adds.
-- **Folder when adding:** if you have folders, a folder field appears once the feed is read. Press Return to add it unfiled, or type to choose a folder; a new name offers 「作って追加」 (make it and add). The ＋ on a folder row adds straight into that folder.
+- **Add:** click ＋ at the top right of the sidebar and type an RSS or Atom address, or a site's address (the app finds the feed the page announces). An `http://` address without an explicit port is checked as `https://`. When you stop typing, the line under the field shows 「✓」 and the feed's name, or why it could not be read. 「追加」 (Add) works only when the feed was read and is not already subscribed. Return also adds; if the check is still running, it waits for the result.
+- **Folder when adding:** if you have folders, a folder field appears once the feed is read. Press Return to add it unfiled, or type to choose a folder; a new name offers `「Work」を作って追加` (Create “Work” and Add), for example. Pick it, then press 「追加」. The ＋ on a folder row adds straight into that folder.
 - **Import from another reader:** File ▸ 「OPMLを取り込む…」 (Import OPML). The subscriptions appear at once and their articles follow. Existing subscriptions do not change. Folders are one level deep.
-- **Manage:** right-click a subscription to refresh, rename (in the row; Return on the selected row too), move to a folder, or unsubscribe. 「フォルダへ移動…」 (Move to folder) opens a chooser: type to narrow, or type a new name and choose 「作って移動」; 「未分類」 (unfiled) moves it out. You can also drag a subscription onto a folder, or onto the 「購読元」 heading to unfile it.
+- **Manage:** right-click a subscription to refresh, rename (in the row; Return on the selected row too), move to a folder, or unsubscribe. 「フォルダへ移動…」 (Move to folder) opens a chooser: type to narrow, or type a new name and choose `「Work」を作って移動` (Create “Work” and Move), for example; 「未分類」 (unfiled) moves it out. You can also drag a subscription onto a folder, or onto the 「購読元」 heading to unfile it.
 - Right-click a folder to rename it; a name that already exists joins the two folders.
 - Hold ⌥ (Option) while you click ＋ for the troubleshooting tools (feed XML by hand, a synthetic sample).
 
@@ -71,8 +71,8 @@ The app also lists these keys in Settings ▸ 「ショートカット」 (Help 
 | `v` | Open the original page in the app. The ✕ at its top left, `Esc` or choosing another article closes it |
 | `Esc` | Back to reading: closes the original page, or the note. With both open, it closes the one you are in; press it again for the other |
 
-- Keys do not act while you type in a field or compose Japanese text. `j`, `k`, `s` and `n` also work on the original page.
-- An article becomes read when its text is shown, not when you scroll past it in the list.
+- Single-letter reading keys and `/` do not act while you type in a field or compose Japanese text. In the note, `Esc` first cancels composition. `j`, `k`, `s` and `n` also work on the original page, outside its text fields.
+- An article becomes read when its body or RSS summary is shown, not when you scroll past it in the list. If neither is available, selecting it does not mark it read.
 - The app shows the feed's own text (or its summary), as the feed gives it. For the whole article, open the original page with `v` (in the app) or `b` (your browser). The app never gets around paywalls or logins.
 - The in-app browser does not keep you signed in to sites.
 - `s` or the button at the top right stars an article; the Star list shows them again.
@@ -82,11 +82,11 @@ The app also lists these keys in Settings ▸ 「ショートカット」 (Help 
 There is one note and nothing to manage: no list, no names, no delete.
 
 - `n`, `⌥⌘I` or the note button at the top of the article opens it beside the article in a short move; the same again, or the ✕ at the top left of the note, closes it and returns you to where you were. It is the same note on every screen.
-- It is plain Markdown in your own words, saved as you type, exactly as typed. A line starting with `#` is shown as a heading; a line starting with `-`, `*`, `+` or `1.` as a list item. Only the look changes, never the saved text. Paste adds plain text only.
+- It is plain Markdown in your own words, saved as you type, exactly as typed. A line starting with one to six `#` marks followed by a space (or the line end) is shown as a heading. A line starting with `- `, `* `, `+ `, `1. ` or `1) ` is shown as a list item. Only the look changes, never the saved text. Paste adds plain text only.
 - `j` / `k` change the article while the note stays open (not while you type in the note). While you write, `⌥⌘↓` and `⌥⌘↑` change the article, and so do the two arrows above the note.
 - Drag the panel's edge to change its width; the width is kept.
-- `c` (or 記事 ▸ 記事をノートに送る) puts the article into the note where you left the caret: its title and link as `[Title](URL)`, or the text you selected in the article as a quotation with that link. Each one is a paragraph of its own, and a short highlight shows where it went. A closed note opens and takes it at its end. One undo removes it. Nothing else ever writes into the note.
-- 「Markdownをコピー」 (Copy Markdown) at the top of the note copies its exact text. It is disabled for an empty note.
+- `c` (or 記事 ▸ 記事をノートに送る) puts the article into the note after the caret or selection you left there, keeping selected note text: its title and link as `[Title](URL)`, or the text you selected in the article as a quotation with that link. Each one is a paragraph of its own, and a short highlight shows where it went. With a translation shown, only the title and link are sent. A closed note opens and takes it at its end. The command does nothing while you compose text in the note or view the original page. One undo removes it. Nothing else ever writes into the note.
+- 「Markdownをコピー」 (Copy Markdown) at the top of the note copies its exact text. It is disabled when the note is empty or contains only whitespace.
 
 ### Language settings
 
@@ -105,10 +105,10 @@ The app has no AI of its own. It does not summarize, suggest or write, and it ne
 
 ## 5. How long data is kept
 
-- Article texts and summaries: 30 days by default; 7, 30, 90 or 365 days in Settings. For an unread article the days count from when it arrived, for a read one from when you first read it. A Star does not extend them.
+- Article texts and summaries: 30 days by default; choose 7, 30, 90 days or 「1年」 (1 Year, 365 days) in Settings ▸ 「記事」 ▸ 「保持期間」. The days count from first receipt until the first reading, then from that first reading. Fetching again, marking unread or adding a Star does not restart the clock.
 - When the text expires, the title, the link and the Star stay.
 - Shortening the period asks you first.
-- **The note is never deleted by the app.**
+- **The note never expires.** The older-library cleanup described in section 2 is a separate beta upgrade step.
 
 ## 6. For developers
 
