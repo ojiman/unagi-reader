@@ -51,7 +51,7 @@ There is no backend, no account and no AI proxy. The app has no AI of its own ([
 ### 3.3 Retention
 
 - `purgeExpired(at:)` (`ContentRetention`) runs at launch, on return to the app and every 30 minutes. Expired or deleted bodies and images do not come back when a feed is received again. Changing the period checks both the old and the new limit.
-- Content removal resolves articles through the ID index and fetches only snapshots whose article IDs were requested. A deletion marker does not skip cleanup of any leftover summary, image or snapshot.
+- Content removal resolves articles through the ID index and fetches only snapshots whose article IDs were requested. The deletion preview, which every purge runs, fetches only the snapshots of expired or deleted articles (#250). A deletion marker does not skip cleanup of any leftover summary, image or snapshot.
 - `ContentSnapshot.bodyFormatData` (optional JSON) holds the link and quote layout; it is used only when it matches the saved text, else the plain text is shown. Deleting a body deletes its snapshot and format.
 
 ## 4. Screen contracts
