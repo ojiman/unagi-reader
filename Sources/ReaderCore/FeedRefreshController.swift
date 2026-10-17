@@ -83,22 +83,34 @@ private extension Result where Failure == any Error {
 struct FetchedFeed: Sendable { let feedID: UUID; let sourceURL: String; let result: FeedFetchResult }
 
 extension ReaderStore {
-    /// Applies several fetched feeds with one save and one list reload (#131). When that fails, the batch is rolled back and each feed
+    /// Applies several fetched feeds with one save and one committed list update (#131, #303). When that fails, the batch is rolled back and each feed
     /// is applied on its own, so a feed that cannot be saved does not hold back the others. Returns the feeds that could not be applied.
     func applyRefreshes(_ fetched: [FetchedFeed], at: Date) -> [UUID: any Error] {
         do {
             try reloadIfNeeded()
-            var index = EntryIndex(articles: articles, memberships: memberships)
+            var index: EntryIndex?
+            var titlesChanged = false
             for item in fetched {
                 guard let feed = feed(id: item.feedID), feed.sourceURL == item.sourceURL else { continue }
                 if case .modified(let parsed, let etag, let modified) = item.result {
                     guard parsed.sourceURL.absoluteString == feed.sourceURL else { continue }
-                    _ = try merge(parsed, receivedAt: at, folder: nil, index: &index)
+                    if index == nil {
+                        if refreshEntryIndex == nil { refreshEntryIndex = EntryIndex(articles: articles, memberships: memberships) }
+                        index = refreshEntryIndex
+                    }
+                    let title = feed.title
+                    _ = try merge(parsed, receivedAt: at, folder: nil, index: index!)
+                    titlesChanged = titlesChanged || feed.title != title
                     feed.etag = etag; feed.lastModified = modified
                 }
                 feed.lastFetchedAt = at
             }
             try save()
+            do { try publishRefresh(index: index, titlesChanged: titlesChanged) } catch {
+                // The save succeeded. Report the publication failure, then recover from the committed store.
+                rollback()
+                return Dictionary(fetched.map { ($0.feedID, error) }, uniquingKeysWith: { first, _ in first })
+            }
         } catch {
             rollback()
             var failed: [UUID: any Error] = [:]
@@ -107,11 +119,6 @@ extension ReaderStore {
                 do { try applyRefresh(item.result, to: feed, at: at) } catch { failed[item.feedID] = error }
             }
             return failed
-        }
-        do { try reload() } catch {
-            // Saved, but the list could not be loaded again: as for a single feed, the error is shown and the store reloads before its next change.
-            rollback()
-            return Dictionary(fetched.map { ($0.feedID, error) }, uniquingKeysWith: { first, _ in first })
         }
         return [:]
     }

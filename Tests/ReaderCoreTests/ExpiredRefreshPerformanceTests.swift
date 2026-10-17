@@ -40,12 +40,12 @@ import Testing
         let removalStart = clock.now
         for id in expiredIDs { #expect(try !store.removeContent(articleIDs: [id], at: at)) }
         let removal = removalStart.duration(to: clock.now)
-        var index = EntryIndex(articles: store.articles, memberships: store.memberships)
+        let index = EntryIndex(articles: store.articles, memberships: store.memberships)
         var longest = Duration.zero
         let mergeStart = clock.now
         for feed in expiredFeeds {
             let began = clock.now
-            _ = try store.merge(feed, receivedAt: at, folder: nil, index: &index)
+            _ = try store.merge(feed, receivedAt: at, folder: nil, index: index)
             longest = max(longest, began.duration(to: clock.now))
         }
         let merge = mergeStart.duration(to: clock.now)

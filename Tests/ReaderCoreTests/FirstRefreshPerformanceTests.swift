@@ -41,6 +41,7 @@ import Testing
         #expect(store.memberships.count == count * 25)
         #expect(store.feeds.allSatisfy { $0.lastFetchedAt != nil && $0.etag == "v1" })
         #expect(store.unreadCount == count * 25)
+        #expect(first.gap <= .milliseconds(100), "Main-actor delay exceeded 100 ms: \(first.gap)")
         print("FIRST_REFRESH feeds=\(count) articles=\(store.articles.count) first=\(first.elapsed) firstGap=\(first.gap) firstMaxRSSMiB=\(first.memory)")
     }
 
