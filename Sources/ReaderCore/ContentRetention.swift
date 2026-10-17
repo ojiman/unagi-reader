@@ -36,12 +36,15 @@ extension ReaderStore {
     public func previewDeletion(days: Int?, at: Date) throws -> DeletionPreview {
         try reloadIfNeeded()
         let policy = RetentionPolicy(days: days ?? retentionDays)
-        let snapshots = try context.fetch(FetchDescriptor<ContentSnapshot>())
-        let selected = articles.filter { article in
-            let hasText = !article.summary.isEmpty || snapshots.contains { $0.articleID == article.id && !$0.text.isEmpty }
-            return hasText && (article.contentDeletedAt != nil ||
-                policy.expiresAt(receivedAt: article.firstReceivedAt, firstReadAt: article.firstReadAt) <= at)
+        let candidates = articles.filter { article in
+            article.contentDeletedAt != nil ||
+                policy.expiresAt(receivedAt: article.firstReceivedAt, firstReadAt: article.firstReadAt) <= at
         }
+        // Only the candidates' bodies are read (#250): every launch runs this, and most libraries have few or none.
+        let candidateIDs = candidates.map(\.id)
+        let snapshots = try context.fetch(FetchDescriptor<ContentSnapshot>(predicate: #Predicate { candidateIDs.contains($0.articleID) }))
+        let withBody = Set(snapshots.filter { !$0.text.isEmpty }.map(\.articleID))
+        let selected = candidates.filter { !$0.summary.isEmpty || withBody.contains($0.id) }
         let ids = Set(selected.map(\.id))
         let bodies = snapshots.filter { ids.contains($0.articleID) && !$0.text.isEmpty }
         let summaries = selected.filter { !$0.summary.isEmpty }
