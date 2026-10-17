@@ -18,7 +18,7 @@
 
 ## Not in this change
 
-Exporting OPML (the way out; a candidate for the "keep it yours" promise). Choosing which feeds to import (preview screen). Importing by dropping a file onto the window. Checking every address at import. Measuring a refresh of thousands of new subscriptions: it is the normal refresh (one subscription at a time, three in parallel, on the main actor), which was never run on a library of that size.
+Exporting OPML (since decision 0063). Choosing which feeds to import (preview screen). Importing by dropping a file onto the window. Checking every address at import. Measuring a refresh of thousands of new subscriptions: it is the normal refresh (one subscription at a time, three in parallel, on the main actor), which was never run on a library of that size.
 
 ## Not verified
 

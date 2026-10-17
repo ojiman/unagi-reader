@@ -118,7 +118,7 @@ struct ReaderView: View {
     var body: some View {
         // The library window's own chain is long (the CI compiler gives up on a longer one); the OPML import is added from outside it.
         windowContent
-            .modifier(OPMLImportPresentation(flow: opml))
+            .modifier(OPMLImportPresentation(flow: opml, store: store))
             .modifier(RenameOnReturn(begin: beginRenamingSelection))
             // `Esc` from the article, the list or the note's editor closes the note, also while the original page is open beside it (decision 0050).
             // The original page has its own `Esc` (`closeOriginal`), and a field of the page keeps it.

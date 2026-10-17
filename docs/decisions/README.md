@@ -57,6 +57,7 @@ A decision record says who decided what, when and why. It is not where the curre
 | [0060](0060-language-settings-and-ui-localization.md) | Language settings, independent defaults and AI-prepared UI localization | valid (built; product acceptance is separate) |
 | [0061](0061-no-deleting-all-bodies-at-once.md) | No action deletes all article bodies at once | valid (built; no action deletes all bodies at once) |
 | [0062](0062-several-writers-under-review.md) | Several writers at once, each on its own issue, under the owner's review | valid |
+| [0063](0063-export-opml.md) | Export the subscriptions as an OPML file | valid (approved when its PR is merged) |
 
 ## Removed from the working tree
 
