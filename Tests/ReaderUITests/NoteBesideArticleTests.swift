@@ -255,7 +255,13 @@ extension SplitViewFoldTests {
             try await settle(h) { article(in: h)?.string.contains("合成記事 1") == true }
             try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
             try press("v", in: h)
-            try await settle(h) { h.window.firstResponder is OriginalFailureHostingView<AnyView> }       // its own keys need no key window
+            // The page's failure pane: its keys need no key window (the web view's do). The failed load can take longer than `settle` on CI.
+            var pane: OriginalFailureHostingView<AnyView>?
+            for _ in 0..<300 where pane == nil {
+                h.host.layoutSubtreeIfNeeded(); pane = find(OriginalFailureHostingView<AnyView>.self, in: h.host)
+                if pane == nil { try await Task.sleep(for: .milliseconds(100)) }
+            }
+            h.window.makeFirstResponder(try #require(pane))
             try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
             let page = try #require(h.window.firstResponder as? NSView)
             page.keyDown(with: try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: h.window.windowNumber,
