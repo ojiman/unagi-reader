@@ -9,7 +9,7 @@ The **order** of the work to the beta and 1.0, and why. The units of work are [G
 Everything that must be done before the beta is an issue in the milestone [Beta](https://github.com/ojiman/unagi-reader/milestone/1). It is closed to new issues; only the owner adds to it. **The beta is done when every issue in it is closed.**
 
 1. **Real-device check by the owner:** [#136](https://github.com/ojiman/unagi-reader/issues/136), [#145](https://github.com/ojiman/unagi-reader/issues/145), and a dogfooding week. Bugs found here come before any polish.
-2. **Preparation:** [#142](https://github.com/ojiman/unagi-reader/issues/142) a fresh acceptance run; [#143](https://github.com/ojiman/unagi-reader/issues/143) the user guide matches the app.
+2. **Preparation:** [#142](https://github.com/ojiman/unagi-reader/issues/142) a fresh acceptance run.
 3. **Other conditions:** the owner decides how the beta is signed and published ([findings](superpowers/plans/2026-10-14-beta-distribution.md), section 6).
 
 ## Next
