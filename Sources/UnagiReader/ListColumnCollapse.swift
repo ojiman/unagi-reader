@@ -106,7 +106,8 @@ struct ListColumnCollapse: NSViewRepresentable {
         }
 
         /// After the change: the list cannot be folded by dragging its edge (only by this view); and the keyboard goes where the person is
-        /// reading: to the article when the list is gone, to the list when it is back (unless they are typing in the note).
+        /// reading: to the article when the list is gone, to the list when it is back, or to the original page beside it (unless they are
+        /// typing in the note).
         private func finish(_ item: NSSplitViewItem, window: NSWindow, collapsed: Bool) {
             if !collapsed {
                 item.canCollapse = false
@@ -118,6 +119,8 @@ struct ListColumnCollapse: NSViewRepresentable {
                 // note's editor does not take the keyboard just because the list is gone.
                 if let article = Self.first(ArticleTextView.self, in: content) { window.makeFirstResponder(article) }
                 else { window.makeFirstResponder(content) }
+            } else if let page = ReaderKeyboardCommands.originalPage(in: content) {
+                window.makeFirstResponder(page)                            // the list is back beside the original page, which keeps the keyboard
             } else if let table = Self.first(NativeArticleList.Table.self, in: content) {
                 window.makeFirstResponder(table)
             }

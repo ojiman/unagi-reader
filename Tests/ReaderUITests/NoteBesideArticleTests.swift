@@ -242,6 +242,37 @@ extension SplitViewFoldTests {
             #expect(list.selectedRow == 1)
         }
 
+        /// Specification 3.1.3, issue #312: with the original page and the note open, `Esc` in the note closes the note and gives the
+        /// keyboard to the page, so a second `Esc` closes the page. The synthetic page cannot load, so the page is its failure pane.
+        @Test func aSecondEscapeClosesTheOriginalPageAfterTheNote() async throws {
+            let h = try harness()
+            defer { finish(h) }
+            h.window.makeKeyAndOrderFront(nil)
+            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
+            let list = try #require(table(in: h))
+            list.selectRowIndexes(IndexSet(integer: 1), byExtendingSelection: false)
+            h.window.makeFirstResponder(list)
+            try await settle(h) { article(in: h)?.string.contains("合成記事 1") == true }
+            try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
+            try press("v", in: h)
+            try await settle(h) { h.window.firstResponder is OriginalFailureHostingView<AnyView> }       // its own keys need no key window
+            try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
+            let page = try #require(h.window.firstResponder as? NSView)
+            page.keyDown(with: try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: h.window.windowNumber,
+                                                             context: nil, characters: "n", charactersIgnoringModifiers: "n", isARepeat: false, keyCode: 45)))
+            try await settle(h) { noteVisible(h) }
+            try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
+            let note = try #require(editor(in: h))
+            h.window.makeFirstResponder(note)
+            try escape(to: note, in: h)
+            try await settle(h) { !noteVisible(h) && ReaderKeyboardCommands.isInOriginalPage(h.window.firstResponder) }
+            try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
+            #expect(ReaderKeyboardCommands.isInOriginalPage(h.window.firstResponder))           // the list's return does not take it
+            try escape(to: try #require(h.window.firstResponder as? NSView), in: h)
+            try await settle(h) { !ReaderKeyboardCommands.isInOriginalPage(h.window.firstResponder) && h.window.firstResponder === list }
+            #expect(list.selectedRow == 1)
+        }
+
         /// Decision 0050 point 1: with the note open, `j` / `k` move the article and the note stays open.
         @Test func jAndKMoveTheArticleWithTheNoteOpen() async throws {
             let h = try harness()

@@ -51,6 +51,9 @@ final class NoteTextView: NSTextView {
                              userInfo: [.announcement: String(localized: "Sent to note", bundle: ReaderLocalization.bundle), .priority: NSAccessibilityPriorityLevel.medium.rawValue])
     }
 
+    /// The window the editor is in; the reader has no other way to it while the window is not the key window.
+    var window: NSWindow? { coordinator?.textView?.window }
+
     /// False while no editor is shown or text is being composed in it.
     var canInsert: Bool { coordinator?.canInsert ?? false }
 
