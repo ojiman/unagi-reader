@@ -87,8 +87,8 @@ extension ReaderStore {
     @discardableResult func removeContent(articleIDs: [UUID], at: Date) throws -> Bool {
         try reloadIfNeeded()
         let ids = Set(articleIDs)
-        let selected = articles.filter { ids.contains($0.id) }
-        let snapshots = try context.fetch(FetchDescriptor<ContentSnapshot>())
+        let selected = ids.compactMap { article(id: $0) }
+        let snapshots = try context.fetch(FetchDescriptor<ContentSnapshot>(predicate: #Predicate { articleIDs.contains($0.articleID) }))
         var changed = false
         for article in selected {
             if article.contentDeletedAt == nil || !article.summary.isEmpty || article.imageURL != nil {
@@ -96,7 +96,7 @@ extension ReaderStore {
                 article.summary = ""; article.imageURL = nil; changed = true
             }
         }
-        for snapshot in snapshots where ids.contains(snapshot.articleID) {
+        for snapshot in snapshots {
             context.delete(snapshot); changed = true
         }
         return changed
