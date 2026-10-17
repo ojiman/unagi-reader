@@ -16,6 +16,30 @@ UNAGI_READER_FIRST_REFRESH_FEEDS=200 swift test -c release \
 # Repeat with 1000 and 2000, one process at a time; --skip-build after the first build.
 ```
 
+The uninstrumented after replay, focused/full regression runs and packaged app used the production and regression-test sources committed as `dd090c365e71f58058a1daa3abdc66ee526f967c`. Temporary timing prints were removed before the full regression run and app build. The fixture-export helper was temporary, was not committed, and changed no production source. Later commits to this record do not change the measured runtime code.
+
+After/regression commands (the focused build preceded the `--skip-build` replays):
+
+```sh
+swift test -c release --scratch-path /private/tmp/unagi-303-before-build \
+  --force-resolved-versions --disable-keychain --disable-netrc \
+  --filter 'RefreshIndexTests|RefreshBatchTests|ContentRetentionTests|ImportFeedLookupTests'
+# Each count in a separate process, with no other build or test running:
+UNAGI_READER_FIRST_REFRESH_FEEDS=200 swift test -c release --skip-build \
+  --scratch-path /private/tmp/unagi-303-before-build \
+  --filter FirstRefreshPerformanceTests/firstRefreshAfterOPMLImport
+# Repeat with 1000 and 2000.
+swift test -c release --scratch-path /private/tmp/unagi-303-before-build \
+  --force-resolved-versions --disable-keychain --disable-netrc \
+  --skip 'ArticleFilterStoreTests/tenThousandArticlesAreNarrowedQuickly'
+swift test -c release --skip-build --scratch-path /private/tmp/unagi-303-before-build \
+  --filter 'ArticleFilterStoreTests/tenThousandArticlesAreNarrowedQuickly'
+# For each successful regression log:
+bash scripts/check-test-log.sh <log>
+bash scripts/build-app.sh release
+bash scripts/make-synthetic-copy.sh
+```
+
 ## Before and after
 
 | Feeds | Before refresh | Before longest delay | Before peak RSS | After refresh | After longest delay | After peak RSS |
@@ -30,4 +54,11 @@ A separate instrumented after run at 2,000 feeds took 85.607 s, with 320.926 ms 
 
 ## Regression and acceptance
 
-The focused Release run passed 27 tests in four suites (`RefreshIndexTests`, `RefreshBatchTests`, `ContentRetentionTests`, `ImportFeedLookupTests`), checked with `scripts/check-test-log.sh`. Expected injected save failures are logged; no continuation-misuse diagnostic was present. The full Release run finished 171 UI and 300 core tests; five opt-in tests were skipped (the first-refresh replay was run separately above). The separately timed filter test passed at 15.601 ms. Both logs passed the completion checker. No continuation-misuse diagnostic was present. Temporary-store CoreData I/O diagnostics also occur in the pre-change main CI and are tracked separately in #314; intentional corrupt-store/save-failure diagnostics remain. Pending: fixed-commit independent review, CI on Swift 6.3.3/macOS 26.6, and a synthetic packaged-app check. The core heartbeat cannot establish that reading and typing remain responsive in the app. Issue #303 stays open until the remaining failures and acceptance checks are resolved. Existing-library performance (#252), reading stalls (#249), launch (#250), Japanese input, VoiceOver and Reduce Motion are separate acceptance work.
+The focused Release run passed 27 tests in four suites (`RefreshIndexTests`, `RefreshBatchTests`, `ContentRetentionTests`, `ImportFeedLookupTests`), checked with `scripts/check-test-log.sh`. Expected injected save failures are logged; no continuation-misuse diagnostic was present. The full Release run finished 171 UI and 300 core tests; five opt-in tests were skipped (the first-refresh replay was run separately above). The separately timed filter test passed at 15.601 ms. Both logs passed the completion checker. No continuation-misuse diagnostic was present. Temporary-store CoreData I/O diagnostics also occur in the pre-change main CI and are tracked separately in #314; intentional corrupt-store/save-failure diagnostics remain. A separate agent reviewed fixed commit `dd090c3` against `7411fb1`, using the review checklist: no code blocker found. Its evidence-provenance finding is addressed by the source revision and commands above. It did not rerun tests, observe the app or exercise CI, and this was not OS-enforced read-only isolation. CI on Swift 6.3.3/macOS 26.6 is tracked by this branch’s PR checks; local results do not establish that environment. The core heartbeat cannot establish that reading and typing remain responsive in the app. Issue #303 stays open until the remaining failures and acceptance checks are resolved. Existing-library performance (#252), reading stalls (#249), launch (#250), Japanese input, VoiceOver and Reduce Motion are separate acceptance work.
+
+
+## Synthetic packaged app
+
+The Release build and ad hoc signature verification passed. The synthetic-copy helper supplied its own bundle ID and data directory; process arguments were checked before interaction. A temporary export used the real OPML importer to add 200 localhost subscriptions beside six demo articles. Native UI automation observed the synthetic subscriptions and the refreshing status, sent `j`, `j`, `k`, opened the note, and typed while the stub still had unfinished feeds (54/200 had completed at the successful input check). The first attempt combined a note click and immediate typing and lost three `t` characters in the AX result. Single-key and later synchronized input worked. This unresolved automation/app observation is tracked in #315; it prevents claiming immediate-input acceptance.
+
+After explicitly observing note focus, typing `Synthetic refresh typing.` matched exactly. The stub was then released to finish quickly. The UI reached 5,006 articles and further `j` navigation displayed the next demo article. After quitting, a read-only check of the synthetic SQLite store confirmed 203 subscriptions (200 fetched), 5,006 articles and memberships, two read articles and one note with that exact text. No app process was left running. This establishes the observed operations and persistence, not a window latency bound or large-scale typing acceptance. Japanese input, VoiceOver, Reduce Motion and long use were not checked.
