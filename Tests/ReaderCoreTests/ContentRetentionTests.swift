@@ -24,6 +24,36 @@ import SwiftData
         #expect(try store.availableContentExpiries(at: read)[article.id] == start.addingTimeInterval(31 * day))
         #expect(try store.content(articleID: article.id, at: start.addingTimeInterval(31 * day)) == nil)
     }
+    /// #250: the preview reads only the bodies of expired articles; the selection and the counts stay as before.
+    @Test func previewSelectsTheSameArticlesWhenItReadsOnlyExpiredBodies() throws {
+        let library = try TestLibrary(); defer { library.cleanup() }
+        let container = try ModelContainer(for: ReaderStore.schema, configurations: [
+            ModelConfiguration("Reader", schema: ReaderStore.schema, url: library.url, cloudKitDatabase: .none)])
+        let context = ModelContext(container); context.autosaveEnabled = false
+        let feed = Feed(title: "Feed", symbol: "dot.radiowaves.left.and.right"); context.insert(feed)
+        func add(_ title: String, summary: String, body: String?, receivedAt: Date) -> Article {
+            let article = Article(feedID: feed.id, title: title, summary: summary, publisher: "", publishedAt: receivedAt, receivedAt: receivedAt)
+            context.insert(article)
+            if let body { context.insert(ContentSnapshot(articleID: article.id, text: body, coverage: .feedProvided, bodyParagraphs: nil)) }
+            return article
+        }
+        let old = start.addingTimeInterval(-40 * day)
+        let fresh = add("fresh", summary: "s", body: "body", receivedAt: start)
+        let summaryOnly = add("summary", summary: "s", body: nil, receivedAt: old)
+        let bodyOnly = add("body", summary: "", body: "body", receivedAt: old)
+        let empty = add("empty", summary: "", body: "", receivedAt: old)
+        let many = (0..<1_500).map { add("many \($0)", summary: "", body: "body", receivedAt: old) }
+        try context.save()
+        // Opened at a time when nothing has expired yet, so the opening purge keeps everything.
+        let store = try ReaderStore(container: container, now: old)
+        let preview = try store.previewDeletion(days: nil, at: start)
+        let selected = Set(preview.articleIDs)
+        #expect(!selected.contains(fresh.id) && !selected.contains(empty.id))
+        #expect(selected.contains(summaryOnly.id) && selected.contains(bodyOnly.id))
+        #expect(selected.isSuperset(of: many.map(\.id)) && selected.count == 1_502)
+        #expect(preview.bodyCount == 1_501 && preview.summaryCount == 1)
+        #expect(preview.articleIDs == store.articles.map(\.id).filter(selected.contains))
+    }
     @Test func previewDoesNotMutateAndShorteningCommitsOnce() throws {
         let library = try TestLibrary(); defer { library.cleanup() }
         let store = try ReaderStore(url: library.url, now: start)
