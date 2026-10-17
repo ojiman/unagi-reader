@@ -16,7 +16,8 @@ import SwiftData
     /// The title and summary of each article, for the list filter (`filteredIDs`). Dropped on each reload.
     @ObservationIgnored var searchTexts: [UUID: String] = [:]
     @ObservationIgnored private var feedIndex: [UUID: Feed] = [:]
-    @ObservationIgnored private var feedArticles: [UUID: [Article]] = [:]
+    @ObservationIgnored private var publishedDates: [UUID: Date] = [:]
+    @ObservationIgnored var refreshEntryIndex: EntryIndex?
     @ObservationIgnored private var articleFeeds: [UUID: Set<UUID>] = [:]
     public private(set) var articleIDs: [UUID] = []
     @ObservationIgnored private var feedArticleIDs: [UUID: [UUID]] = [:]
@@ -70,6 +71,7 @@ import SwiftData
 
     func reload() throws {
         needsReload = true
+        refreshEntryIndex = nil
         try reloadHook?()
         contentRevision += 1
         settings = try context.fetch(FetchDescriptor<ReaderSettings>()).first
@@ -83,13 +85,14 @@ import SwiftData
         articleIndex = Dictionary(uniqueKeysWithValues: articles.map { ($0.id, $0) })
         searchTexts = [:]
         feedIndex = Dictionary(uniqueKeysWithValues: feeds.map { ($0.id, $0) })
-        feedArticles = [:]
+        var feedArticles: [UUID: [Article]] = [:]
         articleFeeds = [:]
         for membership in memberships { articleFeeds[membership.articleID, default: []].insert(membership.feedID) }
         for article in articles {
             for feedID in articleFeeds[article.id] ?? [] { feedArticles[feedID, default: []].append(article) }
         }
         articleIDs = articles.map(\.id)
+        publishedDates = Dictionary(uniqueKeysWithValues: articles.map { ($0.id, $0.publishedAt) })
         feedArticleIDs = feedArticles.mapValues { $0.map(\.id) }
         folderIndex = [:]
         for article in articles {
@@ -99,6 +102,75 @@ import SwiftData
         refreshUnreadCounts()
         refreshStarIndex()
         needsReload = false
+    }
+
+    /// Publish only saved changes. Full reloads invalidate the lookup cache, including after a failed save or publication.
+    func publishRefresh(index: EntryIndex?, titlesChanged: Bool) throws {
+        needsReload = true
+        try reloadHook?()
+        defer { needsReload = false }
+        guard let index else { return } // A 304 changes fetch metadata only.
+        let previousFeeds = Dictionary(uniqueKeysWithValues: index.changedArticles.keys.map { ($0, articleFeeds[$0] ?? []) })
+        memberships.append(contentsOf: index.newMemberships)
+        for membership in index.newMemberships {
+            articleFeeds[membership.articleID, default: []].insert(membership.feedID)
+        }
+        var reordered: [UUID] = []
+        var feedUpdates: [UUID: [UUID]] = [:], folderUpdates: [String: [UUID]] = [:]
+        for (id, article) in index.changedArticles {
+            let isNew = articleIndex[id] == nil
+            let date = article.publishedAt
+            let moved = isNew || publishedDates[id] != date
+            publishedDates[id] = date
+            articleIndex[id] = article
+            searchTexts[id] = nil
+            if moved { reordered.append(id) }
+            if isNew {
+                if !article.isRead { unreadIDs.insert(id); unreadCount += 1 }
+                if article.starredAt != nil { starredIDs.insert(id); starCount += 1 }
+            }
+            let oldFeeds = previousFeeds[id] ?? []
+            let oldFolders = Set(oldFeeds.compactMap { feedIndex[$0]?.folder })
+            let currentFeeds = articleFeeds[id] ?? []
+            let currentFolders = Set(currentFeeds.compactMap { feedIndex[$0]?.folder })
+            for feedID in currentFeeds {
+                let joined = !oldFeeds.contains(feedID)
+                if moved || joined { feedUpdates[feedID, default: []].append(id) }
+                if joined { feedUnreadCounts[feedID, default: 0] += article.isRead ? 0 : 1 }
+            }
+            for folder in currentFolders {
+                let joined = !oldFolders.contains(folder)
+                if moved || joined { folderUpdates[folder, default: []].append(id) }
+                if joined { folderUnreadCounts[folder, default: 0] += article.isRead ? 0 : 1 }
+            }
+        }
+        if !reordered.isEmpty {
+            articleIDs = orderedIDs(articleIDs, updating: reordered)
+            articles = articleIDs.compactMap { articleIndex[$0] }
+        }
+        for (feedID, ids) in feedUpdates { feedArticleIDs[feedID] = orderedIDs(feedArticleIDs[feedID] ?? [], updating: ids) }
+        for (folder, ids) in folderUpdates { folderIndex[folder] = orderedIDs(folderIndex[folder] ?? [], updating: ids) }
+        if titlesChanged { feeds.sort(using: SortDescriptor(\.title)) }
+        if !index.changedArticles.isEmpty { contentRevision += 1 }
+        index.changedArticles.removeAll(keepingCapacity: true)
+        index.newMemberships.removeAll(keepingCapacity: true)
+    }
+
+    /// Both lists are already ordered apart from the affected IDs; compare cached dates, without reading every SwiftData model again.
+    private func orderedIDs(_ ids: [UUID], updating: [UUID]) -> [UUID] {
+        let changed = Set(updating)
+        let kept = ids.filter { !changed.contains($0) }
+        let added = updating.sorted { publishedDates[$0, default: .distantPast] > publishedDates[$1, default: .distantPast] }
+        var result: [UUID] = []
+        result.reserveCapacity(kept.count + added.count)
+        var i = 0, j = 0
+        while i < kept.count && j < added.count {
+            if publishedDates[kept[i], default: .distantPast] >= publishedDates[added[j], default: .distantPast] {
+                result.append(kept[i]); i += 1
+            } else { result.append(added[j]); j += 1 }
+        }
+        result.append(contentsOf: kept[i...]); result.append(contentsOf: added[j...])
+        return result
     }
 
     func reloadIfNeeded() throws {
@@ -114,6 +186,7 @@ import SwiftData
     public func feed(id: UUID) -> Feed? { feedIndex[id] }
     public func visibleArticleIDs(feedID: UUID?, unreadOnly: Bool, keeping: UUID?) -> [UUID] {
         // Observe one array/count rather than registering every SwiftData Article.id getter.
+        _ = contentRevision
         let all = articleIDs
         let values = feedID.map { feedArticleIDs[$0] ?? [] } ?? all
         guard unreadOnly else { return values }
@@ -123,7 +196,7 @@ import SwiftData
     private func refreshUnreadCounts() {
         unreadCount = articles.filter { !$0.isRead }.count
         unreadIDs = Set(articles.filter { !$0.isRead }.map(\.id))
-        feedUnreadCounts = feedArticles.mapValues { $0.filter { !$0.isRead }.count }
+        feedUnreadCounts = feedArticleIDs.mapValues { $0.filter { unreadIDs.contains($0) }.count }
         folderUnreadCounts = folderIndex.mapValues { $0.filter { unreadIDs.contains($0) }.count }
     }
     private func updateUnreadCounts(_ article: Article, wasRead: Bool) {
@@ -144,9 +217,9 @@ import SwiftData
 
     @discardableResult public func importFeed(_ parsed: ParsedFeed, receivedAt: Date = .now, folder: String? = nil) throws -> Feed {
         try reloadIfNeeded()
-        var index = EntryIndex(articles: articles, memberships: memberships)
+        let index = EntryIndex(articles: articles, memberships: memberships)
         do {
-            let feed = try merge(parsed, receivedAt: receivedAt, folder: folder, index: &index)
+            let feed = try merge(parsed, receivedAt: receivedAt, folder: folder, index: index)
             try save()
             try reload()
             return feed
@@ -154,7 +227,7 @@ import SwiftData
     }
 
     /// Adds or updates the feed and its entries in the context, without saving. The feeds of one refresh batch share `index`.
-    func merge(_ parsed: ParsedFeed, receivedAt: Date, folder: String?, index: inout EntryIndex) throws -> Feed {
+    func merge(_ parsed: ParsedFeed, receivedAt: Date, folder: String?, index: EntryIndex) throws -> Feed {
         let feed = feeds.first { $0.sourceURL == parsed.sourceURL.absoluteString } ?? Feed(title: parsed.title, symbol: "dot.radiowaves.left.and.right")
         context.insert(feed)
         feed.sourceURL = parsed.sourceURL.absoluteString
@@ -190,7 +263,9 @@ import SwiftData
                 }
             } else if available && !entry.body.isEmpty { context.insert(ContentSnapshot(articleID: id, text: entry.body, coverage: entry.coverage, bodyParagraphs: entry.bodyParagraphs)) }
             if index.join(feedID: feed.id, articleID: id, sourceID: entry.sourceID) {
-                context.insert(FeedMembership(feedID: feed.id, articleID: id, sourceID: entry.sourceID))
+                let membership = FeedMembership(feedID: feed.id, articleID: id, sourceID: entry.sourceID)
+                context.insert(membership)
+                index.newMemberships.append(membership)
             }
         }
         return feed
@@ -305,8 +380,10 @@ public enum ReaderNavigation {
 }
 
 /// Where an entry's article is, looked up instead of scanned (#131): built once from the library, then kept up to date by every
-/// change of the same import or refresh batch. The first article with an identity wins, as the scans did.
-struct EntryIndex {
+/// change until a full reload invalidates it. The first article with an identity wins, as the scans did.
+final class EntryIndex {
+    var changedArticles: [UUID: Article] = [:]
+    var newMemberships: [FeedMembership] = []
     private var articleByID: [UUID: Article] = [:]
     private var articleByIdentity: [String: Article] = [:]
     private var priorArticleID: [UUID: [String: UUID]] = [:]
@@ -323,14 +400,15 @@ struct EntryIndex {
     func article(identity: String, feedID: UUID, sourceID: String) -> Article? {
         articleByIdentity[identity] ?? priorArticleID[feedID]?[sourceID].flatMap { articleByID[$0] }
     }
-    mutating func add(_ article: Article) { articleByID[article.id] = article }
-    mutating func update(_ article: Article, from oldIdentity: String?) {
+    func add(_ article: Article) { articleByID[article.id] = article }
+    func update(_ article: Article, from oldIdentity: String?) {
+        changedArticles[article.id] = article
         guard article.identityKey != oldIdentity else { return }
         if let oldIdentity, articleByIdentity[oldIdentity]?.id == article.id { articleByIdentity[oldIdentity] = nil }
         if let key = article.identityKey, articleByIdentity[key] == nil { articleByIdentity[key] = article }
     }
     /// True when the feed did not have the article yet.
-    mutating func join(feedID: UUID, articleID: UUID, sourceID: String) -> Bool {
+    func join(feedID: UUID, articleID: UUID, sourceID: String) -> Bool {
         guard members[feedID, default: []].insert(articleID).inserted else { return false }
         if priorArticleID[feedID, default: [:]][sourceID] == nil { priorArticleID[feedID, default: [:]][sourceID] = articleID }
         return true

@@ -3,10 +3,10 @@ import SwiftData
 import Testing
 @testable import ReaderCore
 
-/// The refresh applies fetched feeds in batches: one save and one list reload for several feeds, not two of each per feed (#131).
+/// The refresh applies fetched feeds in batches: one save and one committed list update for several feeds, not two of each per feed (#131).
 @MainActor struct RefreshBatchTests {
     private final class Counter: @unchecked Sendable {
-        nonisolated(unsafe) var saves = 0, reloads = 0
+        nonisolated(unsafe) var saves = 0, publications = 0
         nonisolated(unsafe) var failingSaves = 0, failingReloads = 0
     }
     private struct Library {
@@ -23,7 +23,7 @@ import Testing
             counter.saves += 1
             if counter.failingSaves > 0 { counter.failingSaves -= 1; throw CocoaError(.fileWriteUnknown) }
         }, reloadHook: {
-            counter.reloads += 1
+            counter.publications += 1
             if counter.failingReloads > 0 { counter.failingReloads -= 1; throw CocoaError(.fileReadUnknown) }
         })
         let list = (0..<count).map { OPMLFeed(title: "F\($0)", url: URL(string: "https://f\($0).example/feed")!, siteURL: nil, folder: "") }
@@ -37,16 +37,16 @@ import Testing
     /// Full batches and the rest when the last fetch ends.
     private func batches(_ feeds: Int) -> Int { (feeds + FeedRefreshController.batchSize - 1) / FeedRefreshController.batchSize }
 
-    @Test func manyFeedsAreSavedAndReloadedOncePerBatch() async throws {
+    @Test func manyFeedsAreSavedAndPublishedOncePerBatch() async throws {
         let counter = Counter()
         let library = try library(feeds: 25, counter: counter); defer { try? FileManager.default.removeItem(at: library.directory) }
         let refresh = FeedRefreshController(store: library.store, client: FeedClient(http: StubFeeds()), batchDelay: longDelay)
-        counter.saves = 0; counter.reloads = 0
+        counter.saves = 0; counter.publications = 0
         await refresh.refresh(feedIDs: library.ids)
         #expect(library.store.articles.count == 25 * 3 && refresh.errors.isEmpty)
         #expect(library.store.feeds.allSatisfy { $0.lastFetchedAt != nil && $0.etag == "v1" && $0.title == "Feed \($0.sourceURL ?? "")" })
-        // Before batching: two saves and two reloads for every feed (50 each).
-        #expect(counter.saves == batches(25) && counter.reloads == batches(25), "saves \(counter.saves), reloads \(counter.reloads)")
+        // Before batching: two saves and two publications for every feed (50 each).
+        #expect(counter.saves == batches(25) && counter.publications == batches(25), "saves \(counter.saves), publications \(counter.publications)")
     }
     @Test func unchangedFeedsAreRecordedInBatchesToo() async throws {
         let counter = Counter()
@@ -54,10 +54,10 @@ import Testing
         let refresh = FeedRefreshController(store: library.store, client: FeedClient(http: StubFeeds()), batchDelay: longDelay)
         await refresh.refresh(feedIDs: library.ids)
         let first = Dictionary(uniqueKeysWithValues: library.store.feeds.map { ($0.id, $0.lastFetchedAt) })
-        counter.saves = 0; counter.reloads = 0
+        counter.saves = 0; counter.publications = 0
         await refresh.refresh(feedIDs: library.ids, at: .now.addingTimeInterval(60))     // every feed answers 304
         #expect(library.store.feeds.allSatisfy { $0.lastFetchedAt != first[$0.id] } && library.store.articles.count == 75)
-        #expect(counter.saves == batches(25) && counter.reloads == batches(25), "saves \(counter.saves), reloads \(counter.reloads)")   // was 25 each
+        #expect(counter.saves == batches(25) && counter.publications == batches(25), "saves \(counter.saves), publications \(counter.publications)")   // was 25 each
     }
     @Test func anArticleTwoFeedsCarryInOneBatchIsOneArticleInBoth() async throws {
         let counter = Counter()
@@ -85,7 +85,7 @@ import Testing
         await refresh.refresh(feedIDs: library.ids)
         #expect(refresh.errors.count == 1 && library.store.articles.count == 2 * 3)
     }
-    @Test func aBatchSavedButNotReloadedShowsItsErrorAndTheNextRefreshWorks() async throws {
+    @Test func aBatchSavedButNotPublishedShowsItsErrorAndTheNextRefreshWorks() async throws {
         let counter = Counter()
         let library = try library(feeds: 3, counter: counter); defer { try? FileManager.default.removeItem(at: library.directory) }
         let refresh = FeedRefreshController(store: library.store, client: FeedClient(http: StubFeeds()), batchDelay: longDelay)

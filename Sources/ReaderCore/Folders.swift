@@ -2,7 +2,7 @@ import Foundation
 
 extension ReaderStore {
     public func folderArticleIDs(folder: String, keeping: UUID?) -> [UUID] {
-        _ = feeds
+        _ = contentRevision
         let values = folderIndex[folder] ?? []
         guard let keeping, !values.contains(keeping), article(id: keeping) != nil else { return values }
         let members = Set(values)
