@@ -28,9 +28,18 @@ struct SubscriptionRow: View, Equatable {
     let reduceMotion: Bool
     let imageLoader: ReaderImageLoader
     let actions: Actions
+    /// Which model the row holds: save recovery makes a new one for the same subscription, and the icon must observe the new one (#333).
+    private let feedInstance: ObjectIdentifier
+
+    init(feed: Feed, feedID: UUID, title: String, folder: String, folders: [String], unread: Int, error: String?, editing: String?, moving: Bool,
+         reduceMotion: Bool, imageLoader: ReaderImageLoader, actions: Actions) {
+        self.feed = feed; self.feedID = feedID; self.title = title; self.folder = folder; self.folders = folders; self.unread = unread
+        self.error = error; self.editing = editing; self.moving = moving; self.reduceMotion = reduceMotion; self.imageLoader = imageLoader
+        self.actions = actions; feedInstance = ObjectIdentifier(feed)
+    }
 
     nonisolated static func == (a: Self, b: Self) -> Bool {
-        a.feedID == b.feedID && a.title == b.title && a.folder == b.folder && a.folders == b.folders && a.unread == b.unread
+        a.feedID == b.feedID && a.feedInstance == b.feedInstance && a.title == b.title && a.folder == b.folder && a.folders == b.folders && a.unread == b.unread
             && a.error == b.error && a.editing == b.editing && a.moving == b.moving && a.reduceMotion == b.reduceMotion && a.imageLoader === b.imageLoader
     }
 
