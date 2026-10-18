@@ -136,6 +136,14 @@ struct TranslationHost: View {
     }
 }
 
+/// An empty view that lets a modifier find its window when a key arrives (#315).
+struct WindowAnchor: NSViewRepresentable {
+    @MainActor final class Reference { weak var view: NSView? }
+    let reference: Reference
+    func makeNSView(context: Context) -> NSView { let view = NSView(); reference.view = view; return view }
+    func updateNSView(_ view: NSView, context: Context) { reference.view = view }
+}
+
 /// The translation status: short text at the left of the article band (specification 3.6, decision 0057).
 struct TranslationStatusRow: View {
     let state: ArticleTranslation.State
@@ -218,6 +226,7 @@ struct ArticleTranslationPresentation: ViewModifier {
     @AppStorage(TranslationTarget.key) private var storedTarget = ""
     @State private var supportedTargets: [String] = []
     @State private var targetsLoaded = false
+    @State private var window = WindowAnchor.Reference()
 
     private func updateTarget() {
         guard targetsLoaded else { return }
@@ -237,11 +246,18 @@ struct ArticleTranslationPresentation: ViewModifier {
     func body(content view: Content) -> some View {
         view
             .background(TranslationHost(controller: controller))
+            .background(WindowAnchor(reference: window).frame(width: 0, height: 0).accessibilityHidden(true))
             .task { supportedTargets = await controller.availableTargets(); targetsLoaded = true; updateTarget() }
             .onChange(of: storedTarget) { _, _ in updateTarget() }
             .onReceive(NotificationCenter.default.publisher(for: NSLocale.currentLocaleDidChangeNotification)) { _ in updateTarget() }
             .focusedSceneValue(\.translateArticle, command)
-            .onKeyPress("t") { guard keysEnabled, canTranslate else { return .ignored }; toggle(); return .handled }
+            // `keysEnabled` was decided when the window was last drawn. Where the keyboard is now is read here, at the key: the note's editor
+            // can have it although the window was not drawn again (#315), and its `t` is a letter.
+            .onKeyPress("t") {
+                let responder = (window.view?.window ?? NSApp.keyWindow)?.firstResponder
+                guard keysEnabled, !ReaderKeyboardCommands.isTextInput(responder), !ReaderKeyboardCommands.hasMarkedText(responder), canTranslate else { return .ignored }
+                toggle(); return .handled
+            }
             .onChange(of: articleID) { _, _ in controller.reset() }
             .onChange(of: content) { _, new in
                 if let new, let title, new.articleID == articleID { controller.contentChanged(title: title, content: new) }
