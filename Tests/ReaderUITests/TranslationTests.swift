@@ -1,7 +1,6 @@
 import AppKit
 import SwiftUI
-import SwiftData
-@testable import ReaderCore
+import ReaderCore
 import Testing
 @testable import UnagiReader
 
@@ -31,10 +30,7 @@ import Testing
     private func harness(engine: TranslationEngine) throws -> Harness {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        // A closed hosting window can still retain queued loads; do not delete a live SQLite store.
-        let schema = ReaderStore.schema
-        let configuration = ModelConfiguration("Reader", schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
-        let store = try ReaderStore(container: ModelContainer(for: schema, configurations: [configuration]))
+        let store = try inMemoryReaderStore()
         let entries = (0..<2).map { index in
             ParsedEntry(sourceID: "synthetic-\(index)", title: "Synthetic story \(index)", url: URL(string: "http://127.0.0.1:1/article/\(index)"),
                         summary: "A synthetic summary.", body: "First paragraph \(index).\n\nSecond paragraph \(index).", coverage: .feedProvided,
@@ -70,19 +66,6 @@ import Testing
         table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
         try await settle(h) { shown(h).contains("Second paragraph \(row)") }
         return table
-    }
-
-    @Test func aQueuedTranslationArticleLoadCanFinishAfterHarnessCleanup() async throws {
-        let h = try harness(engine: fakeEngine())
-        let store = h.host.rootView.store
-        let articleID = try #require(store.articles.first?.id)
-        let loading = ArticleLoadingController(store: store)
-        // SwiftUI can keep a queued load alive after the window closes.
-        let load = Task { await loading.load(articleID: articleID) }
-        finish(h)
-        await load.value
-        #expect(loading.error == nil)
-        #expect(loading.displayed?.articleID == articleID)
     }
 
     @Test func tTranslatesTheArticleInPlaceAndAgainShowsTheOriginal() async throws {

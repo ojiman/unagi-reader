@@ -22,10 +22,7 @@ extension SplitViewFoldTests {
         private func harness(noteOpen: Bool = false, listShown: Bool = false) throws -> Harness {
             let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            // A closed hosting window can still retain queued note actions; do not delete a live SQLite store.
-            let schema = ReaderStore.schema
-            let configuration = ModelConfiguration("Reader", schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
-            let store = try ReaderStore(container: ModelContainer(for: schema, configurations: [configuration]))
+            let store = try inMemoryReaderStore()
             let entries = (0..<3).map { index in
                 ParsedEntry(sourceID: "synthetic-\(index)", title: "合成記事 \(index)", url: URL(string: "http://127.0.0.1:1/article/\(index)"), summary: "合成要約", body: "合成本文", coverage: .feedProvided, publishedAt: .now.addingTimeInterval(Double(-index)))
             }
@@ -80,13 +77,20 @@ extension SplitViewFoldTests {
             #expect(list.keyHandler?(key) == true)
         }
 
-        @Test func aQueuedNoteBesideSaveCanFinishAfterHarnessCleanup() async throws {
-            let h = try harness()
-            // SwiftUI can keep a queued note action alive after the window closes.
-            let save = Task { try h.store.saveNote(text: "Queued synthetic note", at: .now) }
+        @Test func theHostedEditorCanSaveAQueuedEditAfterHarnessCleanup() async throws {
+            let h = try harness(noteOpen: true)
+            defer { finish(h) }
+            try await settle(h) { editor(in: h) != nil }
+            let view = try #require(editor(in: h))
+            // Deliver a queued edit through the retained hosted editor after its scratch directory is gone.
+            let edit = Task {
+                view.insertText("Queued synthetic note", replacementRange: NSRange(location: 0, length: (view.string as NSString).length))
+            }
             finish(h)
-            try await save.value
-            #expect(h.store.note?.text == "Queued synthetic note")
+            await edit.value
+            #expect(view.string == "Queued synthetic note")
+            let context = ModelContext(h.store.context.container)
+            #expect(try context.fetch(FetchDescriptor<Note>()).first?.text == "Queued synthetic note")
         }
 
         @Test func nOpensTheNoteBesideTheArticleAndFoldsTheSidebarAndTheList() async throws {

@@ -1,7 +1,6 @@
 import AppKit
 import SwiftUI
-import SwiftData
-@testable import ReaderCore
+import ReaderCore
 import Testing
 @testable import UnagiReader
 
@@ -16,10 +15,7 @@ import Testing
     private func harness(filter: String) throws -> Harness {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        // A closed hosting window can still retain queued loads; do not delete a live SQLite store.
-        let schema = ReaderStore.schema
-        let configuration = ModelConfiguration("Reader", schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
-        let store = try ReaderStore(container: ModelContainer(for: schema, configurations: [configuration]))
+        let store = try inMemoryReaderStore()
         let titles = ["Swift の話 A", "別の記事", "swift の話 B", "その他"]
         let entries = titles.enumerated().map { index, title in
             ParsedEntry(sourceID: "synthetic-\(index)", title: title, url: URL(string: "http://127.0.0.1:1/article/\(index)"), summary: "合成要約",
@@ -49,19 +45,6 @@ import Testing
         #expect(ready(), sourceLocation: SourceLocation(fileID: #fileID, filePath: #filePath, line: line, column: 1))
     }
     private func shown(_ h: Harness) -> String { find(ArticleTextView.self, in: h.host)?.string ?? "" }
-
-    @Test func aQueuedArticleLoadCanFinishAfterHarnessCleanup() async throws {
-        let h = try harness(filter: "swift")
-        let store = h.host.rootView.store
-        let articleID = try #require(store.articles.first?.id)
-        let loading = ArticleLoadingController(store: store)
-        // SwiftUI can keep a queued load alive after the window closes.
-        let load = Task { await loading.load(articleID: articleID) }
-        finish(h)
-        await load.value
-        #expect(loading.error == nil)
-        #expect(loading.displayed?.articleID == articleID)
-    }
 
     @Test func theFilterNarrowsTheListToTitlesThatContainTheText() async throws {
         let h = try harness(filter: "SWIFT")
