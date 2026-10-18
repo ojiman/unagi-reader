@@ -73,6 +73,7 @@ struct ReaderView: View {
     }
 
     private var selectedExpiry: Date? {
+        _ = store.readRevision                                      // a read mark changes `firstReadAt` without notifying the article
         guard let article = selectedArticle, article.contentDeletedAt == nil else { return nil }
         return RetentionPolicy(days: store.retentionDays).expiresAt(receivedAt: article.firstReceivedAt, firstReadAt: article.firstReadAt)
     }

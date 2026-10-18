@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import ReaderCore
 
@@ -43,6 +44,56 @@ struct TestLibrary {
         _ = try store.importFeed(parsed(), receivedAt: received.addingTimeInterval(500))
         #expect(article.firstReadAt == displayed)
         #expect(article.firstReceivedAt == received)
+    }
+
+    /// #249: the read mark is written through a small context, so it does not walk the whole library and does not commit anything else.
+    @Test func aReadMarkDoesNotCommitAnUnrelatedPendingChange() throws {
+        let library = try TestLibrary(); defer { library.cleanup() }
+        let store = try ReaderStore(url: library.url, seedDemo: true, now: displayed)
+        let read = try #require(store.articles.first), other = try #require(store.articles.last)
+        let otherID = other.id, originalTitle = other.title
+        other.title = "An unrelated, unsaved change"
+        try store.markDisplayed(articleID: read.id, at: displayed)
+        let reopened = try ReaderStore(url: library.url, now: displayed)
+        #expect(reopened.article(id: read.id)?.firstReadAt == displayed)
+        #expect(reopened.article(id: otherID)?.title == originalTitle)
+    }
+
+    /// The shown article takes the saved values, and the store's read revision tells the views (a refetch does not notify the model).
+    @Test func aReadMarkUpdatesTheShownArticleAndTheReadRevision() throws {
+        let library = try TestLibrary(); defer { library.cleanup() }
+        let store = try ReaderStore(url: library.url, now: displayed)
+        _ = try store.importFeed(parsed(), receivedAt: received)
+        let article = try #require(store.articles.first)
+        let revision = store.readRevision, unread = store.unreadCount
+        try store.markDisplayed(articleID: article.id, at: displayed)
+        #expect(article.isRead && article.firstReadAt == displayed)
+        #expect(store.unreadCount == unread - 1 && store.readRevision == revision + 1)
+        #expect(!store.context.hasChanges)
+    }
+
+    final class SaveGate { var failNext = false }
+
+    /// A failed read mark is not shown as read and is not saved; the next one works.
+    @Test func aFailedReadMarkIsNotShownAndCanBeRetried() throws {
+        let library = try TestLibrary(); defer { library.cleanup() }
+        let gate = SaveGate()
+        let schema = ReaderStore.schema
+        let container = try ModelContainer(for: schema, configurations: [
+            ModelConfiguration("Reader", schema: schema, url: library.url, cloudKitDatabase: .none)])
+        let store = try ReaderStore(container: container, now: displayed, saveHook: {
+            if gate.failNext { gate.failNext = false; throw CocoaError(.fileWriteUnknown) }
+        })
+        _ = try store.importFeed(parsed(), receivedAt: received)
+        let id = try #require(store.articles.first?.id)
+        let unread = store.unreadCount
+        gate.failNext = true
+        #expect(throws: (any Error).self) { try store.markDisplayed(articleID: id, at: displayed) }
+        #expect(store.article(id: id)?.isRead == false && store.article(id: id)?.firstReadAt == nil && store.unreadCount == unread)
+        #expect(try ReaderStore(url: library.url, now: displayed).article(id: id)?.firstReadAt == nil)
+        try store.markDisplayed(articleID: id, at: displayed)
+        #expect(store.article(id: id)?.firstReadAt == displayed && store.unreadCount == unread - 1)
+        #expect(try ReaderStore(url: library.url, now: displayed).article(id: id)?.firstReadAt == displayed)
     }
 
     @Test func unavailableContentDoesNotMarkRead() throws {
