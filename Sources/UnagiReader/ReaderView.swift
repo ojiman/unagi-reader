@@ -153,7 +153,8 @@ struct ReaderView: View {
         }
     }
 
-    private var reader: some View {
+    // The reader's modifiers are split into stages, in their original order: one long chain made the CI compiler give up (#132).
+    private var splitView: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar.navigationSplitViewColumnWidth(min: 185, ideal: 215, max: 280)
         } content: {
@@ -172,6 +173,11 @@ struct ReaderView: View {
         .onGeometryChange(for: Double.self, of: { Double($0.size.width) }) { windowSpace.width = $0 }
         .tint(AppPalette.accentColor)
         .containerBackground(AppPalette.surfaceColor, for: .window)
+    }
+
+    /// The selected article's loading and expiry, and the work that follows a change of selection or content.
+    private var readerLifecycle: some View {
+        splitView
         .task(id: selectedExpiry) {
             guard let expiry = selectedExpiry else { return }
             do {
@@ -193,6 +199,10 @@ struct ReaderView: View {
             if let id = selection { await loading.load(articleID: id) }
             else { loading.clear() }
         }
+    }
+
+    private var readerKeys: some View {
+        readerLifecycle
         .onKeyPress("j") { guard noteOpen, shortcutsEnabled else { return .ignored }; move(1); return .handled }   // from the reader or the panel; the list has its own
         .onKeyPress("k") { guard noteOpen, shortcutsEnabled else { return .ignored }; move(-1); return .handled }
         .onKeyPress("m") {
@@ -203,6 +213,11 @@ struct ReaderView: View {
         .onKeyPress("s") { guard shortcutsEnabled else { return .ignored }; perform(.toggleStar); return .handled }
         .onKeyPress("v") { guard shortcutsEnabled else { return .ignored }; openOriginal(); return .handled }
         .onKeyPress("n") { guard shortcutsEnabled else { return .ignored }; toggleNote(); return .handled }
+    }
+
+    /// The sheet, the message and the alerts of the reader.
+    private var reader: some View {
+        readerKeys
         .sheet(item: $addingTo) { target in
             SubscriptionSheet(store: store, folder: target.folder) { scope = .feed($0) }
         }
