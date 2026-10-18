@@ -38,4 +38,15 @@ import Testing
             editing: a.editing, moving: a.moving, reduceMotion: a.reduceMotion, imageLoader: loader, actions: a.actions)
         #expect(a != b)
     }
+
+    /// Issue #333: after save recovery the store has a new model for the same subscription. The row must take it, so its icon observes
+    /// the model that later changes, not the old one.
+    @Test func aNewModelOfTheSameSubscriptionIsDifferent() {
+        let replacement = Feed(title: "合成購読", symbol: "dot.radiowaves.left.and.right")
+        replacement.id = feed.id
+        let a = row()
+        let b = SubscriptionRow(feed: replacement, feedID: replacement.id, title: a.title, folder: a.folder, folders: a.folders, unread: a.unread,
+            error: a.error, editing: a.editing, moving: a.moving, reduceMotion: a.reduceMotion, imageLoader: loader, actions: a.actions)
+        #expect(a != b)
+    }
 }
