@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
-import ReaderCore
+import SwiftData
+@testable import ReaderCore
 import Testing
 @testable import UnagiReader
 
@@ -21,7 +22,10 @@ extension SplitViewFoldTests {
         private func harness(noteOpen: Bool = false, listShown: Bool = false) throws -> Harness {
             let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            let store = try ReaderStore(url: directory.appendingPathComponent("Reader.store"))
+            // A closed hosting window can still retain queued note actions; do not delete a live SQLite store.
+            let schema = ReaderStore.schema
+            let configuration = ModelConfiguration("Reader", schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+            let store = try ReaderStore(container: ModelContainer(for: schema, configurations: [configuration]))
             let entries = (0..<3).map { index in
                 ParsedEntry(sourceID: "synthetic-\(index)", title: "合成記事 \(index)", url: URL(string: "http://127.0.0.1:1/article/\(index)"), summary: "合成要約", body: "合成本文", coverage: .feedProvided, publishedAt: .now.addingTimeInterval(Double(-index)))
             }
@@ -74,6 +78,15 @@ extension SplitViewFoldTests {
         private func press(_ key: String, in h: Harness) throws {
             let list = try #require(table(in: h))
             #expect(list.keyHandler?(key) == true)
+        }
+
+        @Test func aQueuedNoteBesideSaveCanFinishAfterHarnessCleanup() async throws {
+            let h = try harness()
+            // SwiftUI can keep a queued note action alive after the window closes.
+            let save = Task { try h.store.saveNote(text: "Queued synthetic note", at: .now) }
+            finish(h)
+            try await save.value
+            #expect(h.store.note?.text == "Queued synthetic note")
         }
 
         @Test func nOpensTheNoteBesideTheArticleAndFoldsTheSidebarAndTheList() async throws {
