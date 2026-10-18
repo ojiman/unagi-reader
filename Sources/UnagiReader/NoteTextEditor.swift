@@ -52,6 +52,8 @@ final class NoteTextView: NSTextView {
     fileprivate weak var coordinator: NoteTextEditor.Coordinator?
     private var waiting: [String] = []
     private var focusWaiting = false
+    /// The number of the latest request to take the keyboard; a cancel or a newer request changes it, so an older callback does nothing.
+    private var focusRequest = 0
 
     /// Shows where the text went, with the system's find indicator, and tells VoiceOver (specification 3.3). Replaced in tests.
     var showInserted: (NSTextView, NSRange) -> Void = { view, range in
@@ -99,12 +101,24 @@ final class NoteTextView: NSTextView {
     /// The note being opened takes the keyboard (decision 0064): now if an editor is there, else when one is shown. After this pass of the
     /// view update, as for waiting text.
     func focusWhenShown() {
-        guard let coordinator else { focusWaiting = true; return }
-        RunLoop.main.perform(inModes: [.common]) { [weak coordinator] in MainActor.assumeIsolated { coordinator?.takeKeyboard() } }
+        focusRequest += 1
+        guard coordinator != nil else { focusWaiting = true; return }
+        queueFocus()
     }
 
-    /// The note closed before its editor took the keyboard: it does not take it later.
+    private func queueFocus() {
+        guard let coordinator else { return }
+        let request = focusRequest
+        RunLoop.main.perform(inModes: [.common]) { [weak self, weak coordinator] in
+            MainActor.assumeIsolated {
+                coordinator?.takeKeyboard(stillWanted: { [weak self] in self?.focusRequest == request })
+            }
+        }
+    }
+
+    /// The note closed before its editor took the keyboard: it does not take it later (#322).
     func cancelFocus() {
+        focusRequest += 1
         focusWaiting = false
         coordinator?.cancelKeyboard()
     }
@@ -112,7 +126,7 @@ final class NoteTextView: NSTextView {
     fileprivate func attach(_ coordinator: NoteTextEditor.Coordinator) {
         guard self.coordinator !== coordinator else { return }
         self.coordinator = coordinator
-        if focusWaiting { focusWaiting = false; focusWhenShown() }
+        if focusWaiting { focusWaiting = false; queueFocus() }                // the same request, now with an editor
         guard !waiting.isEmpty else { return }
         // After this pass of the view update: the editor first gets the store's text, which would otherwise be put back over the insertion.
         // A run loop block, not the main queue, so it also runs inside a nested run of the loop (as in a hosted test).
@@ -306,11 +320,12 @@ struct NoteTextEditor: NSViewRepresentable {
 
         func cancelKeyboard() { (textView as? NoteTextView)?.whenInWindow = nil }
 
-        /// The editor takes the keyboard. The caret stays where the person left it; in a note they have not placed it in, it goes at the end.
-        func takeKeyboard() {
-            guard let textView else { return }
+        /// The editor takes the keyboard, if the request is still wanted when this runs. The caret stays where the person left it; in a
+        /// note they have not placed it in, it goes at the end.
+        func takeKeyboard(stillWanted: @escaping @MainActor () -> Bool) {
+            guard stillWanted(), let textView else { return }
             guard let window = textView.window else {
-                (textView as? NoteTextView)?.whenInWindow = { [weak self] in self?.takeKeyboard() }
+                (textView as? NoteTextView)?.whenInWindow = { [weak self] in self?.takeKeyboard(stillWanted: stillWanted) }
                 return
             }
             guard window.makeFirstResponder(textView) else { return }
