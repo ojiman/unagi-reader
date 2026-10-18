@@ -242,6 +242,26 @@ extension SplitViewFoldTests {
             #expect(list.selectedRow == 1)
         }
 
+        /// Specification 3.1.3, issue #312: with the original page and the note open, `Esc` in the note closes the note and gives the
+        /// keyboard to the page, so that a second `Esc` reaches the page's own `Esc`, which closes it (`OriginalKeyboardTests`). The
+        /// synthetic page cannot load; locally it soon shows its failure pane, on CI it may still be loading, so either may have the keyboard.
+        @Test func escapeInTheNoteGivesTheKeyboardToTheOriginalPage() async throws {
+            let h = try harness()
+            defer { finish(h) }
+            let list = try await openNote(h)
+            try press("v", in: h)
+            func pageShown() -> Bool { ReaderKeyboardCommands.originalPage(in: h.host) != nil }
+            try await settle(h) { pageShown() }
+            try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
+            let note = try #require(editor(in: h))
+            h.window.makeFirstResponder(note)
+            try escape(to: note, in: h)
+            try await settle(h) { !noteVisible(h) && ReaderKeyboardCommands.isInOriginalPage(h.window.firstResponder) }
+            try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
+            // The list comes back beside the page and does not take the keyboard from it.
+            #expect(pageShown() && ReaderKeyboardCommands.isInOriginalPage(h.window.firstResponder) && h.window.firstResponder !== list)
+        }
+
         /// Decision 0050 point 1: with the note open, `j` / `k` move the article and the note stays open.
         @Test func jAndKMoveTheArticleWithTheNoteOpen() async throws {
             let h = try harness()

@@ -584,6 +584,13 @@ struct ReaderView: View {
     private func closeNote() {
         guard noteOpen else { return }
         toggleNote()
+        // With the original page still open, the page takes the keyboard, so a second `Esc` closes it (specification 3.1.3, #312).
+        if originalPage.url != nil {
+            if let window = noteLink.window ?? NSApp.keyWindow, let content = window.contentView, let page = ReaderKeyboardCommands.originalPage(in: content) {
+                window.makeFirstResponder(page)
+            }
+            return
+        }
         // The list takes the keyboard, as after the original page. If the editor had it, the focus state may still say the list has it;
         // a change from false to true is what moves it (seen in CI on macOS 26.6).
         listFocused = false
