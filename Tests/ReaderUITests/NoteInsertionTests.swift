@@ -114,6 +114,51 @@ import ReaderCore
         #expect(r.window.firstResponder === before)
     }
 
+    // Issue #322: a request to take the keyboard (`focusWhenShown`, decision 0064) that is cancelled before it runs must never run.
+    @Test func aCancelledFocusRequestDoesNotTakeTheKeyboard() throws {
+        let r = try rig("existing note"); defer { r.window.close() }
+        r.window.makeFirstResponder(r.other)
+        let before = r.window.firstResponder
+        r.link.focusWhenShown()
+        r.link.cancelFocus()
+        pumpRunLoop(0.05)
+        #expect(r.window.firstResponder === before)
+    }
+
+    @Test func aRequestCancelledBeforeTheEditorIsInTheWindowDoesNotTakeTheKeyboardLater() throws {
+        let r = try rig("existing note"); defer { r.window.close() }
+        r.window.makeFirstResponder(r.other)
+        let before = r.window.firstResponder
+        let host = try #require(r.view.enclosingScrollView?.superview ?? r.view.superview)
+        let content = try #require(r.window.contentView)
+        host.removeFromSuperview()
+        r.link.focusWhenShown()
+        pumpRunLoop(0.05)                                                           // the request now waits for the window
+        content.addSubview(host)                                                    // the editor enters the window: its callback is queued
+        r.link.cancelFocus()
+        pumpRunLoop(0.05)
+        #expect(r.window.firstResponder === before)
+        host.removeFromSuperview(); content.addSubview(host)                         // and nothing is left for a later entry
+        pumpRunLoop(0.05)
+        #expect(r.window.firstResponder === before)
+    }
+
+    @Test func aNewerRequestStillTakesTheKeyboardAfterAnOlderOneIsCancelled() throws {
+        let r = try rig("existing note"); defer { r.window.close() }
+        r.window.makeFirstResponder(r.other)
+        r.view.setSelectedRange(NSRange(location: 3, length: 0))                    // a caret the person placed
+        r.link.focusWhenShown()
+        r.link.cancelFocus()
+        r.link.focusWhenShown()
+        pumpRunLoop(0.05)
+        #expect(r.window.firstResponder === r.view)
+        // The old request's callback did not take the newer one: cancelling now still works for anything left.
+        r.window.makeFirstResponder(r.other)
+        let other = r.window.firstResponder                                         // the field's editor
+        pumpRunLoop(0.05)
+        #expect(r.window.firstResponder === other)
+    }
+
     @Test func whileJapaneseIsComposedNothingIsInserted() throws {
         let r = try rig("メモ"); defer { r.window.close() }
         r.window.makeFirstResponder(r.view)
