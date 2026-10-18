@@ -571,19 +571,20 @@ struct ReaderView: View {
             else if noteOpen { panelReopening = true; Task { @MainActor in panelReopening = false } }
         })
     }
-    /// Opens or closes the note beside the article: the sidebar and the list fold away to the left and the note comes in from the right, as
-    /// one move (decision 0049), the same as the original page. The list is folded by `ListColumnCollapse`, in the same time.
+    /// The note button, `n` and `⌥⌘I`: open the note with the keyboard in its editor (decision 0064), or close it.
     private func toggleNote() {
-        ReaderPerformance.motionBegan(noteOpen ? "note-close" : "note-open", duration: SidebarFold.motionDuration)
-        withAnimation(reduceMotion ? nil : .easeOut(duration: SidebarFold.motionDuration)) {
-            workspace.noteOpen.toggle()
-            columnVisibility = targetColumns(pageOpen: originalPage.url != nil)
-        }
+        if noteOpen { closeNote() } else { openNote(focusEditor: true) }
     }
-    /// The note's ✕ and `Esc`: close the note, the same move as opening it in reverse (decision 0050).
+    private func openNote(focusEditor: Bool) {
+        guard !noteOpen else { return }
+        moveNote()
+        if focusEditor { noteLink.focusWhenShown() }
+    }
+    /// The note's ✕, `Esc` and the note's toggle: close the note, the same move as opening it in reverse (decision 0050).
     private func closeNote() {
         guard noteOpen else { return }
-        toggleNote()
+        noteLink.cancelFocus()
+        moveNote()
         // With the original page still open, the page takes the keyboard, so a second `Esc` closes it (specification 3.1.3, #312).
         if originalPage.url != nil {
             if let window = noteLink.window ?? NSApp.keyWindow, let content = window.contentView, let page = ReaderKeyboardCommands.originalPage(in: content) {
@@ -596,6 +597,15 @@ struct ReaderView: View {
         listFocused = false
         Task { @MainActor in listFocused = true }
     }
+    /// Opens or closes the note beside the article: the sidebar and the list fold away to the left and the note comes in from the right, as
+    /// one move (decision 0049), the same as the original page. The list is folded by `ListColumnCollapse`, in the same time.
+    private func moveNote() {
+        ReaderPerformance.motionBegan(noteOpen ? "note-close" : "note-open", duration: SidebarFold.motionDuration)
+        withAnimation(reduceMotion ? nil : .easeOut(duration: SidebarFold.motionDuration)) {
+            workspace.noteOpen.toggle()
+            columnVisibility = targetColumns(pageOpen: originalPage.url != nil)
+        }
+    }
     /// 「記事をノートに送る」 (specification 3.3): the article's link, or the text selected in it as a quotation, into the note. A closed note
     /// opens first and takes the text at its end. The keyboard does not go into the note. Not from the original page.
     private func sendToNote() {
@@ -604,7 +614,7 @@ struct ReaderView: View {
         let url = article.originalURL.flatMap { ArticleURL.link($0) }?.absoluteString
         guard let text = NoteClip.text(title: article.displayTitle, url: url, selection: selected) else { return }
         if noteOpen, noteLink.insert(text) != .noEditor { return }
-        if !noteOpen { toggleNote() }
+        if !noteOpen { openNote(focusEditor: false) }
         noteLink.insertWhenShown(text)
     }
     private func toggleTranslation() {
