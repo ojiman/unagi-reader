@@ -80,7 +80,8 @@ import Testing
     }
 
     private func waitForResult(_ checker: FeedChecker, sourceLocation: SourceLocation = #_sourceLocation) async throws {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(30))
+        // CI runs hosted UI tests on this actor too; one turn can be delayed by over 50 seconds.
+        let deadline = ContinuousClock.now.advanced(by: .seconds(180))
         while checker.state == .idle || checker.state == .checking {
             try #require(ContinuousClock.now < deadline, "Timed out waiting for a feed check: \(checker.state)", sourceLocation: sourceLocation)
             try await Task.sleep(for: .milliseconds(10))
