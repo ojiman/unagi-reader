@@ -28,7 +28,7 @@ The vision promises that reading and typing never wait. These are the budgets a 
 |---|---|---|
 | W1 | `j` / `k` to the start of the next article's display: 95th percentile ≤ 100 ms, maximum ≤ 200 ms | Release build, `--reading-benchmark --performance-output <file>` (`selectionMilliseconds`), the synthetic library of `BenchmarkFixtureTests` (100 subscriptions, 10,000 articles) |
 | W2 | No main-thread stall over 100 ms while reading with keys, while typing in the note, or while a refresh runs | The same run: `schedulingGapsOver100ms` is empty |
-| W3 | Launch to a list with articles: ≤ 1 s with the same library | The same run: `launchMilliseconds`, from the kernel's process start time to the first visible list draw with rows |
+| W3 | Launch to a list with articles: ≤ 1 s with the same library, on a copy of the app that has been launched before. A copy's first launch (after an install or an update) is recorded separately and has no budget | The same run, on the second or a later launch of the same copy: `launchMilliseconds`, from the kernel's process start time to the first visible list draw with rows |
 
 ## 3. Reading and the note
 
