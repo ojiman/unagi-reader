@@ -30,7 +30,7 @@ import Testing
     private func harness(engine: TranslationEngine) throws -> Harness {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let store = try ReaderStore(url: directory.appendingPathComponent("Reader.store"))
+        let store = try inMemoryReaderStore()
         let entries = (0..<2).map { index in
             ParsedEntry(sourceID: "synthetic-\(index)", title: "Synthetic story \(index)", url: URL(string: "http://127.0.0.1:1/article/\(index)"),
                         summary: "A synthetic summary.", body: "First paragraph \(index).\n\nSecond paragraph \(index).", coverage: .feedProvided,
