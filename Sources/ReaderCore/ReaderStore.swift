@@ -28,6 +28,7 @@ import SwiftData
     public private(set) var feedUnreadCounts: [UUID: Int] = [:]
     @ObservationIgnored private let container: ModelContainer
     @ObservationIgnored var context: ModelContext
+    @ObservationIgnored var noteContext: ModelContext
     @ObservationIgnored private var saveHook: (() throws -> Void)?
     @ObservationIgnored private var reloadHook: (() throws -> Void)?
     @ObservationIgnored private var needsReload = false
@@ -49,6 +50,8 @@ import SwiftData
         self.container = container
         context = ModelContext(container)
         context.autosaveEnabled = false
+        noteContext = ModelContext(container)
+        noteContext.autosaveEnabled = false
         if try context.fetchCount(FetchDescriptor<ReaderSettings>()) == 0 {
             context.insert(ReaderSettings()); try context.save()
         }
@@ -79,7 +82,7 @@ import SwiftData
         feeds = try context.fetch(FetchDescriptor<Feed>(sortBy: [SortDescriptor(\.title)]))
         memberships = try context.fetch(FetchDescriptor<FeedMembership>())
         // Ties on the timestamp break by a stable key, so equal times never reorder between launches.
-        notes = try context.fetch(FetchDescriptor<Note>()).sorted {
+        notes = try noteContext.fetch(FetchDescriptor<Note>()).sorted {
             $0.createdAt == $1.createdAt ? $0.id.uuidString < $1.id.uuidString : $0.createdAt < $1.createdAt
         }
         articleIndex = Dictionary(uniqueKeysWithValues: articles.map { ($0.id, $0) })
@@ -326,20 +329,23 @@ import SwiftData
         updateUnreadCounts(article, wasRead: wasRead)
     }
 
-    func save() throws {
+    func save(_ modelContext: ModelContext? = nil) throws {
         // Mutations must resolve models only after recovery has loaded this context.
         guard !needsReload else { throw CocoaError(.fileReadUnknown) }
-        do { try saveHook?(); try context.save() }
+        do { try saveHook?(); try (modelContext ?? context).save() }
         catch { rollback(); throw error }
     }
 
     func rollback() {
         context.rollback()
+        noteContext.rollback()
         // ContentRetentionTests.failedSaveRollsBackAndDoesNotNotify reproduces
         // changed registered models after a failed save on macOS 26.6.2 / Xcode 26.6.
         // Reload committed values using a fresh context for the same store.
         context = ModelContext(container)
         context.autosaveEnabled = false
+        noteContext = ModelContext(container)
+        noteContext.autosaveEnabled = false
         try? reload()
     }
 }

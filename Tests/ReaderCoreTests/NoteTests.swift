@@ -43,10 +43,42 @@ import Testing
         #expect(note.text == text && note.createdAt == at && note.updatedAt == at.addingTimeInterval(3))
     }
 
+    @Test func savingANoteDoesNotCommitAnUnrelatedPendingArticleChange() throws {
+        let library = try TestLibrary(); defer { library.cleanup() }
+        let store = try ReaderStore(url: library.url, seedDemo: true, now: at)
+        let article = try #require(store.articles.first)
+        let id = article.id, originalTitle = article.title
+        article.title = "An unrelated, unsaved change"
+        try store.saveNote(text: "Only this note is saved", at: at)
+        let reopened = try ReaderStore(url: library.url, now: at)
+        #expect(reopened.note?.text == "Only this note is saved")
+        #expect(reopened.article(id: id)?.title == originalTitle)
+    }
+
+    @Test func noteAndLibrarySavesKeepBothAfterAFullReloadAndReopen() throws {
+        let library = try TestLibrary(); defer { library.cleanup() }
+        let store = try ReaderStore(url: library.url, seedDemo: true, now: at)
+        let articleID = try #require(store.articles.first?.id)
+        let feed = try #require(store.feeds.first)
+        let feedID = feed.id
+        try store.saveNote(text: "Before library changes", at: at)
+        try store.markDisplayed(articleID: articleID, at: at)
+        try store.setStar(articleID: articleID, isStarred: true, at: at)
+        try store.updateSubscription(feed, title: "Renamed feed", folder: "Synthetic")
+        #expect(store.note?.text == "Before library changes")
+        try store.saveNote(text: "After the full reload", at: at.addingTimeInterval(1))
+        let reopened = try ReaderStore(url: library.url, now: at)
+        #expect(reopened.note?.text == "After the full reload")
+        #expect(reopened.note?.updatedAt == at.addingTimeInterval(1))
+        #expect(reopened.article(id: articleID)?.firstReadAt == at)
+        #expect(reopened.article(id: articleID)?.starredAt == at)
+        #expect(reopened.feed(id: feedID)?.title == "Renamed feed")
+    }
+
     @Test func savingWithoutANoteIsAnErrorNotASilentDrop() throws {
         let library = try TestLibrary(); defer { library.cleanup() }
         let store = try ReaderStore(url: library.url, now: at)
-        for note in store.notes { store.context.delete(note) }                               // a store that lost its note after it was opened
+        for note in try store.context.fetch(FetchDescriptor<Note>()) { store.context.delete(note) }                               // a store that lost its note after it was opened
         try store.context.save(); try store.reload()
         #expect(store.note == nil)
         #expect(throws: NoteError.missingNote) { try store.saveNote(text: "書いたこと", at: at) }
@@ -76,7 +108,8 @@ import Testing
         try store.saveNote(text: "# 成功\n", at: at)
         gate.failNext = true
         #expect(throws: (any Error).self) { try store.saveNote(text: "失われるノート", at: at) }
-        #expect(store.notes.count == 1)
+        #expect(store.notes.count == 1 && store.note?.text == "# 成功\n")
+        #expect(try ReaderStore(url: library.url, now: at).note?.text == "# 成功\n")
         try store.saveNote(text: "再試行のノート", at: at.addingTimeInterval(1))
         #expect(store.note?.text == "再試行のノート")
         let reopened = try ReaderStore(url: library.url, now: at)
@@ -115,7 +148,7 @@ import Testing
     private func storeWith(_ notes: [(text: String, edited: TimeInterval, id: String?)], in library: TestLibrary) throws {
         try autoreleasepool {
             let store = try ReaderStore(url: library.url, now: at)
-            for note in store.notes { store.context.delete(note) }
+            for note in try store.context.fetch(FetchDescriptor<Note>()) { store.context.delete(note) }
             for entry in notes {
                 let note = Note(text: entry.text, at: at)
                 if let id = entry.id { note.id = UUID(uuidString: id)! }
