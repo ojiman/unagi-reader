@@ -44,7 +44,7 @@ A decision record says who decided what, when and why. It is not where the curre
 | [0047](0047-the-way-back-is-a-cross-in-the-right-column.md) | The way back is a ✕ at the top left of the right column | valid for the original page (note parts: 0049, 0050; the ✕ in the band: 0057) |
 | [0048](0048-the-list-title-sits-below-the-band.md) | The list title sits below the toolbar band, level with the ✕ | valid (the ✕ moves into the band: 0057) |
 | [0049](0049-one-note-and-no-ai-of-its-own.md) | One note, written beside the article; no hand-off and no AI of its own | valid (points 3 and 9 in part: 0059) |
-| [0050](0050-the-note-screen-closes-like-the-original-page.md) | The note screen closes like the original page; a layout button; a wider note | valid (point 4's place: 0057) |
+| [0050](0050-the-note-screen-closes-like-the-original-page.md) | The note screen closes like the original page; a layout button; a wider note | valid (point 4's place: 0057; the keyboard on opening: 0064) |
 | [0051](0051-app-name-and-eel-icon.md) | App bundle filename matches Unagi Reader; orange eel icon | valid |
 | [0052](0052-the-reading-screen-is-four-areas.md) | The vision describes the screen as four areas, not "three columns" | valid |
 | [0053](0053-plain-http-feeds-are-not-supported.md) | Plain `http://` feeds are not supported; the sentence when the https form fails | valid |
@@ -58,6 +58,7 @@ A decision record says who decided what, when and why. It is not where the curre
 | [0061](0061-no-deleting-all-bodies-at-once.md) | No action deletes all article bodies at once | valid (built; no action deletes all bodies at once) |
 | [0062](0062-several-writers-under-review.md) | Several writers at once, each on its own issue, under the owner's review | valid |
 | [0063](0063-export-opml.md) | Export the subscriptions as an OPML file | valid (approved when its PR is merged) |
+| [0064](0064-opening-the-note-gives-it-the-keyboard.md) | Opening the note gives it the keyboard | valid (built) |
 
 ## Removed from the working tree
 

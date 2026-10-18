@@ -154,9 +154,10 @@ extension SplitViewFoldTests {
             #expect(try #require(right(noteView)) <= 1_241, "\(state(h))")
         }
 
-        /// Opening the note must not take the keyboard: the editor gets it only when the person clicks it, so `j`, `k`, `s` and the other
-        /// keys still work. The list that had the keyboard goes away, so the reader gets it.
-        @Test func openingTheNoteDoesNotTakeTheKeyboard() async throws {
+        /// Decision 0064 (issue #313): `n`, the note button and `⌥⌘I` open the note with the keyboard in its editor, the caret at the end
+        /// of a note the person has not placed it in, so they can write at once. Closing the note again (here as `⌥⌘I` or the note button
+        /// do, which reach the same action as this `n`) gives the keyboard back to the list. `c` keeps it where it was (`SendToNoteTests`).
+        @Test func openingTheNoteGivesTheKeyboardToTheEditor() async throws {
             let h = try harness()
             defer { finish(h) }
             h.window.makeKeyAndOrderFront(nil)
@@ -167,12 +168,12 @@ extension SplitViewFoldTests {
             try await settle(h) { article(in: h)?.string.contains("合成記事 0") == true }
             try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
             try press("n", in: h)
-            try await settle(h) { noteVisible(h) && !sidebarButtonsMounted(h) }
+            try await settle(h) { noteVisible(h) && !sidebarButtonsMounted(h) && h.window.firstResponder === editor(in: h) }
             try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
-            let responder = h.window.firstResponder
-            #expect(!ReaderKeyboardCommands.isTextInput(responder), "the first responder is \(String(describing: responder))")
-            #expect(responder === article(in: h))                                           // the keys go to the reader
-            try press("n", in: h)                                                           // closing: the list is back, and has the keyboard
+            let note = try #require(editor(in: h))
+            #expect(h.window.firstResponder === note)                                       // the end of the fold does not take it away
+            #expect(note.selectedRange() == NSRange(location: (noteText as NSString).length, length: 0))
+            try press("n", in: h)
             try await settle(h) { !noteVisible(h) && sidebarButtonsMounted(h) && h.window.firstResponder === list }
         }
 
@@ -197,7 +198,7 @@ extension SplitViewFoldTests {
                                                       context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53))
             view.keyDown(with: event)
         }
-        /// The window with the note open and the keyboard nowhere yet: article 1 is shown.
+        /// The window with the note open and the keyboard in its editor (decision 0064): article 1 is shown.
         private func openNote(_ h: Harness) async throws -> NativeArticleList.Table {
             h.window.makeKeyAndOrderFront(nil)
             try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
