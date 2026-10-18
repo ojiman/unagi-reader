@@ -116,7 +116,7 @@ struct ReaderView: View {
     }
 
     var body: some View {
-        // The library window's own chain is long (the CI compiler gives up on a longer one); the OPML import is added from outside it.
+        // Window-level presentations are view modifiers, outside the reader's stages (#132; the CI compiler gave up on one long chain).
         windowContent
             .modifier(OPMLImportPresentation(flow: opml, store: store))
             .modifier(RenameOnReturn(begin: beginRenamingSelection))
@@ -215,8 +215,8 @@ struct ReaderView: View {
         .onKeyPress("n") { guard shortcutsEnabled else { return .ignored }; toggleNote(); return .handled }
     }
 
-    /// The sheet, the message and the alerts of the reader.
-    private var reader: some View {
+    /// The subscription sheet and the note's short message.
+    private var readerPresentations: some View {
         readerKeys
         .sheet(item: $addingTo) { target in
             SubscriptionSheet(store: store, folder: target.folder) { scope = .feed($0) }
@@ -232,32 +232,41 @@ struct ReaderView: View {
             guard !Task.isCancelled else { return }
             noteActionMessage = nil
         }
+    }
+
+    /// The alerts of the reader.
+    private var reader: some View {
+        readerPresentations
         .alert(String(localized: "Could Not Save", bundle: ReaderLocalization.bundle), isPresented: Binding(get: { saveError != nil }, set: { if !$0 { saveError = nil } })) {
             Button(String(localized: "Close", bundle: ReaderLocalization.bundle)) { saveError = nil }
         } message: { Text(saveError ?? "") }
         .alert(String(localized: "Rename Folder", bundle: ReaderLocalization.bundle), isPresented: Binding(get: { renamingFolder != nil }, set: { if !$0 { renamingFolder = nil } })) {
             TextField(String(localized: "Folder Name", bundle: ReaderLocalization.bundle), text: $folderName.singleLine())
-            Button(String(localized: "Save", bundle: ReaderLocalization.bundle)) {
-                guard let old = renamingFolder else { return }
-                let name = folderName.trimmingCharacters(in: .whitespacesAndNewlines)
-                perform {
-                    try store.renameFolder(from: old, to: name)
-                    folderExpansion.rename(from: old, to: name)
-                    if scope == .folder(old) {
-                        let next: LibraryScope = name.isEmpty ? .all : .folder(name)
-                        workspace.rememberReader(scrollMemory.state, in: next); scope = next
-                    }
-                }
-                renamingFolder = nil
-            }
+            Button(String(localized: "Save", bundle: ReaderLocalization.bundle)) { saveFolderName() }
             Button(String(localized: "Cancel", bundle: ReaderLocalization.bundle), role: .cancel) { renamingFolder = nil }
         } message: { Text(String(localized: "An existing name merges the folders. An empty name moves subscriptions to Unfiled.", bundle: ReaderLocalization.bundle)) }
     }
 
-    private var sidebar: some View {
+    /// The folder rename alert's Save: an existing name merges the folders, an empty name moves the subscriptions to 未分類.
+    private func saveFolderName() {
+        guard let old = renamingFolder else { return }
+        let name = folderName.trimmingCharacters(in: .whitespacesAndNewlines)
+        perform {
+            try store.renameFolder(from: old, to: name)
+            folderExpansion.rename(from: old, to: name)
+            if scope == .folder(old) {
+                let next: LibraryScope = name.isEmpty ? .all : .folder(name)
+                workspace.rememberReader(scrollMemory.state, in: next); scope = next
+            }
+        }
+        renamingFolder = nil
+    }
+
+    /// The sidebar's rows: the three views, then the subscriptions, unfiled first and then by folder.
+    private var sidebarList: some View {
         let grouped = Dictionary(grouping: store.feeds, by: \.folder)
         let folders = grouped.keys.filter { !$0.isEmpty }.sorted()
-        let list = List(selection: $scope) {
+        return List(selection: $scope) {
             Section(String(localized: "Feeds", bundle: ReaderLocalization.bundle)) {
                 sidebarRow(String(localized: "All Articles", bundle: ReaderLocalization.bundle), symbol: "tray", count: store.articles.count).tag(LibraryScope.all)
                 sidebarRow(String(localized: "Unread", bundle: ReaderLocalization.bundle), symbol: "circle.dotted", count: store.unreadCount).tag(LibraryScope.unread)
@@ -268,10 +277,7 @@ struct ReaderView: View {
                 ForEach(folders, id: \.self) { folder in
                     DisclosureGroup(isExpanded: Binding(get: { folderExpansion.isExpanded(folder) }, set: { folderExpansion.set(folder, expanded: $0) })) {
                         ForEach(grouped[folder] ?? []) { feed in subscriptionRow(feed, folders: folders) }
-                    } label: {
-                        sidebarRow(folder, symbol: "folder", count: store.folderUnreadCount(folder: folder), addHelp: String(localized: "Add Subscription to “\(folder)”", bundle: ReaderLocalization.bundle), onAdd: { addingTo = SubscriptionTarget(folder: folder) }, onDropFeeds: { dropFeeds($0, into: folder) }).tag(LibraryScope.folder(folder))
-                            .contextMenu { Button(String(localized: "Rename…", bundle: ReaderLocalization.bundle)) { folderName = folder; renamingFolder = folder } }
-                    }
+                    } label: { folderRow(folder) }
                 }
             } header: {
                 SidebarSectionHeader(title: String(localized: "Subscriptions", bundle: ReaderLocalization.bundle), help: String(localized: "Add a Subscription", bundle: ReaderLocalization.bundle), action: { addingTo = SubscriptionTarget(folder: "") }, onDropFeeds: { dropFeeds($0, into: "") })
@@ -279,11 +285,19 @@ struct ReaderView: View {
         }
         .listStyle(.sidebar)
         .onChange(of: folders) { old, new in folderExpansion.forget(Set(old).subtracting(new)) }
+    }
+
+    private func folderRow(_ folder: String) -> some View {
+        sidebarRow(folder, symbol: "folder", count: store.folderUnreadCount(folder: folder), addHelp: String(localized: "Add Subscription to “\(folder)”", bundle: ReaderLocalization.bundle), onAdd: { addingTo = SubscriptionTarget(folder: folder) }, onDropFeeds: { dropFeeds($0, into: folder) }).tag(LibraryScope.folder(folder))
+            .contextMenu { Button(String(localized: "Rename…", bundle: ReaderLocalization.bundle)) { folderName = folder; renamingFolder = folder } }
+    }
+
+    private var sidebar: some View {
         // The sidebar's band belongs to the window buttons and the two buttons (decision 0057): the rows scroll below it, and so does
         // the scroll bar. The list's own frame starts under the band, as the safe area of a column reports 0 (see `ListHeader`).
-        return VStack(spacing: 0) {
+        VStack(spacing: 0) {
             Color.clear.frame(height: ListHeader.bandHeight).contentShape(Rectangle()).gesture(WindowDragGesture())
-            list
+            sidebarList
         }
         .modifier(SidebarPaper())
         .navigationTitle("Unagi Reader")
