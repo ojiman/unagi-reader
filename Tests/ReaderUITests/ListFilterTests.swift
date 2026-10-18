@@ -15,7 +15,7 @@ import Testing
     private func harness(filter: String) throws -> Harness {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let store = try ReaderStore(url: directory.appendingPathComponent("Reader.store"))
+        let store = try inMemoryReaderStore()
         let titles = ["Swift の話 A", "別の記事", "swift の話 B", "その他"]
         let entries = titles.enumerated().map { index, title in
             ParsedEntry(sourceID: "synthetic-\(index)", title: title, url: URL(string: "http://127.0.0.1:1/article/\(index)"), summary: "合成要約",

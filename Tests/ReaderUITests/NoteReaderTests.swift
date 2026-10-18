@@ -67,7 +67,7 @@ import Testing
                          prepare: (ReaderStore) throws -> Void) throws -> Harness {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let store = try ReaderStore(url: directory.appendingPathComponent("Reader.store"))
+        let store = try inMemoryReaderStore()
         let entries = (0..<4).map { index in
             ParsedEntry(sourceID: "synthetic-\(index)", title: "合成記事 \(index)", url: URL(string: "http://127.0.0.1:1/article/\(index)"), summary: "合成要約", body: "合成本文", coverage: .feedProvided, publishedAt: .now.addingTimeInterval(Double(-index)))
         }
