@@ -6,6 +6,8 @@ import SwiftData
     public private(set) var articles: [Article] = []
     public private(set) var feeds: [Feed] = []
     public private(set) var contentRevision = 0
+    /// Changes after a read mark saved through a small context: the shown article took the values by a refetch, which does not notify it.
+    public private(set) var readRevision = 0
     public private(set) var settings: ReaderSettings?
     public var retentionDays: Int { settings?.retentionDays ?? 30 }
     public private(set) var memberships: [FeedMembership] = []
@@ -323,10 +325,20 @@ import SwiftData
               try content(articleID: articleID, at: at) != nil else { return }
         guard !article.isRead || article.firstReadAt == nil else { return }
         let wasRead = article.isRead
-        article.isRead = true
-        if article.firstReadAt == nil { article.firstReadAt = at }
-        try save()
+        // Written through a small context of its own (#249): a save in the library context walks every registered model (about 8 ms
+        // per change with 10,000 articles), and a read mark comes with every article shown. The library context then fetches the
+        // article again, which gives its instance the saved values; that does not notify the article, so `readRevision` does.
+        let writer = ModelContext(container)
+        writer.autosaveEnabled = false
+        guard let stored = try writer.fetch(FetchDescriptor<Article>(predicate: #Predicate { $0.id == articleID })).first else { return }
+        stored.isRead = true
+        if stored.firstReadAt == nil { stored.firstReadAt = at }
+        do { try saveHook?(); try writer.save() }
+        catch { rollback(); throw error }
+        // Saved. If the refetch fails, the next change reloads the library first (`needsReload`); the mark is not reported as failed.
+        if (try? context.fetch(FetchDescriptor<Article>(predicate: #Predicate { $0.id == articleID }))) == nil { needsReload = true }
         updateUnreadCounts(article, wasRead: wasRead)
+        readRevision += 1
     }
 
     func save(_ modelContext: ModelContext? = nil) throws {
