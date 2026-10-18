@@ -26,6 +26,14 @@ final class NoteTextView: NSTextView {
     }
     override func paste(_ sender: Any?) { pasteAsPlainText(sender) }
     override func pasteAsRichText(_ sender: Any?) { pasteAsPlainText(sender) }
+    /// Run once when the view is next put in a window: the editor of a note being opened is not in the window until the panel is shown.
+    var whenInWindow: (@MainActor @Sendable () -> Void)?
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil, let action = whenInWindow else { return }
+        whenInWindow = nil
+        RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated { action() } }
+    }
 }
 
 /// The way into the note editor from outside, for 「記事をノートに送る」 (specification 3.3). The reader keeps one; the editor that is
@@ -43,6 +51,7 @@ final class NoteTextView: NSTextView {
     }
     fileprivate weak var coordinator: NoteTextEditor.Coordinator?
     private var waiting: [String] = []
+    private var focusWaiting = false
 
     /// Shows where the text went, with the system's find indicator, and tells VoiceOver (specification 3.3). Replaced in tests.
     var showInserted: (NSTextView, NSRange) -> Void = { view, range in
@@ -87,9 +96,23 @@ final class NoteTextView: NSTextView {
         Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { _ in MainActor.assumeIsolated { showNow() } }
     }
 
+    /// The note being opened takes the keyboard (decision 0064): now if an editor is there, else when one is shown. After this pass of the
+    /// view update, as for waiting text.
+    func focusWhenShown() {
+        guard let coordinator else { focusWaiting = true; return }
+        RunLoop.main.perform(inModes: [.common]) { [weak coordinator] in MainActor.assumeIsolated { coordinator?.takeKeyboard() } }
+    }
+
+    /// The note closed before its editor took the keyboard: it does not take it later.
+    func cancelFocus() {
+        focusWaiting = false
+        coordinator?.cancelKeyboard()
+    }
+
     fileprivate func attach(_ coordinator: NoteTextEditor.Coordinator) {
         guard self.coordinator !== coordinator else { return }
         self.coordinator = coordinator
+        if focusWaiting { focusWaiting = false; focusWhenShown() }
         guard !waiting.isEmpty else { return }
         // After this pass of the view update: the editor first gets the store's text, which would otherwise be put back over the insertion.
         // A run loop block, not the main queue, so it also runs inside a nested run of the loop (as in a hosted test).
@@ -280,6 +303,23 @@ struct NoteTextEditor: NSViewRepresentable {
         }
 
         var canInsert: Bool { textView.map { !$0.hasMarkedText() } ?? false }
+
+        func cancelKeyboard() { (textView as? NoteTextView)?.whenInWindow = nil }
+
+        /// The editor takes the keyboard. The caret stays where the person left it; in a note they have not placed it in, it goes at the end.
+        func takeKeyboard() {
+            guard let textView else { return }
+            guard let window = textView.window else {
+                (textView as? NoteTextView)?.whenInWindow = { [weak self] in self?.takeKeyboard() }
+                return
+            }
+            guard window.makeFirstResponder(textView) else { return }
+            if !caretPlaced {
+                let end = NSRange(location: (textView.string as NSString).length, length: 0)
+                textView.setSelectedRange(end)
+                textView.scrollRangeToVisible(end)
+            }
+        }
 
         /// 「記事をノートに送る」 (specification 3.3): the text goes after the caret or selection the person left (nothing is replaced), or at
         /// the end of the note, as a paragraph of its own (`NoteClip.paragraph`). It is one undo step and is saved like typing. The keyboard
