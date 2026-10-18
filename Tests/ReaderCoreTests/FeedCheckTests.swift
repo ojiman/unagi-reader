@@ -26,7 +26,7 @@ import Testing
         #expect(request("https://example.com/feed") == .url(URL(string: "https://example.com/feed")!))
         let fetched = Recorder<FeedCheckRequest>()
         let checker = FeedChecker(fetch: { fetched.add($0); return Self.checked() }, sleep: { _ in })
-        checker.update(source: "http://example.com/feed.xml", delay: .zero); await settle(checker)
+        checker.update(source: "http://example.com/feed.xml", delay: .zero); try await waitForResult(checker)
         #expect(fetched.values == [.url(URL(string: "https://example.com/feed.xml")!)])                       // plain http is never sent
     }
     @Test func theSheetShowsTheAddressOnlyWhenItIsNotTheOneTyped() {
@@ -76,15 +76,30 @@ import Testing
     }
     private func settle(_ checker: FeedChecker) async {
         for _ in 0..<20 { await Task.yield() }
-        try? await Task.sleep(for: .milliseconds(60))               // generous: the stubs answer at once, a loaded machine only needs to schedule
+        try? await Task.sleep(for: .milliseconds(60))               // deliberately blocked checks and ignored late answers
     }
 
-    @Test func aReadableFeedBecomesReadyAfterTheDelay() async {
+    private func waitForResult(_ checker: FeedChecker, sourceLocation: SourceLocation = #_sourceLocation) async throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(30))
+        while checker.state == .idle || checker.state == .checking {
+            try #require(ContinuousClock.now < deadline, "Timed out waiting for a feed check: \(checker.state)", sourceLocation: sourceLocation)
+            try await Task.sleep(for: .milliseconds(10))
+        }
+    }
+
+    @Test(arguments: [Duration.zero, .milliseconds(200)])
+    func aReadableFeedBecomesReadyAfterTheDelay(responseDelay: Duration) async throws {
         let waits = Recorder<Duration>()
-        let checker = FeedChecker(fetch: { _ in Self.checked("読書ラボ") }, sleep: { waits.add($0) })
+        let checker = FeedChecker(fetch: { _ in
+            // #304: deliver the answer on the main actor after the old 60 ms wait would have ended.
+            try await Task { @MainActor in
+                try await Task.sleep(for: responseDelay)
+                return Self.checked("読書ラボ")
+            }.value
+        }, sleep: { waits.add($0) })
         checker.update(source: "https://example.com/feed.xml", delay: .milliseconds(800))
         #expect(checker.state == .idle)                                              // nothing yet: the person may still be typing
-        await settle(checker)
+        try await waitForResult(checker)
         guard case .ready(let feed) = checker.state else { Issue.record("expected ready, got \(checker.state)"); return }
         #expect(feed.parsed.title == "読書ラボ")
         #expect(waits.values == [.milliseconds(800)])
@@ -97,24 +112,24 @@ import Testing
         }
         #expect(fetched.values.isEmpty)
     }
-    @Test func aFailureIsShownInPlainWordsAndTheButtonStaysOff() async {
+    @Test func aFailureIsShownInPlainWordsAndTheButtonStaysOff() async throws {
         let checker = FeedChecker(fetch: { _ in throw HTTPError.status(404) }, sleep: { _ in })
-        checker.update(source: "https://example.com/missing", delay: .zero); await settle(checker)
+        checker.update(source: "https://example.com/missing", delay: .zero); try await waitForResult(checker)
         #expect(checker.state == .failed("Page not found (404). Check the URL."))
     }
-    @Test func textWithoutASchemeGetsAHintAfterTheDelayAndEmptyTextIsQuiet() async {
+    @Test func textWithoutASchemeGetsAHintAfterTheDelayAndEmptyTextIsQuiet() async throws {
         let checker = FeedChecker(fetch: { _ in Self.checked() }, sleep: { _ in })
-        checker.update(source: "example.com/feed", delay: .zero); await settle(checker)
+        checker.update(source: "example.com/feed", delay: .zero); try await waitForResult(checker)
         #expect(checker.state == .failed("Enter a URL starting with http:// or https://."))
         checker.update(source: "", delay: .zero); await settle(checker)
         #expect(checker.state == .idle)
     }
-    @Test func pressingReturnFetchesALocalNameThatTypingWouldNotSend() async {
+    @Test func pressingReturnFetchesALocalNameThatTypingWouldNotSend() async throws {
         let fetched = Recorder<FeedCheckRequest>()
         let checker = FeedChecker(fetch: { fetched.add($0); return Self.checked() }, sleep: { _ in })
         checker.update(source: "https://localhost/feed", delay: .milliseconds(800)); await settle(checker)
         #expect(fetched.values.isEmpty)
-        checker.update(source: "https://localhost/feed", delay: .zero, asked: true); await settle(checker)
+        checker.update(source: "https://localhost/feed", delay: .zero, asked: true); try await waitForResult(checker)
         #expect(fetched.values == [.url(URL(string: "https://localhost/feed")!)])
     }
     @Test func anEditDuringTheWaitCancelsTheOldCheckBeforeItFetches() async {
@@ -141,10 +156,10 @@ import Testing
         #expect(FeedChecker.State.failed("x").whileWaitingForReturn == .giveUp)
         #expect(FeedChecker.State.checking.whileWaitingForReturn == .keepWaiting && FeedChecker.State.idle.whileWaitingForReturn == .keepWaiting)
     }
-    @Test func pressingReturnOnAnUnfinishedAddressSaysSo() async {
+    @Test func pressingReturnOnAnUnfinishedAddressSaysSo() async throws {
         let fetched = Recorder<FeedCheckRequest>()
         let checker = FeedChecker(fetch: { fetched.add($0); return Self.checked() }, sleep: { _ in })
-        checker.update(source: "https://", delay: .zero, asked: true); await settle(checker)
+        checker.update(source: "https://", delay: .zero, asked: true); try await waitForResult(checker)
         #expect(checker.state == .failed("Enter the complete URL."))
         checker.update(source: "", delay: .zero, asked: true); await settle(checker)
         #expect(checker.state == .idle && fetched.values.isEmpty)
@@ -157,14 +172,14 @@ import Testing
         checker.cancel(); await gate.open(); await settle(checker)
         #expect(checker.state == .idle)
     }
-    @Test func anEditDropsTheOldResultAtOnce() async {
+    @Test func anEditDropsTheOldResultAtOnce() async throws {
         let checker = FeedChecker(fetch: { _ in Self.checked() }, sleep: { _ in })
-        checker.update(source: "https://example.com/feed.xml", delay: .zero); await settle(checker)
+        checker.update(source: "https://example.com/feed.xml", delay: .zero); try await waitForResult(checker)
         guard case .ready = checker.state else { Issue.record("expected ready"); return }
         checker.update(source: "https://example.com/feed.xm", delay: .milliseconds(800))
         #expect(checker.state == .idle)                                              // the add button cannot use a result for another address
     }
-    @Test func aSlowAnswerForAnOldAddressIsIgnored() async {
+    @Test func aSlowAnswerForAnOldAddressIsIgnored() async throws {
         let gate = SlowGate()
         let checker = FeedChecker(fetch: { request in
             guard case .url(let url) = request else { throw HTTPError.invalidResponse }
@@ -173,15 +188,15 @@ import Testing
         }, sleep: { _ in })
         checker.update(source: "https://example.com/old", delay: .zero); await settle(checker)
         #expect(checker.state == .checking)
-        checker.update(source: "https://example.com/new", delay: .zero); await settle(checker)
+        checker.update(source: "https://example.com/new", delay: .zero); try await waitForResult(checker)
         await gate.open(); await settle(checker)
         guard case .ready(let feed) = checker.state else { Issue.record("expected ready, got \(checker.state)"); return }
         #expect(feed.parsed.title == "/new")
     }
-    @Test func checkingNowSkipsTheDelay() async {
+    @Test func checkingNowSkipsTheDelay() async throws {
         let waits = Recorder<Duration>()
         let checker = FeedChecker(fetch: { _ in Self.checked() }, sleep: { waits.add($0) })
-        checker.update(source: "https://example.com/feed.xml", delay: .zero); await settle(checker)
+        checker.update(source: "https://example.com/feed.xml", delay: .zero); try await waitForResult(checker)
         #expect(waits.values.isEmpty)
         guard case .ready = checker.state else { Issue.record("expected ready"); return }
     }
@@ -223,14 +238,14 @@ import Testing
         // An address typed with https is not blamed on http.
         #expect(FeedCheckMessage.text(for: URLError(.cannotConnectToHost)) == "Could not connect.")
     }
-    @Test func theCheckerTellsAnHttpAddressApartFromAnHttpsOne() async {
+    @Test func theCheckerTellsAnHttpAddressApartFromAnHttpsOne() async throws {
         let httpOnly = "Could not load over HTTPS. HTTP is not supported."
         let checker = FeedChecker(fetch: { _ in throw URLError(.cannotConnectToHost) }, sleep: { _ in })
-        checker.update(source: "http://example.com/feed.xml", delay: .zero); await settle(checker)
+        checker.update(source: "http://example.com/feed.xml", delay: .zero); try await waitForResult(checker)
         #expect(checker.state == .failed(httpOnly))
-        checker.update(source: "https://example.com/feed.xml", delay: .zero); await settle(checker)
+        checker.update(source: "https://example.com/feed.xml", delay: .zero); try await waitForResult(checker)
         #expect(checker.state == .failed("Could not connect."))
-        checker.update(source: "  HTTP://example.com/feed.xml", delay: .zero); await settle(checker)      // pasted with spaces and capitals
+        checker.update(source: "  HTTP://example.com/feed.xml", delay: .zero); try await waitForResult(checker)      // pasted with spaces and capitals
         #expect(checker.state == .failed(httpOnly))
     }
 
