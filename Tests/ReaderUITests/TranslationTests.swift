@@ -103,6 +103,49 @@ import Testing
         #expect(!shown(h).contains("訳:"))
     }
 
+    /// Issue #315: `n` gives the keyboard to the note's editor (decision 0064), and a `t` typed at once is written in the note. It must not
+    /// translate the article: the window's `t` decided from a state taken while the list still had the keyboard. A real key event goes
+    /// through the application, as a key typed by the person does.
+    @Test func aTTypedInTheNoteRightAfterOpeningItIsWrittenNotTranslated() async throws {
+        let h = try harness(engine: fakeEngine())
+        defer { finish(h) }
+        h.window.makeKeyAndOrderFront(nil)
+        let table = try await open(0, in: h)
+        h.window.makeFirstResponder(table)
+        #expect(table.keyHandler?("n") == true)
+        try await settle(h) { h.window.firstResponder is NoteTextView }
+        let note = try #require(h.window.firstResponder as? NoteTextView)
+        let before = note.string
+        let event = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: h.window.windowNumber, context: nil, characters: "t", charactersIgnoringModifiers: "t", isARepeat: false, keyCode: 17))
+        NSApp.sendEvent(event)
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(note.string == before + "t")
+        #expect(!shown(h).contains("訳:"))
+        // The same after a click: the list takes the keyboard, then the editor at once (as the click of #315 did), and `t` is typed.
+        h.window.makeFirstResponder(table)
+        try await Task.sleep(for: .milliseconds(100))
+        h.window.makeFirstResponder(note)
+        NSApp.sendEvent(event)
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(note.string == before + "tt")
+        #expect(!shown(h).contains("訳:"))
+    }
+
+    /// The article's text is read-only: with the keyboard in it, `t` still translates (the check of #315 is only for typing).
+    @Test func aTWithTheKeyboardInTheArticleTranslates() async throws {
+        let h = try harness(engine: fakeEngine())
+        defer { finish(h) }
+        h.window.makeKeyAndOrderFront(nil)
+        _ = try await open(0, in: h)
+        let article = try #require(find(ArticleTextView.self, in: h.host))
+        h.window.makeFirstResponder(article)
+        let event = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: h.window.windowNumber, context: nil, characters: "t", charactersIgnoringModifiers: "t", isARepeat: false, keyCode: 17))
+        NSApp.sendEvent(event)
+        try await settle(h) { shown(h).contains("訳:Synthetic story 0") }
+    }
+
     @Test func anArticleAlreadyInTheTargetLanguageIsLeftAsItIs() async throws {
         let h = try harness(engine: fakeEngine(decision: .alreadyInTarget))
         defer { finish(h) }
