@@ -7,9 +7,9 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 failures=0
 
-expect_status() { # name expected-status log-file
+expect_status() { # name expected-status log-file [xunit-file]
   local name=$1 expected=$2 log=$3
-  bash "$check" "$log" >"$work/out" 2>&1; local status=$?
+  bash "$check" "$log" ${4:+"$4"} >"$work/out" 2>&1; local status=$?
   if [ "$status" -eq "$expected" ]; then echo "ok   $name"; else echo "FAIL $name: expected exit $expected, got $status"; sed 's/^/     /' "$work/out"; failures=$((failures + 1)); fi
 }
 expect_message() { # name text (in the output of the last check)
@@ -69,5 +69,31 @@ expect_status "a missing log fails" 1 "$work/does-not-exist.log"
 
 printf '%s\n' "CoreData: error: something" "$begin" "$a_start" "swift: some other output" "$a_end" "$suite_end" "$summary" >"$work/noise.log"
 expect_status "other output between the lines does not matter" 0 "$work/noise.log"
+
+# With the xUnit file that Swift Testing writes itself (#186). The log below lost the end lines of first() and sized(width:).
+xunit_case() { printf '        <testcase classname="T.A" name="%s" time="0.01"/>\n' "$1"; }
+xunit_file() { # cases...
+  printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' '<testsuites>' '    <testsuite name="TestResults" errors="0" tests="'$#'" failures="0" skipped="0" time="0.04">'
+  for name in "$@"; do xunit_case "$name"; done
+  printf '%s\n' '    </testsuite>' '</testsuites>'
+}
+printf '%s\n' "$begin" "$a_start" "$b_start" "$cases_start" "$b_end" "$suite_end" "$summary" >"$work/lost.log"
+expect_status "lost end lines alone still fail" 1 "$work/lost.log"
+xunit_file 'first()' 'second()' 'sized(width:)' >"$work/full.xml"
+expect_status "lost end lines pass when the xUnit file lists the tests" 0 "$work/lost.log" "$work/full.xml"
+expect_status "a missing xUnit file fails" 1 "$work/lost.log" "$work/missing.xml"
+expect_message "  it says the run did not finish" "the run did not finish"
+head -n 4 "$work/full.xml" >"$work/cut.xml"
+expect_status "an xUnit file that is not closed fails" 1 "$work/lost.log" "$work/cut.xml"
+xunit_file 'second()' 'sized(width:)' >"$work/short.xml"
+expect_status "an xUnit file without a started test fails" 1 "$work/lost.log" "$work/short.xml"
+expect_message "  it counts the cases against the summary" "2 test cases and the summary lines 3 tests"
+expect_message "  it names the test" "first()"
+sed 's|name="second()" time="0.01"/>|name="second()" time="0.01"><failure message="x"/></testcase>|' "$work/full.xml" >"$work/failure.xml"
+expect_status "a failure in the xUnit file fails" 1 "$work/lost.log" "$work/failure.xml"
+expect_status "a run that stops early fails with an xUnit file too" 1 "$work/early.log" "$work/full.xml"
+xunit_file 'first()' 'second()' 'sized(width:)' 'skipped()' >"$work/skipped.xml"
+printf '%s\n' "$begin" "$a_start" "$b_start" "$cases_start" "$suite_end" '✔ Test run with 4 tests in 1 suite passed after 0.040 seconds.' >"$work/skip.log"
+expect_status "a skipped test counts as a test case, as in the summary" 0 "$work/skip.log" "$work/skipped.xml"
 
 [ "$failures" -eq 0 ] && echo "all passed" || { echo "$failures failed"; exit 1; }
