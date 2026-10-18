@@ -32,12 +32,13 @@ There is no backend, no account and no AI proxy. The app has no AI of its own ([
 - `Feed.folder` is a one-level string; there is no folder model, so an empty folder cannot exist.
 - `Article.starredAt` non-nil means starred; starring again uses the current time; there is no history of Star changes.
 - `Note` has `text`, created and updated times. There is exactly one: `ReaderStore.note`. `saveNote(text:at:)` saves the text exactly as typed, with no length limit; with no note it throws `missingNote`. When the store opens, `keepOnlyOneNote(at:)` keeps the most recently edited note (ties: the lower ID), deletes the others, or creates an empty one; a failed save fails the open.
+- Note models use their own main-actor `ModelContext` on the same container. Each edit is still saved synchronously; saving the note does not scan the article and membership models registered in the library context. `reload()` fetches notes through the note context.
 - Data compatibility follows [decision 0003](decisions/0003-beta-data-compatibility.md): none promised between betas; from 1.0, preserved and checked in CI ([specification 7.1](specification.md)). An unreadable store is never deleted or recreated by the app.
 - Opt-in upgrade tests open synthetic stores made by older builds: `V1StoreUpgradeTests` (`UNAGI_READER_V1_FIXTURE_DIR`, made by `scripts/prepare-v1-store-fixture.sh`), `PreNoteStoreUpgradeTests` (`UNAGI_READER_PRE0019_FIXTURE_DIR`, commit `52429b4`), `OneNoteStoreUpgradeTests` (`UNAGI_READER_PRE0049_FIXTURE_DIR`, commit `60da7df`; [record](verification/0049-one-note-store.md)). Opening an old store drops the tables of removed models; CoreData logs this as `error:`, which is harmless.
 
 ### 3.1 Save failure and recovery
 
-- After a failed save, `ReaderStore.rollback()` swaps in a fresh `ModelContext` on the same container. Values from the failed context are never shown.
+- After a failed save, `ReaderStore.rollback()` rolls back both contexts and swaps in fresh library and note `ModelContext`s on the same container. Values from the failed context are never shown.
 - `needsReload` blocks every change until `reloadIfNeeded()` succeeds. A new mutating method calls `reloadIfNeeded()` first and resolves models by ID, not by a reference taken before the failure.
 - One operation is never committed in part, and a failed change is never reported as done. Every change path (read, subscription, Star, note, retention) has a save-failure and reload-failure test; a new path gets one too.
 

@@ -32,7 +32,7 @@ extension ReaderStore {
         guard let note else { throw NoteError.missingNote }
         guard note.text != text else { return }
         note.text = text; note.updatedAt = at
-        try save()
+        try save(noteContext)
     }
 
     /// Decision 0049: the app has one note. A store that has several (from before this decision) keeps the one that was edited last and
