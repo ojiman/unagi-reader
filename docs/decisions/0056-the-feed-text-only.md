@@ -3,7 +3,7 @@
 - Status: valid (approved by the PdM when the PR that adds this record is merged)
 - Date: 2026-10-14
 - Decider: the owner (PdM), after trying the app on articles of www.nytimes.com, in the chat of 2026-10-14. The new wording of the vision's promise 2 was proposed by the agent and confirmed by the owner the same day.
-- Replaces: [0033](0033-rss-first.md) points 3 and 4 (the button 「全文を取得」 and the quality check of extracted pages). Changes the vision's promise 2.
+- Replaces: [0033](0033-rss-first.md) points 3 and 4 (the button 「全文を取得」 and the quality check of extracted pages), and with point 4 below, point 6 (the one-time removal of extracted bodies). Changes the vision's promise 2.
 
 ## Decision
 

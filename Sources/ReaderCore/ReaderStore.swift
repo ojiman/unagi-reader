@@ -299,29 +299,6 @@ import SwiftData
         updateUnreadCounts(article, wasRead: wasRead)
     }
 
-    /// `discardExtractedBodies` once per library: the marker is a file in the library's folder, so a copy or a renamed folder of the library
-    /// keeps it. Returns nil when it was done before;
-    /// a failure leaves no marker, so it is tried again at the next start.
-    @discardableResult public func discardExtractedBodiesOnce(marker: URL) throws -> Int? {
-        guard !FileManager.default.fileExists(atPath: marker.path) else { return nil }
-        let removed = try discardExtractedBodies()
-        try Data().write(to: marker)
-        return removed
-    }
-
-    /// Removes the bodies that an earlier version took from the original pages by itself when an article was opened. They can be wrong
-    /// (a page's menus and counters instead of the article). The article keeps its RSS summary and the next feed refresh brings back the
-    /// feed's own body. Returns how many bodies were removed.
-    @discardableResult public func discardExtractedBodies() throws -> Int {
-        try reloadIfNeeded()
-        let raw = ContentCoverage.extracted.rawValue
-        let snapshots = try context.fetch(FetchDescriptor<ContentSnapshot>(predicate: #Predicate { $0.coverageRaw == raw }))
-        guard !snapshots.isEmpty else { return 0 }
-        for snapshot in snapshots { context.delete(snapshot) }
-        try save(); try reload()
-        return snapshots.count
-    }
-
     public func content(articleID: UUID, at: Date) throws -> ArticleContent? {
         try reloadIfNeeded()
         guard let article = articleIndex[articleID], isContentAvailable(article, at: at) else { return nil }

@@ -30,7 +30,7 @@ A decision record says who decided what, when and why. It is not where the curre
 | [0030](0030-one-reading-surface.md) | One reading surface | valid |
 | [0031](0031-less-clutter.md) | Less clutter in the window | valid |
 | [0032](0032-simple-add-subscription.md) | A simple "add subscription" sheet | valid |
-| [0033](0033-rss-first.md) | RSS first: the feed's own text is shown | valid in part (points 3 and 4 replaced by 0056) |
+| [0033](0033-rss-first.md) | RSS first: the feed's own text is shown | valid in part (points 3, 4 and 6 replaced by 0056) |
 | [0034](0034-move-to-folder-chooser.md) | 「フォルダへ移動…」 is a chooser with a text field | valid |
 | [0036](0036-check-the-feed-as-you-type.md) | Check the feed while the address is typed | valid |
 | [0037](0037-choose-the-folder-when-adding.md) | Choose the folder when adding a subscription | valid |
