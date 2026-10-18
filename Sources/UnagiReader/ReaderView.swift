@@ -294,28 +294,20 @@ struct ReaderView: View {
     }
 
     private func subscriptionRow(_ feed: Feed, folders: [String]) -> some View {
-        HStack {
-            SubscriptionIconView(feed: feed, loader: imageLoader)
-            if let edit = inlineEdit(for: .feed(feed.id), initial: feed.title) { InlineNameField(initial: edit.initial, onFinish: edit.finish) }
-            else { Text(feed.displayTitle).lineLimit(1) }
-            Spacer()
-            Text((store.feedUnreadCounts[feed.id] ?? 0).formatted()).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-            if let error = refresh.errors[feed.id] {
-                Image(systemName: "exclamationmark.circle").foregroundStyle(.secondary).help(error)
-                    .accessibilityLabel(String(localized: "Refresh failed: \(error)", bundle: ReaderLocalization.bundle))
-            }
-        }.padding(.vertical, 4)
-            .draggable(FeedDrag(id: feed.id))
+        let edit = inlineEdit(for: .feed(feed.id), initial: feed.title)
+        return SubscriptionRow(feed: feed, feedID: feed.id, title: feed.displayTitle, folder: feed.folder, folders: folders,
+            unread: store.feedUnreadCounts[feed.id] ?? 0, error: refresh.errors[feed.id], editing: edit?.initial,
+            moving: movingFeedID == feed.id, reduceMotion: reduceMotion, imageLoader: imageLoader,
+            actions: SubscriptionRow.Actions(
+                finishEdit: { edit?.finish($0) },
+                refresh: { Task { await refresh.refresh(feedIDs: [feed.id]) } },
+                rename: { renaming = .feed(feed.id) },
+                beginMove: { movingFeedID = feed.id },
+                endMove: { movingFeedID = nil },
+                move: { folder in movingFeedID = nil; moveFeeds([feed.id], to: folder) },
+                unsubscribe: { removingFeed = feed }))
+            .equatable()
             .tag(LibraryScope.feed(feed.id))
-            .popover(isPresented: Binding(get: { movingFeedID == feed.id }, set: { if !$0 { movingFeedID = nil } }), arrowEdge: .trailing) {
-                MoveToFolderView(folders: folders, current: feed.folder, onMove: { folder in movingFeedID = nil; moveFeeds([feed.id], to: folder) }, onClose: { movingFeedID = nil })
-            }
-            .contextMenu {
-                Button(String(localized: "Refresh This Subscription", bundle: ReaderLocalization.bundle)) { Task { await refresh.refresh(feedIDs: [feed.id]) } }
-                Button(String(localized: "Rename", bundle: ReaderLocalization.bundle)) { renaming = .feed(feed.id) }
-                Button(String(localized: "Move to Folder…", bundle: ReaderLocalization.bundle)) { movingFeedID = feed.id }
-                Button(String(localized: "Unsubscribe…", bundle: ReaderLocalization.bundle), role: .destructive) { removingFeed = feed }
-            }
     }
 
     private func sidebarRow(_ title: String, symbol: String, count: Int, addHelp: String? = nil, onAdd: @escaping () -> Void = {}, onDropFeeds: (([UUID]) -> Bool)? = nil,
