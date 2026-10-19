@@ -21,6 +21,8 @@ public struct BodyParagraph: Sendable, Codable, Equatable {
         return paragraphs
     }
     static func encode(_ paragraphs: [BodyParagraph]?) -> Data? { paragraphs.flatMap { try? JSONEncoder().encode($0) } }
+    /// The saved paragraphs as values, whatever the order of their JSON keys; nil for no format or an unreadable one.
+    static func values(_ data: Data?) -> [BodyParagraph]? { data.flatMap { try? JSONDecoder().decode([BodyParagraph].self, from: $0) } }
 }
 
 // Convert HTML into native text metadata. No HTML renderer or resource loading is used.
