@@ -15,8 +15,10 @@ import Observation
     private struct Request: Sendable { let id: UUID; let url: URL; let etag: String?; let modified: String? }
     private enum Event: Sendable { case fetched(Request, Result<FeedFetchResult, any Error>), due }
     /// Fetched feeds are applied together (one save, one list reload) when this many are in, or when the first of them
-    /// has waited this long, or when the last fetch ends (#131). A slow feed does not hold back the others.
-    nonisolated static let batchSize = 4
+    /// has waited this long, or when the last fetch ends (#131). A slow feed does not hold back the others. One feed per main-actor
+    /// turn (#303): a batch of four with changed bodies held the main actor for 110–300 ms on a 10,000-article library; after each
+    /// feed the window has a turn.
+    nonisolated static let batchSize = 1
     public func refresh(feedIDs: [UUID]? = nil, at: Date = .now) async {
         guard !refreshing else { return }
         refreshing = true; defer { refreshing = false }
