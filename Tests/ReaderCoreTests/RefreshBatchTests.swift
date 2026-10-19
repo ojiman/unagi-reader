@@ -91,7 +91,8 @@ import Testing
         let refresh = FeedRefreshController(store: library.store, client: FeedClient(http: StubFeeds()), batchDelay: longDelay)
         counter.failingReloads = 1
         await refresh.refresh(feedIDs: library.ids)
-        #expect(refresh.errors.count == 3)                                          // never reported as done
+        // The batch whose publication failed reports its feeds (one feed per batch since #303); never reported as done.
+        #expect(refresh.errors.count == FeedRefreshController.batchSize)
         #expect(library.store.articles.count == 3 * 3)                              // they were saved; the rollback loads them
         await refresh.refresh(feedIDs: library.ids, at: .now.addingTimeInterval(60))
         #expect(refresh.errors.isEmpty && library.store.articles.count == 3 * 3)
