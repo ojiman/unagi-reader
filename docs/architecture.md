@@ -42,7 +42,6 @@ There is no backend, no account and no AI proxy. The app has no AI of its own ([
 ### 3.1 Save failure and recovery
 
 - After a failed save, `ReaderStore.rollback()` rolls back both contexts and swaps in fresh library and note `ModelContext`s on the same container. Values from the failed context are never shown.
-- `libraryGeneration` changes at the start of every `reload()`, so with every write that can change what a refresh matches its entries against (they all save and reload) and with a failed save's rollback; a read mark, a Star, the note and a refresh batch's publication leave it as it is. A refresh merged off the main thread uses it to know that its index or result may be stale ([plan](superpowers/plans/2026-10-19-refresh-off-main.md)). A new write of that kind must reload, or change the generation itself.
 - `needsReload` blocks every change until `reloadIfNeeded()` succeeds. A new mutating method calls `reloadIfNeeded()` first and resolves models by ID, not by a reference taken before the failure.
 - One operation is never committed in part, and a failed change is never reported as done. Every change path (read, subscription, Star, note, retention) has a save-failure and reload-failure test; a new path gets one too.
 

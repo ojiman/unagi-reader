@@ -92,7 +92,7 @@ extension ReaderStore {
         do {
             try reloadIfNeeded()
             // Written in a small context of its own (#303): a save in the library context walks every registered model. The library
-            // context then refetches only what the batch wrote (plan "Writes through small contexts").
+            // context then refetches only what the batch wrote (architecture 3).
             let writer = ModelContext(container)
             writer.autosaveEnabled = false
             let models = ArticleModels()

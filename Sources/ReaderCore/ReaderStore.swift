@@ -20,11 +20,6 @@ import SwiftData
     @ObservationIgnored private var feedIndex: [UUID: Feed] = [:]
     @ObservationIgnored private var publishedDates: [UUID: Date] = [:]
     @ObservationIgnored var refreshEntryIndex: EntryIndex?
-    /// Changes with every reload of the library: every write that can change what a refresh reads to match its entries (subscriptions,
-    /// identities, memberships, content) saves and then reloads, and so does a failed save's rollback. A read mark, a Star, the note
-    /// and a refresh batch's own publication do not reload. A refresh merged off the main thread compares it to know that its index
-    /// or its result may be stale (plan "Refresh merge off the main thread").
-    @ObservationIgnored private(set) var libraryGeneration = 0
     @ObservationIgnored private var articleFeeds: [UUID: Set<UUID>] = [:]
     public private(set) var articleIDs: [UUID] = []
     @ObservationIgnored private var feedArticleIDs: [UUID: [UUID]] = [:]
@@ -80,7 +75,6 @@ import SwiftData
     }
 
     func reload() throws {
-        libraryGeneration += 1                                      // also when the reload fails: the library may have changed
         needsReload = true
         refreshEntryIndex = nil
         try reloadHook?()
@@ -413,7 +407,7 @@ import SwiftData
         catch { rollback(); throw error }
     }
 
-    /// Saves a small context of a write (plan "Writes through small contexts"), with the same hook as `save()`. The caller rolls back on failure.
+    /// Saves a small context of a write (architecture 3), with the same hook as `save()`. The caller rolls back on failure.
     func save(writer: ModelContext) throws {
         guard !needsReload else { throw CocoaError(.fileReadUnknown) }
         try saveHook?(); try writer.save()
