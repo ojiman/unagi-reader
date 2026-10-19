@@ -242,12 +242,14 @@ import SwiftData
                models: ArticleModels = ArticleModels()) throws -> Feed {
         let target = target ?? context
         let feed = stored ?? feeds.first { $0.sourceURL == parsed.sourceURL.absoluteString } ?? Feed(title: parsed.title, symbol: "dot.radiowaves.left.and.right")
-        target.insert(feed)
-        feed.sourceURL = parsed.sourceURL.absoluteString
-        feed.siteURL = parsed.siteURL?.absoluteString ?? feed.siteURL
-        feed.iconURL = parsed.iconURL?.absoluteString ?? feed.iconURL
-        if !feed.customTitle { feed.title = parsed.title }
-        if let folder { feed.folder = SingleLineText.name(folder) }
+        if feed.modelContext == nil { target.insert(feed) }       // a fetched feed counts as inserted again, and its save writes it
+        // Each value is assigned only when it differs (#303): SwiftData counts an assignment of the same value as a change, and the save
+        // writes every changed model; a feed that answers 200 with the content it had would otherwise write all its bodies again.
+        update(feed, \.sourceURL, parsed.sourceURL.absoluteString)
+        update(feed, \.siteURL, parsed.siteURL?.absoluteString ?? feed.siteURL)
+        update(feed, \.iconURL, parsed.iconURL?.absoluteString ?? feed.iconURL)
+        if !feed.customTitle { update(feed, \.title, parsed.title) }
+        if let folder { update(feed, \.folder, SingleLineText.name(folder)) }
         func model(_ id: UUID) throws -> Article {
             if let article = models.byID[id] { return article }
             if target === context, let article = articleIndex[id] { return article }
@@ -265,15 +267,17 @@ import SwiftData
             if existing == nil { target.insert(article); models.byID[article.id] = article; index.add(article.id) }
             let oldIdentity = article.identityKey
             if let url = entry.url {
-                article.identityKey = identity
-                article.originalURL = url.absoluteString
+                update(article, \.identityKey, identity)
+                update(article, \.originalURL, url.absoluteString)
             } else if article.identityKey == nil { article.identityKey = identity }
             index.update(article.id, identity: article.identityKey, from: oldIdentity)
-            article.title = entry.title
+            update(article, \.title, entry.title)
             let available = isContentAvailable(article, at: receivedAt)
-            if available { article.summary = entry.summary; article.imageURL = entry.imageURL?.absoluteString ?? article.imageURL }
-            else { try clearContent(of: article, at: receivedAt, in: target, models: models) }
-            if let date = entry.publishedAt { article.publishedAt = date }
+            if available {
+                update(article, \.summary, entry.summary)
+                update(article, \.imageURL, entry.imageURL?.absoluteString ?? article.imageURL)
+            } else { try clearContent(of: article, at: receivedAt, in: target, models: models) }
+            if let date = entry.publishedAt { update(article, \.publishedAt, date) }
             // A second feed must not overwrite a saved article with a shorter excerpt.
             let id = article.id
             let snapshot = models.bodiesFetched.contains(id) ? models.bodies[id]
@@ -282,8 +286,14 @@ import SwiftData
                 if !entry.body.isEmpty &&
                     snapshot.coverageRaw != ContentCoverage.extracted.rawValue &&
                     (article.feedID == feed.id || entry.body.count > snapshot.text.count) {
-                    snapshot.text = entry.body; snapshot.coverageRaw = entry.coverage.rawValue
-                    snapshot.bodyFormatData = BodyParagraph.encode(entry.bodyParagraphs)
+                    let textChanged = snapshot.text != entry.body
+                    if textChanged { snapshot.text = entry.body }
+                    update(snapshot, \.coverageRaw, entry.coverage.rawValue)
+                    // A changed text has a new format. An unchanged one compares the paragraphs, not their JSON: the encoder does not sort
+                    // keys, so the same values can be saved as other bytes, and the body would be written at every refresh (#346).
+                    if textChanged || BodyParagraph.values(snapshot.bodyFormatData) != entry.bodyParagraphs {
+                        snapshot.bodyFormatData = BodyParagraph.encode(entry.bodyParagraphs)
+                    }
                 }
             } else if available && !entry.body.isEmpty {
                 let snapshot = ContentSnapshot(articleID: id, text: entry.body, coverage: entry.coverage, bodyParagraphs: entry.bodyParagraphs)
@@ -297,6 +307,11 @@ import SwiftData
             }
         }
         return feed
+    }
+
+    /// Assigns `value` only when it differs from the model's (see `merge`).
+    private func update<Model: AnyObject, Value: Equatable>(_ model: Model, _ keyPath: ReferenceWritableKeyPath<Model, Value>, _ value: Value) {
+        if model[keyPath: keyPath] != value { model[keyPath: keyPath] = value }
     }
 
     /// Fetches, with one fetch each, the articles a batch's entries will update and their bodies, into `models` (#303): one fetch per
