@@ -3,7 +3,7 @@ import SwiftData
 import Testing
 @testable import ReaderCore
 
-/// Opt-in (#249, plan "Writes through small contexts"): the save of a read mark on a copy of the `BenchmarkFixtureTests` library, against a
+/// Opt-in (#249, architecture 3): the save of a read mark on a copy of the `BenchmarkFixtureTests` library, against a
 /// one-field save in the library context. Release only; run alone on the Mac:
 ///
 ///     UNAGI_READER_READ_MARK_FIXTURE=<exported fixture> swift test -c release --filter ReadMarkPerformanceTests
