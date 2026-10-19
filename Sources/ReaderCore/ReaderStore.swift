@@ -28,7 +28,7 @@ import SwiftData
     @ObservationIgnored private var unreadIDs: Set<UUID> = []
     public private(set) var unreadCount = 0
     public private(set) var feedUnreadCounts: [UUID: Int] = [:]
-    @ObservationIgnored private let container: ModelContainer
+    @ObservationIgnored let container: ModelContainer
     @ObservationIgnored var context: ModelContext
     @ObservationIgnored var noteContext: ModelContext
     @ObservationIgnored private var saveHook: (() throws -> Void)?
@@ -157,8 +157,7 @@ import SwiftData
         for (folder, ids) in folderUpdates { folderIndex[folder] = orderedIDs(folderIndex[folder] ?? [], updating: ids) }
         if titlesChanged { feeds.sort(using: SortDescriptor(\.title)) }
         if !index.changedArticles.isEmpty { contentRevision += 1 }
-        index.changedArticles.removeAll(keepingCapacity: true)
-        index.newMemberships.removeAll(keepingCapacity: true)
+        index.clearChanges()
     }
 
     /// Both lists are already ordered apart from the affected IDs; compare cached dates, without reading every SwiftData model again.
@@ -231,49 +230,94 @@ import SwiftData
         } catch { rollback(); throw error }
     }
 
-    /// Adds or updates the feed and its entries in the context, without saving. The feeds of one refresh batch share `index`.
-    func merge(_ parsed: ParsedFeed, receivedAt: Date, folder: String?, index: EntryIndex) throws -> Feed {
-        let feed = feeds.first { $0.sourceURL == parsed.sourceURL.absoluteString } ?? Feed(title: parsed.title, symbol: "dot.radiowaves.left.and.right")
-        context.insert(feed)
+    /// Adds or updates the feed and its entries in `target` (the library context unless given), without saving. `stored` is the feed's model in
+    /// `target`; without it the feed is found by address in the library, or made. The feeds of one refresh batch share `index` and `models`.
+    func merge(_ parsed: ParsedFeed, receivedAt: Date, folder: String?, index: EntryIndex, into target: ModelContext? = nil, feed stored: Feed? = nil,
+               models: ArticleModels = ArticleModels()) throws -> Feed {
+        let target = target ?? context
+        let feed = stored ?? feeds.first { $0.sourceURL == parsed.sourceURL.absoluteString } ?? Feed(title: parsed.title, symbol: "dot.radiowaves.left.and.right")
+        target.insert(feed)
         feed.sourceURL = parsed.sourceURL.absoluteString
         feed.siteURL = parsed.siteURL?.absoluteString ?? feed.siteURL
         feed.iconURL = parsed.iconURL?.absoluteString ?? feed.iconURL
         if !feed.customTitle { feed.title = parsed.title }
         if let folder { feed.folder = SingleLineText.name(folder) }
+        func model(_ id: UUID) throws -> Article {
+            if let article = models.byID[id] { return article }
+            if target === context, let article = articleIndex[id] { return article }
+            guard let article = try target.fetch(FetchDescriptor<Article>(predicate: #Predicate { $0.id == id })).first else {
+                throw CocoaError(.fileReadUnknown)      // the index knows an article the store does not: apply the feed on its own
+            }
+            models.byID[id] = article
+            return article
+        }
         for entry in parsed.entries {
             let identity = entry.url?.absoluteString ?? (parsed.sourceURL.absoluteString + "|" + entry.sourceID)
-            let existing = index.article(identity: identity, feedID: feed.id, sourceID: entry.sourceID)
+            let existing = try index.articleID(identity: identity, feedID: feed.id, sourceID: entry.sourceID).map(model)
             let article = existing ?? Article(feedID: feed.id, title: entry.title, summary: entry.summary,
                                               publisher: entry.url?.host ?? "", publishedAt: entry.publishedAt ?? .distantPast, receivedAt: receivedAt)
-            if existing == nil { context.insert(article); index.add(article) }
+            if existing == nil { target.insert(article); models.byID[article.id] = article; index.add(article.id) }
             let oldIdentity = article.identityKey
             if let url = entry.url {
                 article.identityKey = identity
                 article.originalURL = url.absoluteString
             } else if article.identityKey == nil { article.identityKey = identity }
-            index.update(article, from: oldIdentity)
+            index.update(article.id, identity: article.identityKey, from: oldIdentity)
             article.title = entry.title
             let available = isContentAvailable(article, at: receivedAt)
             if available { article.summary = entry.summary; article.imageURL = entry.imageURL?.absoluteString ?? article.imageURL }
-            else { _ = try removeContent(articleIDs: [article.id], at: receivedAt) }
+            else { try clearContent(of: article, at: receivedAt, in: target, models: models) }
             if let date = entry.publishedAt { article.publishedAt = date }
             // A second feed must not overwrite a saved article with a shorter excerpt.
             let id = article.id
-            if available, let snapshot = try context.fetch(FetchDescriptor<ContentSnapshot>(predicate: #Predicate { $0.articleID == id })).first {
+            let snapshot = models.bodiesFetched.contains(id) ? models.bodies[id]
+                : try target.fetch(FetchDescriptor<ContentSnapshot>(predicate: #Predicate { $0.articleID == id })).first
+            if available, let snapshot {
                 if !entry.body.isEmpty &&
                     snapshot.coverageRaw != ContentCoverage.extracted.rawValue &&
                     (article.feedID == feed.id || entry.body.count > snapshot.text.count) {
                     snapshot.text = entry.body; snapshot.coverageRaw = entry.coverage.rawValue
                     snapshot.bodyFormatData = BodyParagraph.encode(entry.bodyParagraphs)
                 }
-            } else if available && !entry.body.isEmpty { context.insert(ContentSnapshot(articleID: id, text: entry.body, coverage: entry.coverage, bodyParagraphs: entry.bodyParagraphs)) }
+            } else if available && !entry.body.isEmpty {
+                let snapshot = ContentSnapshot(articleID: id, text: entry.body, coverage: entry.coverage, bodyParagraphs: entry.bodyParagraphs)
+                target.insert(snapshot)
+                if models.bodiesFetched.contains(id) { models.bodies[id] = snapshot }
+            }
             if index.join(feedID: feed.id, articleID: id, sourceID: entry.sourceID) {
                 let membership = FeedMembership(feedID: feed.id, articleID: id, sourceID: entry.sourceID)
-                context.insert(membership)
-                index.newMemberships.append(membership)
+                target.insert(membership)
+                index.newMembershipKeys.append(membership.key)
             }
         }
         return feed
+    }
+
+    /// Fetches, with one fetch each, the articles a batch's entries will update and their bodies, into `models` (#303): one fetch per
+    /// entry would cost more than the save in a small context saves.
+    func prefetch(_ parsed: [(feedID: UUID, feed: ParsedFeed)], index: EntryIndex, into target: ModelContext, models: ArticleModels) throws {
+        var ids: [UUID] = []
+        for (feedID, feed) in parsed {
+            for entry in feed.entries {
+                let identity = entry.url?.absoluteString ?? (feed.sourceURL.absoluteString + "|" + entry.sourceID)
+                if let id = index.articleID(identity: identity, feedID: feedID, sourceID: entry.sourceID), models.byID[id] == nil { ids.append(id) }
+            }
+        }
+        guard !ids.isEmpty else { return }
+        for article in try target.fetch(FetchDescriptor<Article>(predicate: #Predicate { ids.contains($0.id) })) { models.byID[article.id] = article }
+        for snapshot in try target.fetch(FetchDescriptor<ContentSnapshot>(predicate: #Predicate { ids.contains($0.articleID) })) { models.bodies[snapshot.articleID] = snapshot }
+        models.bodiesFetched.formUnion(ids)
+    }
+
+    /// The content of an article that left retention while a feed still carries it: as `removeContent`, for one article, in `target`.
+    private func clearContent(of article: Article, at: Date, in target: ModelContext, models: ArticleModels? = nil) throws {
+        if article.contentDeletedAt == nil || !article.summary.isEmpty || article.imageURL != nil {
+            article.contentDeletedAt = article.contentDeletedAt ?? at
+            article.summary = ""; article.imageURL = nil
+        }
+        let id = article.id
+        for snapshot in try target.fetch(FetchDescriptor<ContentSnapshot>(predicate: #Predicate { $0.articleID == id })) { target.delete(snapshot) }
+        if models?.bodiesFetched.contains(id) == true { models?.bodies[id] = nil }
     }
 
     public func updateSubscription(_ feed: Feed, title: String, folder: String) throws {
@@ -348,6 +392,12 @@ import SwiftData
         catch { rollback(); throw error }
     }
 
+    /// Saves a small context of a write (plan "Writes through small contexts"), with the same hook as `save()`. The caller rolls back on failure.
+    func save(writer: ModelContext) throws {
+        guard !needsReload else { throw CocoaError(.fileReadUnknown) }
+        try saveHook?(); try writer.save()
+    }
+
     func rollback() {
         context.rollback()
         noteContext.rollback()
@@ -376,31 +426,36 @@ public enum ReaderNavigation {
 
 /// Where an entry's article is, looked up instead of scanned (#131): built once from the library, then kept up to date by every
 /// change until a full reload invalidates it. The first article with an identity wins, as the scans did.
+/// Finds a feed's entries among the library's articles: by identity, or by the source ID the feed last used. It holds IDs, not models,
+/// because a refresh batch is written in a small context of its own (#303). `changedArticleIDs` and `newMembershipKeys` say what a batch
+/// wrote; the library context refetches only those, into `changedArticles` and `newMemberships`, for the publication.
 final class EntryIndex {
+    var changedArticleIDs: Set<UUID> = []
+    var newMembershipKeys: [String] = []
     var changedArticles: [UUID: Article] = [:]
     var newMemberships: [FeedMembership] = []
-    private var articleByID: [UUID: Article] = [:]
-    private var articleByIdentity: [String: Article] = [:]
+    private var knownIDs: Set<UUID> = []
+    private var articleByIdentity: [String: UUID] = [:]
     private var priorArticleID: [UUID: [String: UUID]] = [:]
     private var members: [UUID: Set<UUID>] = [:]
 
     init(articles: [Article], memberships: [FeedMembership]) {
         for article in articles {
-            articleByID[article.id] = article
-            if let key = article.identityKey, articleByIdentity[key] == nil { articleByIdentity[key] = article }
+            knownIDs.insert(article.id)
+            if let key = article.identityKey, articleByIdentity[key] == nil { articleByIdentity[key] = article.id }
         }
         for membership in memberships { _ = join(feedID: membership.feedID, articleID: membership.articleID, sourceID: membership.sourceID) }
     }
     /// The article with this identity, or the one this feed last had under the same source ID.
-    func article(identity: String, feedID: UUID, sourceID: String) -> Article? {
-        articleByIdentity[identity] ?? priorArticleID[feedID]?[sourceID].flatMap { articleByID[$0] }
+    func articleID(identity: String, feedID: UUID, sourceID: String) -> UUID? {
+        articleByIdentity[identity] ?? priorArticleID[feedID]?[sourceID].flatMap { knownIDs.contains($0) ? $0 : nil }
     }
-    func add(_ article: Article) { articleByID[article.id] = article }
-    func update(_ article: Article, from oldIdentity: String?) {
-        changedArticles[article.id] = article
-        guard article.identityKey != oldIdentity else { return }
-        if let oldIdentity, articleByIdentity[oldIdentity]?.id == article.id { articleByIdentity[oldIdentity] = nil }
-        if let key = article.identityKey, articleByIdentity[key] == nil { articleByIdentity[key] = article }
+    func add(_ id: UUID) { knownIDs.insert(id) }
+    func update(_ id: UUID, identity: String?, from oldIdentity: String?) {
+        changedArticleIDs.insert(id)
+        guard identity != oldIdentity else { return }
+        if let oldIdentity, articleByIdentity[oldIdentity] == id { articleByIdentity[oldIdentity] = nil }
+        if let identity, articleByIdentity[identity] == nil { articleByIdentity[identity] = id }
     }
     /// True when the feed did not have the article yet.
     func join(feedID: UUID, articleID: UUID, sourceID: String) -> Bool {
@@ -408,4 +463,16 @@ final class EntryIndex {
         if priorArticleID[feedID, default: [:]][sourceID] == nil { priorArticleID[feedID, default: [:]][sourceID] = articleID }
         return true
     }
+    func clearChanges() {
+        changedArticleIDs.removeAll(keepingCapacity: true); newMembershipKeys.removeAll(keepingCapacity: true)
+        changedArticles.removeAll(keepingCapacity: true); newMemberships.removeAll(keepingCapacity: true)
+    }
+}
+
+/// The article models and bodies one write has fetched or made, so each is fetched once (#303). `bodiesFetched` says for which articles
+/// `bodies` is complete (an ID there without a body has none).
+final class ArticleModels {
+    var byID: [UUID: Article] = [:]
+    var bodies: [UUID: ContentSnapshot] = [:]
+    var bodiesFetched: Set<UUID> = []
 }

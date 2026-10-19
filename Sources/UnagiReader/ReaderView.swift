@@ -312,7 +312,7 @@ struct ReaderView: View {
         let edit = inlineEdit(for: .feed(feed.id), initial: feed.title)
         return SubscriptionRow(feed: feed, feedID: feed.id, title: feed.displayTitle, folder: feed.folder, folders: folders,
             unread: store.feedUnreadCounts[feed.id] ?? 0, error: refresh.errors[feed.id], editing: edit?.initial,
-            moving: movingFeedID == feed.id, reduceMotion: reduceMotion, imageLoader: imageLoader,
+            moving: movingFeedID == feed.id, iconURL: SubscriptionIconView.url(for: feed), reduceMotion: reduceMotion, imageLoader: imageLoader,
             actions: SubscriptionRow.Actions(
                 finishEdit: { edit?.finish($0) },
                 refresh: { Task { await refresh.refresh(feedIDs: [feed.id]) } },

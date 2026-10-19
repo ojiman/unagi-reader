@@ -9,9 +9,9 @@ import Testing
     private let loader = ReaderImageLoader(directory: FileManager.default.temporaryDirectory.appending(path: "row-icons-" + UUID().uuidString))
 
     private func row(title: String = "合成購読", folder: String = "", folders: [String] = ["技術"], unread: Int = 3, error: String? = nil,
-                     editing: String? = nil, moving: Bool = false, reduceMotion: Bool = false, onRename: @escaping () -> Void = {}) -> SubscriptionRow {
+                     editing: String? = nil, moving: Bool = false, iconURL: URL? = nil, reduceMotion: Bool = false, onRename: @escaping () -> Void = {}) -> SubscriptionRow {
         SubscriptionRow(feed: feed, feedID: feed.id, title: title, folder: folder, folders: folders, unread: unread, error: error, editing: editing,
-            moving: moving, reduceMotion: reduceMotion, imageLoader: loader,
+            moving: moving, iconURL: iconURL, reduceMotion: reduceMotion, imageLoader: loader,
             actions: SubscriptionRow.Actions(finishEdit: { _ in }, refresh: {}, rename: onRename, beginMove: {}, endMove: {}, move: { _ in }, unsubscribe: {}))
     }
 
@@ -28,6 +28,7 @@ import Testing
         #expect(base != row(error: "合成エラー"))
         #expect(base != row(editing: "合成購読"))
         #expect(base != row(moving: true))
+        #expect(base != row(iconURL: URL(string: "https://feed.example/icon.png")))   // a refresh can change it without notifying the feed
         #expect(base != row(reduceMotion: true))              // the move action reads it
     }
 

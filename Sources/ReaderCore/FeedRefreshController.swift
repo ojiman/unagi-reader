@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Observation
 
 @Observable @MainActor public final class FeedRefreshController {
@@ -37,7 +38,7 @@ import Observation
             var applied = false
             @MainActor func applyPending() {
                 guard !pending.isEmpty, !Task.isCancelled else { return }
-                let failed = store.applyRefreshes(pending, at: at)
+                let failed = autoreleasepool { store.applyRefreshes(pending, at: at) }   // the batch's small context goes with it (#303)
                 for item in pending { errors[item.feedID] = failed[item.feedID]?.localizedDescription }
                 pending = []; applied = true
             }
@@ -88,25 +89,47 @@ extension ReaderStore {
     func applyRefreshes(_ fetched: [FetchedFeed], at: Date) -> [UUID: any Error] {
         do {
             try reloadIfNeeded()
+            // Written in a small context of its own (#303): a save in the library context walks every registered model. The library
+            // context then refetches only what the batch wrote (plan "Writes through small contexts").
+            let writer = ModelContext(container)
+            writer.autosaveEnabled = false
+            let models = ArticleModels()
             var index: EntryIndex?
             var titlesChanged = false
+            var feedIDs: [UUID] = []
+            var toMerge: [(feedID: UUID, feed: ParsedFeed)] = []
+            for item in fetched {
+                guard let feed = feed(id: item.feedID), feed.sourceURL == item.sourceURL,
+                      case .modified(let parsed, _, _) = item.result, parsed.sourceURL.absoluteString == feed.sourceURL else { continue }
+                toMerge.append((feed.id, parsed))
+            }
+            if !toMerge.isEmpty {
+                if refreshEntryIndex == nil { refreshEntryIndex = EntryIndex(articles: articles, memberships: memberships) }
+                try prefetch(toMerge, index: refreshEntryIndex!, into: writer, models: models)
+            }
             for item in fetched {
                 guard let feed = feed(id: item.feedID), feed.sourceURL == item.sourceURL else { continue }
+                let feedID = feed.id
+                guard let stored = try writer.fetch(FetchDescriptor<Feed>(predicate: #Predicate { $0.id == feedID })).first else { continue }
                 if case .modified(let parsed, let etag, let modified) = item.result {
                     guard parsed.sourceURL.absoluteString == feed.sourceURL else { continue }
                     if index == nil {
                         if refreshEntryIndex == nil { refreshEntryIndex = EntryIndex(articles: articles, memberships: memberships) }
                         index = refreshEntryIndex
                     }
-                    let title = feed.title
-                    _ = try merge(parsed, receivedAt: at, folder: nil, index: index!)
-                    titlesChanged = titlesChanged || feed.title != title
-                    feed.etag = etag; feed.lastModified = modified
+                    let title = stored.title
+                    _ = try merge(parsed, receivedAt: at, folder: nil, index: index!, into: writer, feed: stored, models: models)
+                    titlesChanged = titlesChanged || stored.title != title
+                    stored.etag = etag; stored.lastModified = modified
                 }
-                feed.lastFetchedAt = at
+                stored.lastFetchedAt = at
+                feedIDs.append(feedID)
             }
-            try save()
-            do { try publishRefresh(index: index, titlesChanged: titlesChanged) } catch {
+            try save(writer: writer)
+            do {
+                try refetch(feedIDs: feedIDs, index: index)
+                try publishRefresh(index: index, titlesChanged: titlesChanged)
+            } catch {
                 // The save succeeded. Report the publication failure, then recover from the committed store.
                 rollback()
                 return Dictionary(fetched.map { ($0.feedID, error) }, uniquingKeysWith: { first, _ in first })
@@ -121,6 +144,18 @@ extension ReaderStore {
             return failed
         }
         return [:]
+    }
+    /// After a batch saved in its own context: the library context fetches the batch's feeds, changed articles and new memberships again,
+    /// once each, so its instances take the saved values and the new ones are registered for the publication.
+    private func refetch(feedIDs: [UUID], index: EntryIndex?) throws {
+        if !feedIDs.isEmpty { _ = try context.fetch(FetchDescriptor<Feed>(predicate: #Predicate { feedIDs.contains($0.id) })) }
+        guard let index else { return }
+        let ids = Array(index.changedArticleIDs), keys = index.newMembershipKeys
+        let changed = ids.isEmpty ? [] : try context.fetch(FetchDescriptor<Article>(predicate: #Predicate { ids.contains($0.id) }))
+        let joined = keys.isEmpty ? [] : try context.fetch(FetchDescriptor<FeedMembership>(predicate: #Predicate { keys.contains($0.key) }))
+        guard changed.count == ids.count, joined.count == keys.count else { throw CocoaError(.fileReadUnknown) }
+        index.changedArticles = Dictionary(uniqueKeysWithValues: changed.map { ($0.id, $0) })
+        index.newMemberships = joined
     }
     public func applyRefresh(_ result: FeedFetchResult, to feed: Feed, at: Date) throws {
         try reloadIfNeeded()

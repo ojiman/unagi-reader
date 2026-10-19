@@ -52,6 +52,6 @@ The note already left the library context for this reason (#332). The read mark 
 
 ## Steps
 
-1. `markDisplayed` (#249): this PR. The refetch, the revision, the architecture rule.
+1. `markDisplayed` (#249): done in #337.
 2. `setRead`, `setStar` (keys `m`, `s`): the same path, if step 1 holds.
-3. The refresh batch (#303): merges in a small context, one refetch per batch; separate measurements at 200, 1,000 and 2,000 feeds.
+3. The refresh batch (#303): merges in a small context, one refetch per batch; separate measurements at 200, 1,000 and 2,000 feeds. In the PR for #303. What shows a refresh's values: the list rows (reloaded on each window update, which `contentRevision` and the counts cause), the open article (`contentRevision`), the sidebar titles (the `feeds` array changes when a title does) and icons (the address is a row value).
