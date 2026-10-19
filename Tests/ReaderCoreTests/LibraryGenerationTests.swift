@@ -39,7 +39,7 @@ import Testing
         try changes("unsubscribe") { try store.unsubscribe(other) }
     }
 
-    @Test func readMarksStarsTheNoteAndARefreshBatchDoNot() throws {
+    @Test func readMarksStarsTheNoteAndARefreshBatchDoNot() async throws {
         let library = try TestLibrary(); defer { library.cleanup() }
         let store = try ReaderStore(url: library.url, now: at)
         let feed = try store.importFeed(parsed("https://feed.example/rss", entries: ["a", "b"]), receivedAt: at)
@@ -50,14 +50,14 @@ import Testing
         try store.setStar(articleID: article.id, isStarred: true, at: at)
         try store.saveNote(text: "合成ノート", at: at)
         let source = try #require(feed.sourceURL)
-        #expect(store.applyRefreshes([FetchedFeed(feedID: feed.id, sourceURL: source,
+        #expect(await store.applyRefreshes([FetchedFeed(feedID: feed.id, sourceURL: source,
             result: .modified(parsed(source, entries: ["a", "b", "c"]), etag: "v2", lastModified: nil))], at: at).isEmpty)
         #expect(store.libraryGeneration == before)
     }
 
     @Test func aFailedSaveChangesTheGeneration() throws {
         let library = try TestLibrary(); defer { library.cleanup() }
-        final class Gate { var failNext = false }
+        final class Gate: @unchecked Sendable { var failNext = false }
         let gate = Gate()
         let schema = ReaderStore.schema
         let container = try ModelContainer(for: schema, configurations: [

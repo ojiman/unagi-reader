@@ -72,7 +72,7 @@ struct TestLibrary {
         #expect(!store.context.hasChanges)
     }
 
-    final class SaveGate { var failNext = false }
+    final class SaveGate: @unchecked Sendable { var failNext = false }
 
     /// A failed read mark is not shown as read and is not saved; the next one works.
     @Test func aFailedReadMarkIsNotShownAndCanBeRetried() throws {

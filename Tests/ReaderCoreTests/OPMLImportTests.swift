@@ -128,12 +128,12 @@ import Testing
         defer { try? FileManager.default.removeItem(at: url) }
         let schema = ReaderStore.schema
         let container = try ModelContainer(for: schema, configurations: [ModelConfiguration("Reader", schema: schema, url: url.appending(path: "Reader.store"), cloudKitDatabase: .none)])
-        var failSave = false
-        let store = try ReaderStore(container: container, now: .now, saveHook: { if failSave { throw CocoaError(.fileWriteUnknown) } })
-        failSave = true
+        let failSave = TestBox(false)
+        let store = try ReaderStore(container: container, now: .now, saveHook: { if failSave.value { throw CocoaError(.fileWriteUnknown) } })
+        failSave.value = true
         #expect(throws: (any Error).self) { try store.importSubscriptions([feed("A", "https://a.example/f")]) }
         #expect(store.feeds.isEmpty)                                                                  // nothing half-added
-        failSave = false
+        failSave.value = false
         #expect(try store.importSubscriptions([feed("A", "https://a.example/f")]).addedFeedIDs.count == 1)
     }
     @Test func theStoreDoesNotTrustTheCallerToNormalizeAddresses() throws {

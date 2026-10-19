@@ -36,11 +36,14 @@ import Observation
                 group.addTask { .fetched(request, await Result { try await client.fetch(url: request.url, etag: request.etag, lastModified: request.modified) }) }
             }
             var applied = false
-            @MainActor func applyPending() {
+            let writer = RefreshWriter(container: store.container, saveHook: store.saveHook)
+            @MainActor func applyPending() async {
                 guard !pending.isEmpty, !Task.isCancelled else { return }
-                let failed = autoreleasepool { store.applyRefreshes(pending, at: at) }   // the batch's small context goes with it (#303)
-                for item in pending { errors[item.feedID] = failed[item.feedID]?.localizedDescription }
-                pending = []; applied = true
+                let batch = pending
+                pending = []
+                let failed = await store.applyRefreshes(batch, at: at, writer: writer)
+                for item in batch { errors[item.feedID] = failed[item.feedID]?.localizedDescription }
+                applied = true
             }
             for _ in 0..<3 { if let request = iterator.next() { enqueue(request) } }
             while let event = await group.next() {
@@ -55,7 +58,7 @@ import Observation
                         if store.feeds.contains(where: { $0.id == request.id && $0.sourceURL == request.url.absoluteString }) { errors[request.id] = error.localizedDescription }
                     }
                     if let next = iterator.next() { enqueue(next) }
-                    if pending.count >= Self.batchSize { applyPending() }
+                    if pending.count >= Self.batchSize { await applyPending() }
                     else if !pending.isEmpty && !waiting {
                         waiting = true
                         let delay = batchDelay
@@ -63,9 +66,9 @@ import Observation
                     }
                 case .due:
                     waiting = false
-                    applyPending()
+                    await applyPending()
                 }
-                if fetching == 0 { applyPending(); group.cancelAll() }          // the last fetch ended: no need to wait
+                if fetching == 0 { await applyPending(); group.cancelAll() }          // the last fetch ended: no need to wait
                 // A finished fetch makes `next()` return without suspending; after a batch, let the window have a turn.
                 if applied { applied = false; await Task.yield() }
             }
@@ -84,78 +87,44 @@ private extension Result where Failure == any Error {
 struct FetchedFeed: Sendable { let feedID: UUID; let sourceURL: String; let result: FeedFetchResult }
 
 extension ReaderStore {
-    /// Applies several fetched feeds with one save and one committed list update (#131, #303). When that fails, the batch is rolled back and each feed
-    /// is applied on its own, so a feed that cannot be saved does not hold back the others. Returns the feeds that could not be applied.
-    func applyRefreshes(_ fetched: [FetchedFeed], at: Date) -> [UUID: any Error] {
+    /// Applies several fetched feeds with one save and one committed list update (#131, #303). `writer` merges and saves them off the main
+    /// thread (plan "Refresh merge off the main thread"); the main actor then refetches what it wrote and publishes it. Returns the feeds
+    /// that could not be applied.
+    /// `afterWrite` lets a test change the library while the batch is written.
+    func applyRefreshes(_ fetched: [FetchedFeed], at: Date, writer: RefreshWriter? = nil, afterWrite: (() -> Void)? = nil) async -> [UUID: any Error] {
+        do { try reloadIfNeeded() } catch { return Dictionary(fetched.map { ($0.feedID, error) }, uniquingKeysWith: { first, _ in first }) }
+        // A subscription removed, or given another address, since its fetch is skipped; the writer checks again when it writes.
+        let items = fetched.filter { feed(id: $0.feedID)?.sourceURL == $0.sourceURL }
+        guard !items.isEmpty else { return [:] }
+        let writer = writer ?? RefreshWriter(container: container, saveHook: saveHook)
+        let generation = libraryGeneration
+        let result = await writer.apply(items, at: at, retentionDays: retentionDays, generation: generation)
+        afterWrite?()
         do {
-            try reloadIfNeeded()
-            // Written in a small context of its own (#303): a save in the library context walks every registered model. The library
-            // context then refetches only what the batch wrote (plan "Writes through small contexts").
-            let writer = ModelContext(container)
-            writer.autosaveEnabled = false
-            let models = ArticleModels()
-            var index: EntryIndex?
-            var titlesChanged = false
-            var feedIDs: [UUID] = []
-            var toMerge: [(feedID: UUID, feed: ParsedFeed)] = []
-            for item in fetched {
-                guard let feed = feed(id: item.feedID), feed.sourceURL == item.sourceURL,
-                      case .modified(let parsed, _, _) = item.result, parsed.sourceURL.absoluteString == feed.sourceURL else { continue }
-                toMerge.append((feed.id, parsed))
-            }
-            if !toMerge.isEmpty {
-                if refreshEntryIndex == nil { refreshEntryIndex = EntryIndex(articles: articles, memberships: memberships) }
-                try prefetch(toMerge, index: refreshEntryIndex!, into: writer, models: models)
-            }
-            for item in fetched {
-                guard let feed = feed(id: item.feedID), feed.sourceURL == item.sourceURL else { continue }
-                let feedID = feed.id
-                guard let stored = try writer.fetch(FetchDescriptor<Feed>(predicate: #Predicate { $0.id == feedID })).first else { continue }
-                if case .modified(let parsed, let etag, let modified) = item.result {
-                    guard parsed.sourceURL.absoluteString == feed.sourceURL else { continue }
-                    if index == nil {
-                        if refreshEntryIndex == nil { refreshEntryIndex = EntryIndex(articles: articles, memberships: memberships) }
-                        index = refreshEntryIndex
-                    }
-                    let title = stored.title
-                    _ = try merge(parsed, receivedAt: at, folder: nil, index: index!, into: writer, feed: stored, models: models)
-                    titlesChanged = titlesChanged || stored.title != title
-                    stored.etag = etag; stored.lastModified = modified
-                }
-                stored.lastFetchedAt = at
-                feedIDs.append(feedID)
-            }
-            try save(writer: writer)
-            do {
-                try refetch(feedIDs: feedIDs, index: index)
-                try publishRefresh(index: index, titlesChanged: titlesChanged)
-            } catch {
-                // The save succeeded. Report the publication failure, then recover from the committed store.
-                rollback()
-                return Dictionary(fetched.map { ($0.feedID, error) }, uniquingKeysWith: { first, _ in first })
+            if libraryGeneration != generation || needsReload {
+                // The library changed while the batch was written (or must be reloaded anyway): its result may not fit the shown
+                // state, so everything is loaded from the store, including what the batch saved.
+                try reload()
+            } else {
+                try publish(result)
             }
         } catch {
+            // Saved, but not shown. Report it, then recover from the committed store.
             rollback()
-            var failed: [UUID: any Error] = [:]
-            for item in fetched {
-                guard let feed = feed(id: item.feedID), feed.sourceURL == item.sourceURL else { continue }
-                do { try applyRefresh(item.result, to: feed, at: at) } catch { failed[item.feedID] = error }
-            }
-            return failed
+            return Dictionary(items.map { ($0.feedID, error) }, uniquingKeysWith: { first, _ in first })
         }
-        return [:]
+        return result.errors
     }
-    /// After a batch saved in its own context: the library context fetches the batch's feeds, changed articles and new memberships again,
-    /// once each, so its instances take the saved values and the new ones are registered for the publication.
-    private func refetch(feedIDs: [UUID], index: EntryIndex?) throws {
+    /// The library context fetches the batch's feeds, changed articles and new memberships again, once each, so its instances take the
+    /// saved values and the new ones are registered; then the lists and counts are updated from them.
+    private func publish(_ result: BatchResult) throws {
+        let feedIDs = result.feedIDs, ids = result.changedArticleIDs, keys = result.newMembershipKeys
         if !feedIDs.isEmpty { _ = try context.fetch(FetchDescriptor<Feed>(predicate: #Predicate { feedIDs.contains($0.id) })) }
-        guard let index else { return }
-        let ids = Array(index.changedArticleIDs), keys = index.newMembershipKeys
         let changed = ids.isEmpty ? [] : try context.fetch(FetchDescriptor<Article>(predicate: #Predicate { ids.contains($0.id) }))
         let joined = keys.isEmpty ? [] : try context.fetch(FetchDescriptor<FeedMembership>(predicate: #Predicate { keys.contains($0.key) }))
-        guard changed.count == ids.count, joined.count == keys.count else { throw CocoaError(.fileReadUnknown) }
-        index.changedArticles = Dictionary(uniqueKeysWithValues: changed.map { ($0.id, $0) })
-        index.newMemberships = joined
+        guard changed.count == Set(ids).count, joined.count == Set(keys).count else { throw CocoaError(.fileReadUnknown) }
+        try publishRefresh(changedArticles: Dictionary(uniqueKeysWithValues: changed.map { ($0.id, $0) }), newMemberships: joined,
+                           titlesChanged: result.titlesChanged)
     }
     public func applyRefresh(_ result: FeedFetchResult, to feed: Feed, at: Date) throws {
         try reloadIfNeeded()

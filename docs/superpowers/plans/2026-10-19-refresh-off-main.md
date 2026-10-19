@@ -55,8 +55,8 @@ If probe 1 had lost a value, or probe 2 had been over about 50 ms, the alternati
 
 ## Steps (one PR each, each with an independent review)
 
-1. The library generation and its tests (no behavior change).
-2. `RefreshWriter` with the index and the batch merge; `applyRefreshes` awaits it; publication on the main actor. Tests: everything `RefreshBatchTests` and `RefreshIndexTests` check today; a subscription removed during a refresh; a read mark and a Star on an article that the batch updates; a generation change between batches; cancellation.
+1. The library generation and its tests (no behavior change): done in #341.
+2. (In the PR that follows #341.) `RefreshWriter` with the index and the batch merge; `applyRefreshes` awaits it; publication on the main actor. Tests: everything `RefreshBatchTests` and `RefreshIndexTests` check today; a subscription removed during a refresh; a read mark and a Star on an article that the batch updates; a generation change between batches; cancellation.
 3. Measurements: the reading-budget replay (W2 while refreshing, alternating with main), the first refresh at 200, 1,000 and 2,000 feeds, and peak RSS (#339).
 
 ## Not in this plan

@@ -37,17 +37,17 @@ struct ReaderStoreTests {
         let at = Date(timeIntervalSince1970: 1_000_000)
         let schema = ReaderStore.schema
         let container = try ModelContainer(for: schema, configurations: [ModelConfiguration("Reader", schema: schema, url: url, cloudKitDatabase: .none)])
-        var fail = false
+        let fail = TestBox(false)
         let store = try ReaderStore(container: container, now: at, saveHook: {
-            if fail { throw CocoaError(.fileWriteUnknown) }
+            if fail.value { throw CocoaError(.fileWriteUnknown) }
         })
         let parsed = try FeedParser.parse(Data(FeedParserTests.rss.utf8), sourceURL: URL(string: "https://feed.example/rss")!)
         let feed = try store.importFeed(parsed, receivedAt: at)
         let article = try #require(store.articles.first)
-        fail = true
+        fail.value = true
         #expect(throws: (any Error).self) { try store.setRead(article, true) }
         #expect(store.article(id: article.id)?.isRead == false)
-        fail = false
+        fail.value = false
         try store.setRead(article, true)
         try store.updateSubscription(feed, title: "再試行した購読", folder: "技術")
         #expect(store.article(id: article.id)?.isRead == true)
@@ -73,23 +73,23 @@ struct ReaderStoreTests {
         let at = Date(timeIntervalSince1970: 1_000_000)
         let schema = ReaderStore.schema
         let container = try ModelContainer(for: schema, configurations: [ModelConfiguration("Reader", schema: schema, url: url, cloudKitDatabase: .none)])
-        var failSave = false, failReload = false, saveAttempts = 0
+        let failSave = TestBox(false), failReload = TestBox(false), saveAttempts = TestBox(0)
         let store = try ReaderStore(container: container, now: at, saveHook: {
-            saveAttempts += 1
-            if failSave { throw CocoaError(.fileWriteUnknown) }
+            saveAttempts.value += 1
+            if failSave.value { throw CocoaError(.fileWriteUnknown) }
         }, reloadHook: {
-            if failReload { throw CocoaError(.fileReadUnknown) }
+            if failReload.value { throw CocoaError(.fileReadUnknown) }
         })
         let parsed = try FeedParser.parse(Data(FeedParserTests.rss.utf8), sourceURL: URL(string: "https://feed.example/rss")!)
         let feed = try store.importFeed(parsed, receivedAt: at)
         let article = try #require(store.articles.first)
         try store.saveNote(text: "# 保存済み\n", at: at)
-        failSave = true; failReload = true
+        failSave.value = true; failReload.value = true
         #expect(throws: (any Error).self) { try store.setRead(article, true) }
-        failSave = false
-        let attempts = saveAttempts
+        failSave.value = false
+        let attempts = saveAttempts.value
         #expect(throws: (any Error).self) { try store.setRead(article, true) }
-        try #require(saveAttempts == attempts)
+        try #require(saveAttempts.value == attempts)
         let changes: [() throws -> Void] = [
             { try store.setRead(article, true) },
             { try store.setStar(articleID: article.id, isStarred: true, at: at) },
@@ -106,8 +106,8 @@ struct ReaderStoreTests {
             { try store.markDisplayed(articleID: article.id, at: at) }
         ]
         for change in changes { #expect(throws: (any Error).self) { try change() } }
-        #expect(saveAttempts == attempts)
-        failReload = false
+        #expect(saveAttempts.value == attempts)
+        failReload.value = false
         try store.setRead(article, true)
         try store.saveNote(text: "再試行したノート", at: at)
         let reopened = try ReaderStore(url: url, now: at)

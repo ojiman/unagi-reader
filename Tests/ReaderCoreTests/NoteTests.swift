@@ -94,7 +94,7 @@ import Testing
         #expect(store.note?.text.count == long.count)
     }
 
-    final class SaveGate { var failNext = false }
+    final class SaveGate: @unchecked Sendable { var failNext = false }
 
     @Test func failedSaveLeavesNoPartialNoteStateAndCanBeRetried() throws {
         let library = try TestLibrary(); defer { library.cleanup() }
@@ -116,7 +116,7 @@ import Testing
         #expect(reopened.notes.count == 1 && reopened.note?.text == "再試行のノート")
     }
 
-    final class RecoveryGate { var failSave = false, failReload = false }
+    final class RecoveryGate: @unchecked Sendable { var failSave = false, failReload = false }
 
     /// Once reloading works again, the very first note change must recover the store and succeed.
     /// `save()` alone refuses while a reload is pending, so only a leading `reloadIfNeeded()` passes this.
