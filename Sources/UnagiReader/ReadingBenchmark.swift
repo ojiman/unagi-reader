@@ -4,6 +4,20 @@ import ReaderCore
 /// Opt-in replay for issue #164. Only a marked, temporary BenchmarkFixtureTests library may be changed.
 @MainActor enum ReadingBenchmark {
     static var requested: Bool { ProcessInfo.processInfo.arguments.contains("--reading-benchmark") }
+    /// What the measured refresh brings (`--refresh-scenario`, #303). `changed`, the default, is the original replay: every feed answers
+    /// its 100 entries with bodies that differ from the fixture's. The others first refresh once unmeasured, to the stub's own content
+    /// (etag "base"), and then measure a second refresh: `unchanged` answers the same content again with 200; `morning` adds 10 new
+    /// entries to every feed; `typical` answers 304 for 6 feeds in 10, the same content for 3, and 3 new entries for 1.
+    enum RefreshScenario: String, Sendable { case changed, unchanged, morning, typical }
+    nonisolated static var scenario: RefreshScenario {
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "--refresh-scenario"), args.indices.contains(index + 1) else { return .changed }
+        return RefreshScenario(rawValue: args[index + 1]) ?? .changed
+    }
+    /// New articles the measured refresh of a scenario adds to the 10,000.
+    nonisolated static func newArticles(_ scenario: RefreshScenario) -> Int {
+        switch scenario { case .changed, .unchanged: 0; case .morning: 100 * 10; case .typical: 10 * 3 }
+    }
     private(set) static var completed = false
     private(set) static var failure: String?
 
@@ -23,18 +37,32 @@ import ReaderCore
     }
 
     struct SyntheticHTTP: HTTPFetching {
+        var scenario: RefreshScenario = ReadingBenchmark.scenario
         func fetch(url: URL, headers: [String: String], maximumBytes: Int) async throws -> HTTPResponse {
             guard url.scheme == "https", url.host == "synthetic.example", url.user == nil, url.password == nil, url.port == nil,
                   url.deletingLastPathComponent().path == "/feeds", let feed = Int(url.lastPathComponent), (0..<100).contains(feed) else {
                 throw HTTPError.invalidURL
             }
             let body = (1...80).map { "合成段落 \($0)。更新計測のための本文です。これは現実の記事ではありません。" }.joined(separator: "\n\n")
-            let entries = stride(from: feed, to: 10_000, by: 100).map { index in
-                "<item><guid>\(index)</guid><title>合成記事 \(index)</title><description>負荷試験のための合成要約です。</description><content:encoded><![CDATA[\(body)]]></content:encoded></item>"
-            }.joined()
-            let data = Data("<rss version=\"2.0\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\"><channel><title>合成購読 \(feed)</title>\(entries)</channel></rss>".utf8)
+            func item(_ guid: String, _ title: String) -> String {
+                "<item><guid>\(guid)</guid><title>\(title)</title><description>負荷試験のための合成要約です。</description><content:encoded><![CDATA[\(body)]]></content:encoded></item>"
+            }
+            var entries = stride(from: feed, to: 10_000, by: 100).map { item("\($0)", "合成記事 \($0)") }
+            var etag: String?
+            // The measured round of a scenario: the feed already has the stub's content and its etag.
+            if scenario != .changed, headers["If-None-Match"] == "base" {
+                etag = "base"
+                switch scenario {
+                case .changed, .unchanged: break
+                case .morning: entries = (0..<10).map { item("new-\(feed)-\($0)", "合成新着 \(feed)-\($0)") } + entries
+                case .typical:
+                    if feed % 10 < 6 { return HTTPResponse(data: Data(), finalURL: url, statusCode: 304, headers: ["etag": "base"]) }
+                    if feed % 10 == 9 { entries = (0..<3).map { item("new-\(feed)-\($0)", "合成新着 \(feed)-\($0)") } + entries }
+                }
+            } else if scenario != .changed { etag = "base" }
+            let data = Data("<rss version=\"2.0\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\"><channel><title>合成購読 \(feed)</title>\(entries.joined())</channel></rss>".utf8)
             guard data.count <= maximumBytes else { throw HTTPError.tooLarge }
-            return HTTPResponse(data: data, finalURL: url, statusCode: 200, headers: [:])
+            return HTTPResponse(data: data, finalURL: url, statusCode: 200, headers: etag.map { ["etag": $0] } ?? [:])
         }
     }
 
@@ -103,11 +131,20 @@ import ReaderCore
             // The canonical fixture has no feed URLs. Keep ordinary startup, then prepare only the explicit refresh.
             for (index, feed) in store.feeds.enumerated() { feed.sourceURL = "https://synthetic.example/feeds/\(index)" }
             if let first = store.feeds.first { try store.recordFetch(first, etag: nil, lastModified: nil, at: .now) }
+            let scenario = Self.scenario
+            ReaderPerformance.refreshScenario = scenario.rawValue
+            if scenario != .changed {
+                await refresh.refresh()                                    // unmeasured: the feeds take the stub's content and etag
+                guard refresh.errors.isEmpty, store.feeds.allSatisfy({ $0.etag == "base" }) else {
+                    throw Failure(message: "The scenario's first refresh did not finish every feed.")
+                }
+                try await Task.sleep(for: .seconds(1))
+            }
             ReaderPerformance.beginPhase("refresh")
             let started = Date.now
             await refresh.refresh()
             guard refresh.errors.isEmpty, store.feeds.allSatisfy({ ($0.lastFetchedAt ?? .distantPast) >= started }),
-                  store.articles.count == 10_000 else { throw Failure(message: "The synthetic refresh did not finish every feed.") }
+                  store.articles.count == 10_000 + Self.newArticles(scenario) else { throw Failure(message: "The synthetic refresh did not finish every feed.") }
             // Include the screen work queued by the last reload, not just the synchronous store calls.
             try await Task.sleep(for: .seconds(1))
             content.layoutSubtreeIfNeeded()

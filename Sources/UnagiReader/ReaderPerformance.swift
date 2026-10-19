@@ -16,6 +16,7 @@ import Darwin
     private static var launch = Launch()
     static var selectionCount: Int { samples.count }
     static var columnWidths: [String: [String: Double]] = [:]
+    static var refreshScenario: String?
     static var output: URL? {
         let args = ProcessInfo.processInfo.arguments
         guard let index = args.firstIndex(of: "--performance-output"), args.indices.contains(index + 1) else { return nil }
@@ -85,6 +86,7 @@ import Darwin
             "os": ProcessInfo.processInfo.operatingSystemVersionString,
             "displayRefreshRate": CGDisplayCopyDisplayMode(CGMainDisplayID())?.refreshRate ?? 0]
         if !columnWidths.isEmpty { values["columnWidthsPoints"] = columnWidths }
+        if let refreshScenario { values["refreshScenario"] = refreshScenario }
         if let milliseconds = launch.milliseconds { values["launchMilliseconds"] = milliseconds }
         if !phaseGaps.isEmpty { values["phaseGapsOver100ms"] = phaseGaps; values["phaseHeartbeatCounts"] = phaseHeartbeats }
         if ReadingBenchmark.requested {
