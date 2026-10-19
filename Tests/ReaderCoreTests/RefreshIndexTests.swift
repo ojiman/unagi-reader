@@ -16,6 +16,38 @@ import Testing
                                                 result: .modified(parsed, etag: "v1", lastModified: nil))], at: at).isEmpty)
     }
 
+    /// #303: a refresh batch is written through a small context, so its save does not walk the whole library or commit anything else.
+    @Test func aBatchDoesNotCommitAnUnrelatedPendingChange() throws {
+        let library = try TestLibrary(); defer { library.cleanup() }
+        let store = try ReaderStore(url: library.url)
+        let feed = try store.importFeed(ParsedFeed(title: "Feed", sourceURL: URL(string: "https://feed.example/rss")!,
+                                                  entries: [entry("a", "a", 1), entry("b", "b", 2)], skippedEntries: 0), receivedAt: at)
+        let other = try #require(store.articles.first { $0.originalURL == "https://article.example/b" })
+        let otherID = other.id
+        other.isRead = true                                                         // unsaved, and not part of the refresh
+        try apply(store, feed, [entry("a", "a", 1, title: "Changed"), entry("c", "c", 3)])
+        let reopened = try ReaderStore(url: library.url)
+        #expect(reopened.article(id: otherID)?.isRead == false)
+        #expect(reopened.articles.count == 3 && reopened.articles.contains { $0.title == "Changed" })
+    }
+
+    /// The library context's instances take the batch's saved values (the shown article and feed are the same objects), and it is left
+    /// with no unsaved change.
+    @Test func aBatchShowsItsValuesWithoutLeavingChanges() throws {
+        let library = try TestLibrary(); defer { library.cleanup() }
+        let store = try ReaderStore(url: library.url)
+        let feed = try store.importFeed(ParsedFeed(title: "Feed", sourceURL: URL(string: "https://feed.example/rss")!,
+                                                  entries: [entry("a", "a", 1)], skippedEntries: 0), receivedAt: at)
+        let article = try #require(store.articles.first)
+        let source = try #require(feed.sourceURL)
+        let parsed = ParsedFeed(title: "Renamed", sourceURL: try #require(URL(string: source)), entries: [entry("a", "a", 1, title: "Changed")],
+                                skippedEntries: 0, iconURL: URL(string: "https://feed.example/icon.png"))
+        #expect(store.applyRefreshes([FetchedFeed(feedID: feed.id, sourceURL: source, result: .modified(parsed, etag: "v2", lastModified: nil))], at: at).isEmpty)
+        #expect(store.article(id: article.id) === article && article.title == "Changed")
+        #expect(store.feed(id: feed.id) === feed && feed.title == "Renamed" && feed.iconURL == "https://feed.example/icon.png" && feed.etag == "v2")
+        #expect(feed.lastFetchedAt == at && !store.context.hasChanges)
+    }
+
     @Test func notModifiedKeepsTheDisplayedArticleLists() throws {
         let library = try TestLibrary(); defer { library.cleanup() }
         let store = try ReaderStore(url: library.url)

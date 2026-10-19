@@ -24,6 +24,8 @@ struct SubscriptionRow: View, Equatable {
     /// The name when it is edited in place; nil for every other row.
     let editing: String?
     let moving: Bool
+    /// The icon's address: a refresh can change it without notifying the feed (#303).
+    let iconURL: URL?
     /// Not shown, but the move action reads it: a change rebuilds the row so the action is current.
     let reduceMotion: Bool
     let imageLoader: ReaderImageLoader
@@ -32,20 +34,20 @@ struct SubscriptionRow: View, Equatable {
     private let feedInstance: ObjectIdentifier
 
     init(feed: Feed, feedID: UUID, title: String, folder: String, folders: [String], unread: Int, error: String?, editing: String?, moving: Bool,
-         reduceMotion: Bool, imageLoader: ReaderImageLoader, actions: Actions) {
+         iconURL: URL? = nil, reduceMotion: Bool, imageLoader: ReaderImageLoader, actions: Actions) {
         self.feed = feed; self.feedID = feedID; self.title = title; self.folder = folder; self.folders = folders; self.unread = unread
-        self.error = error; self.editing = editing; self.moving = moving; self.reduceMotion = reduceMotion; self.imageLoader = imageLoader
+        self.error = error; self.editing = editing; self.moving = moving; self.iconURL = iconURL; self.reduceMotion = reduceMotion; self.imageLoader = imageLoader
         self.actions = actions; feedInstance = ObjectIdentifier(feed)
     }
 
     nonisolated static func == (a: Self, b: Self) -> Bool {
         a.feedID == b.feedID && a.feedInstance == b.feedInstance && a.title == b.title && a.folder == b.folder && a.folders == b.folders && a.unread == b.unread
-            && a.error == b.error && a.editing == b.editing && a.moving == b.moving && a.reduceMotion == b.reduceMotion && a.imageLoader === b.imageLoader
+            && a.error == b.error && a.editing == b.editing && a.moving == b.moving && a.iconURL == b.iconURL && a.reduceMotion == b.reduceMotion && a.imageLoader === b.imageLoader
     }
 
     var body: some View {
         HStack {
-            SubscriptionIconView(feed: feed, loader: imageLoader)
+            SubscriptionIconView(feed: feed, url: iconURL, loader: imageLoader)
             if let editing { InlineNameField(initial: editing, onFinish: actions.finishEdit) }
             else { Text(title).lineLimit(1) }
             Spacer()
