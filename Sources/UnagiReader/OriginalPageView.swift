@@ -51,7 +51,11 @@ struct OriginalPageView: View {
     override var acceptsFirstResponder: Bool { true }
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        window?.makeFirstResponder(self)
+        guard let window else { return }
+        let responder = window.firstResponder
+        // A late failure must not take the keyboard after the person moved to the note or list.
+        guard responder == nil || responder === window || ReaderKeyboardCommands.isInOriginalPage(responder) else { return }
+        window.makeFirstResponder(self)
     }
     override func keyDown(with event: NSEvent) {
         guard window?.firstResponder === self, window?.attachedSheet == nil,
