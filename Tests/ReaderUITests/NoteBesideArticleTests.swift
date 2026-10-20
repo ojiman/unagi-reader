@@ -354,12 +354,12 @@ extension SplitViewFoldTests {
             let h = try harness(noteOpen: true)
             defer { finish(h) }
             try await settle(h) { noteVisible(h) }
-            let editor = try #require(editor(in: h))
-            var view: NSView? = editor.superview
+            let noteEditor = try #require(editor(in: h))
+            var view: NSView? = noteEditor.superview
             var found: (NSSplitViewController, Int)?
             while let current = view, found == nil {
                 if let split = current as? NSSplitView, let controller = split.delegate as? NSSplitViewController,
-                   let index = controller.splitViewItems.firstIndex(where: { editor.isDescendant(of: $0.viewController.view) }) {
+                   let index = controller.splitViewItems.firstIndex(where: { noteEditor.isDescendant(of: $0.viewController.view) }) {
                     found = (controller, index)
                 }
                 view = current.superview
@@ -374,7 +374,7 @@ extension SplitViewFoldTests {
             }
             try await Task.sleep(for: .milliseconds(300))
             try await settle(h) { noteVisible(h) && !controller.splitViewItems[index].isCollapsed }
-            let width = try #require(self.editor(in: h)).enclosingScrollView.map { $0.convert($0.bounds, to: nil).width } ?? 0
+            let width = try #require(editor(in: h)).enclosingScrollView.map { $0.convert($0.bounds, to: nil).width } ?? 0
             #expect(width >= NotePanelWidth.range.lowerBound - 40, "the note is \(width) pt wide")
         }
 
