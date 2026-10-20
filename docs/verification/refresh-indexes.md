@@ -1,6 +1,6 @@
 # Refresh indexes after a large OPML import
 
-Result: FAIL at 1,000 and 2,000 feeds; PASS at 200. Index reuse and incremental publication reduce the stalls and total refresh time, but do not meet the unchanged 100 ms budget at every scale. #303 remains open.
+Result: FAIL at 1,000 and 2,000 feeds; PASS at 200. Index reuse and incremental publication reduce the stalls and total refresh time, but do not meet the unchanged 100 ms budget at every scale. #303 was later consolidated into [#356](https://github.com/ojiman/unagi-reader/issues/356) (paused).
 
 ## Environment and method
 

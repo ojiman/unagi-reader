@@ -1,6 +1,6 @@
 # Reading budgets (issue #164)
 
-Result: at `ad39e24`, W1 PASS (p95 27.660 / 28.541 ms); W2 still FAIL while reading and refreshing; W3 PASS (823.730 / 795.568 ms). The cached-selection fix below is partial progress on #249, which stays open. These are measurements, not product acceptance; specification 2.1 budgets are unchanged.
+Result: at `ad39e24`, W1 PASS (p95 27.660 / 28.541 ms); W2 still FAIL while reading and refreshing; W3 PASS (823.730 / 795.568 ms). The cached-selection fix below is partial progress on #249; the remaining failures are tracked, paused, in [#356](https://github.com/ojiman/unagi-reader/issues/356). These are measurements, not product acceptance; specification 2.1 budgets are unchanged.
 Scope: Release, ad hoc signed synthetic copies, macOS 27.0.1 (26A434), arm64 Mac14,2, Xcode 27.1 (27A9275), Swift 6.4, display at 60 Hz. Each record below names its source commit and runs; since 2026-10-19 W3 counts a copy's second and later launches.
 
 ## Integrated replay before the refresh work
@@ -10,7 +10,7 @@ Historical scope: `b99a92d` (main `c93b978` plus the note-context fix `49637f3`)
 | Budget | Measured result (copies 1 / 2 / 3) | Status |
 |---|---|---|
 | W1: p95 ≤ 100 ms, maximum ≤ 200 ms | 100 `j` / `k` events each; nearest-rank p95 70.575 / 71.806 / 70.826 ms; maximum 75.520 / 81.392 / 81.851 ms | PASS |
-| W2: no scheduling delay over 100 ms | Reading: 45 / 49 / 50 gaps, longest 135.255 / 124.393 / 126.747 ms. Typing: 0 gaps each. Refresh: 29 gaps each, 160–589 ms, sum 10.3 / 10.6 / 10.4 s | FAIL: [reading #249](https://github.com/ojiman/unagi-reader/issues/249); refresh with [#303](https://github.com/ojiman/unagi-reader/issues/303). The typing investigation is [#327](https://github.com/ojiman/unagi-reader/issues/327) |
+| W2: no scheduling delay over 100 ms | Reading: 45 / 49 / 50 gaps, longest 135.255 / 124.393 / 126.747 ms. Typing: 0 gaps each. Refresh: 29 gaps each, 160–589 ms, sum 10.3 / 10.6 / 10.4 s | FAIL: reading and refresh, paused in [#356](https://github.com/ojiman/unagi-reader/issues/356) (earlier #249, #303). The typing investigation was [#327](https://github.com/ojiman/unagi-reader/issues/327) |
 | W3: launch to list ≤ 1,000 ms, on a copy's second or later launch | 812.716 / 823.234 / 791.193 ms | PASS |
 | A copy's first launch (no budget) | 1,569.259 / 1,279.290 / 1,256.894 ms | recorded only |
 
