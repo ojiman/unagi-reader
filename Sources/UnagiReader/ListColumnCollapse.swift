@@ -85,13 +85,7 @@ struct ListColumnCollapse: NSViewRepresentable {
             if wanted { widthBeforeFold = bounds.width }
             item.canCollapse = true
             if immediate {
-                // Bringing the list back at once made AppKit widen the window by the list's width (#371): the article's column, with the note
-                // still leaving it, did not give way in the same layout pass. The window keeps its frame, and the screen is not updated in
-                // between, so the wider frame is never shown.
-                let frame = window.frame
-                if !wanted { window.disableScreenUpdatesUntilFlush() }
                 item.isCollapsed = wanted
-                if !wanted, window.frame != frame, !window.styleMask.contains(.fullScreen) { window.setFrame(frame, display: false) }
                 finish(item, window: window, collapsed: wanted)
             } else {
                 moving = true
