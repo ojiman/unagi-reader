@@ -39,7 +39,7 @@ struct NativeArticleList: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> NSScrollView {
-        let scroll = NSScrollView()
+        let scroll = ScrollView()
         let table = Table()
         Self.configure(table)
         table.delegate = context.coordinator
@@ -74,6 +74,16 @@ struct NativeArticleList: NSViewRepresentable {
     static func dismantleNSView(_ scroll: NSScrollView, coordinator: Coordinator) {
         if let observer = coordinator.observer { NotificationCenter.default.removeObserver(observer) }
         coordinator.table?.delegate = nil; coordinator.table?.dataSource = nil
+    }
+
+    @MainActor final class ScrollView: NSScrollView {
+        override func tile() {
+            super.tile()
+            // A zero-width fold can leave the table's old column width as its minimum (#371).
+            guard let table = documentView as? Table, contentSize.width > 0,
+                  abs(table.frame.width - contentSize.width) > 0.5 else { return }
+            table.setFrameSize(NSSize(width: contentSize.width, height: table.frame.height))
+        }
     }
 
     /// A row that is selected in a quiet way: a rounded neutral gray, also when the list has the keyboard focus. The text keeps its

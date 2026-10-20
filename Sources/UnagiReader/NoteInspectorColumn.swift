@@ -3,11 +3,10 @@ import AppKit
 import Observation
 import ReaderCore
 
-/// The width of the window, kept apart from `ReaderView`'s state: it changes on every frame of a window resize, and only the note
-/// panel's column reads it.
+/// Window geometry stays outside `ReaderView`'s state; only the column modifiers read each resize.
 @MainActor @Observable final class WindowSpace {
     var width: Double = 1_280
-    /// The list's width while it is shown beside the note (not while it folds or comes back: only widths from its minimum up count).
+    /// The settled visible list width; folding and returning widths do not replace it.
     var listWidth: Double = NotePanelWidth.listDefaultWidth
     /// The note panel's width now.
     var noteWidth: Double = NotePanelWidth.defaultWidth

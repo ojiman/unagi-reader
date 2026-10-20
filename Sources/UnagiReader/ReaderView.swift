@@ -161,8 +161,8 @@ struct ReaderView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar.navigationSplitViewColumnWidth(min: 185, ideal: 215, max: 280)
         } content: {
-            articleList.id(scope).background(AppPalette.surfaceColor).navigationSplitViewColumnWidth(min: 280, ideal: 400, max: 640)
-                .background(ListColumnCollapse(collapsed: SidebarFold.listFolded(noteOpen: noteOpen, listShown: workspace.noteListShown), animated: !reduceMotion, space: windowSpace))
+            articleList.id(scope).background(AppPalette.surfaceColor)
+                .modifier(ListColumnCollapse(collapsed: SidebarFold.listFolded(noteOpen: noteOpen, listShown: workspace.noteListShown), animated: !reduceMotion, space: windowSpace))
         } detail: {
             originalColumn.frame(minWidth: NotePanelWidth.articleMinimum)
                 .overlay(alignment: .top) { articleBand.ignoresSafeArea(.container, edges: .top) }
