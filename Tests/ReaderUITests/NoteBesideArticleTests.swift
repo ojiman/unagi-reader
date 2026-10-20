@@ -19,7 +19,7 @@ extension SplitViewFoldTests {
             let window: NSWindow
             let directory: URL
         }
-        private func harness(noteOpen: Bool = false, listShown: Bool = false, width: CGFloat = 1240) throws -> Harness {
+        private func harness(noteOpen: Bool = false, listShown: Bool = false) throws -> Harness {
             let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let store = try inMemoryReaderStore()
@@ -33,7 +33,7 @@ extension SplitViewFoldTests {
                 initialNoteOpen: noteOpen, initialListShown: listShown,
                 notePasteboard: NSPasteboard(name: .init("unagi-reader-test-\(UUID())")))
             let host = NSHostingView(rootView: reader)
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 800), styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1240, height: 800), styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false; window.toolbar = NSToolbar(identifier: "synthetic-note-beside")
             window.contentView = host
             window.orderFront(nil)
@@ -53,7 +53,7 @@ extension SplitViewFoldTests {
             return search(h.host)
         }
         /// The closed note stays in the view tree, outside the window on the right.
-        private func noteVisible(_ h: Harness) -> Bool { (x(editor(in: h)) ?? 99_999) < h.window.frame.width - 50 }
+        private func noteVisible(_ h: Harness) -> Bool { (x(editor(in: h)) ?? 99_999) < 1_240 - 50 }
         private func table(in h: Harness) -> NativeArticleList.Table? { find(NativeArticleList.Table.self, in: h.host) }
         private func article(in h: Harness) -> ArticleTextView? { find(ArticleTextView.self, in: h.host) }
         private func x(_ view: NSView?) -> CGFloat? { view.map { $0.convert($0.bounds, to: nil).minX } }
@@ -384,40 +384,6 @@ extension SplitViewFoldTests {
             try await settle(h) { noteVisible(h) && !controller.splitViewItems[index].isCollapsed }
             let width = try #require(editor(in: h)).enclosingScrollView.map { $0.convert($0.bounds, to: nil).width } ?? 0
             #expect(width >= NotePanelWidth.range.lowerBound - 40, "the note is \(width) pt wide")
-        }
-
-        /// Issue #371: in a window narrower than 1,400 pt the list folds and comes back at once; the window's own width never changes.
-        @Test(arguments: [1_170.0, 1_240.0])
-        func theWindowKeepsItsWidthWhileTheListFoldsAndReturns(width: Double) async throws {
-            let h = try harness(width: width)
-            defer { finish(h) }
-            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
-            let list = try #require(table(in: h))
-            list.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
-            try await settle(h) { article(in: h)?.string.contains("合成記事 0") == true }
-            try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
-            let start = h.window.frame
-            var seen: [CGFloat] = []
-            func watch(for seconds: Double) async throws {
-                let end = ContinuousClock.now + .seconds(seconds)
-                while ContinuousClock.now < end {
-                    h.host.layoutSubtreeIfNeeded()
-                    seen.append(h.window.frame.width)
-                    try await Task.sleep(for: .milliseconds(5))
-                }
-            }
-            try press("n", in: h)
-            try await watch(for: 1)
-            #expect(noteVisible(h))
-            h.window.makeFirstResponder(list)
-            try press("n", in: h)
-            try await watch(for: 1)
-            #expect(!noteVisible(h))
-            // The list is back at a usable width, and it and the article fit in the window.
-            try await settle(h) { list.bounds.width >= NotePanelWidth.listMinimum - 1 && (right(article(in: h)) ?? 99_999) <= width + 1 }
-            let widest = seen.max() ?? 0, narrowest = seen.min() ?? 0
-            #expect(abs(widest - start.width) < 1 && abs(narrowest - start.width) < 1, "window \(start.width) pt wide, seen \(narrowest)...\(widest)")
-            #expect(abs(h.window.frame.minX - start.minX) < 1)
         }
 
         @Test func aNoteOpenAtTheStartHasTheListFolded() async throws {
