@@ -33,6 +33,7 @@ struct TranslationEngine {
     private(set) var configuration: TranslationSession.Configuration?
     @ObservationIgnored private var job: ArticleTranslation.Job?
     @ObservationIgnored private var deciding: Task<Void, Never>?
+    @ObservationIgnored private var decidingKey: TranslationPlan.Key?
     @ObservationIgnored private let engine: TranslationEngine
 
     init(engine: TranslationEngine) { self.engine = engine }
@@ -54,10 +55,11 @@ struct TranslationEngine {
         }
         let sample = LanguageDecision.sample(title: title, paragraphs: content.paragraphs)
         let decide = engine.decide
+        decidingKey = TranslationPlan(title: title, content: content, target: target).key
         deciding = Task { [weak self] in
             let outcome = await decide(sample, target)
             guard let self, !Task.isCancelled else { return }
-            deciding = nil
+            deciding = nil; decidingKey = nil
             guard let job = state.press(title: title, content: content, target: target, decision: outcome) else { return }
             start(job)
         }
@@ -65,12 +67,17 @@ struct TranslationEngine {
 
     /// Back to the original: another article, or a second press. A running translation is dropped.
     func reset() {
-        deciding?.cancel(); deciding = nil
+        deciding?.cancel(); deciding = nil; decidingKey = nil
         job = nil; configuration = nil
         state.reset()
     }
 
     func contentChanged(title: String, content: ArticleContent) {
+        // The core has no active key until language detection ends; cancel that earlier stage too.
+        if let decidingKey, TranslationPlan(title: title, content: content, target: decidingKey.target).key != decidingKey {
+            reset()
+            return
+        }
         state.contentChanged(title: title, content: content)
         if state.key == nil, job != nil { job = nil; configuration = nil }
     }
