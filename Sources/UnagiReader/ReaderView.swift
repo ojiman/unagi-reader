@@ -22,7 +22,6 @@ struct ReaderView: View {
     /// True for one turn after the person dragged the panel shut, so that it is shown again (see `noteOpenBinding`).
     @State private var panelReopening = false
     @State private var saveError: String?
-    @State private var noteActionMessage: String?
     /// How 「記事をノートに送る」 reaches the note's editor (specification 3.3).
     @State private var noteLink: NoteEditorLink
     @State private var loading: ArticleLoadingController
@@ -93,7 +92,6 @@ struct ReaderView: View {
             saveError = String(localized: "The note could not be copied to the clipboard.", bundle: ReaderLocalization.bundle)
             return false
         }
-        noteActionMessage = String(localized: "Note copied", bundle: ReaderLocalization.bundle)
         return true
     }
 
@@ -216,22 +214,11 @@ struct ReaderView: View {
         .onKeyPress("n") { guard shortcutsEnabled else { return .ignored }; toggleNote(); return .handled }
     }
 
-    /// The subscription sheet and the note's short message.
+    /// The subscription sheet.
     private var readerPresentations: some View {
         readerKeys
         .sheet(item: $addingTo) { target in
             SubscriptionSheet(store: store, folder: target.folder) { scope = .feed($0) }
-        }
-        .overlay(alignment: .bottomLeading) {
-            if let noteActionMessage {
-                Text(noteActionMessage).font(.callout).padding(10).background(.regularMaterial, in: .rect(cornerRadius: 8)).padding(12)
-            }
-        }
-        .task(id: noteActionMessage) {
-            guard noteActionMessage != nil else { return }
-            try? await Task.sleep(for: .seconds(2))
-            guard !Task.isCancelled else { return }
-            noteActionMessage = nil
         }
     }
 
@@ -484,7 +471,7 @@ struct ReaderView: View {
                   canNext: NoteArticleSwitcher.canMove(1, from: selection, in: visibleArticleIDs),
                   onPrevious: { guard panelMayMove else { return }; perform(.previous) },
                   onNext: { guard panelMayMove else { return }; perform(.next) },
-                  onCopy: { _ = copyNote() },
+                  onCopy: { copyNote() },
                   onClose: closeNote,
                   listShown: workspace.noteListShown, onSwitchLayout: switchNoteLayout, link: noteLink)
             .modifier(NotePanelWidthMemory(limit: limit, space: windowSpace))

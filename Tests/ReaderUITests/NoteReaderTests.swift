@@ -268,6 +268,20 @@ import SwiftData
         #expect(h.store.note?.text == "Keep this note")
     }
 
+    /// #374: after a copy the button shows a check mark for a moment, then the copy symbol again; a second copy keeps it a little longer.
+    @Test func aCopyShowsACheckMarkForAMoment() async throws {
+        let sign = CopySign(duration: .milliseconds(200))
+        #expect(sign.symbol == "doc.on.doc")
+        sign.show()
+        #expect(sign.symbol == "checkmark")
+        try await Task.sleep(for: .milliseconds(120))
+        sign.show()                                                                       // a second press starts the moment again
+        try await Task.sleep(for: .milliseconds(120))
+        #expect(sign.symbol == "checkmark")
+        for _ in 0..<50 where sign.symbol != "doc.on.doc" { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(sign.symbol == "doc.on.doc")
+    }
+
     @Test func theCopyUsesTheExactTextOfTheNote() async throws {
         let note = "# 保存\r\n本文 🐟"
         let pasteboard = NSPasteboard(name: .init("unagi-reader-copy-\(UUID())"))

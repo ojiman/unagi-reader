@@ -262,7 +262,7 @@ The **note** is the app's **one** plain-text Markdown document ([decision 0049](
 
 - In the note panel's header. Copies the note's text exactly, as UTF-8 text on the system pasteboard, the end unchanged.
 - Disabled when the note is empty or only whitespace.
-- The app starts no other app, makes no file, uses no network and shows no confirmation.
+- The app starts no other app, makes no file and uses no network. After a copy the button's symbol is a check mark for about 1.5 s, with no motion and no dialog (VoiceOver says 「ノートをコピーしました」); after a failure it stays as it was and the error shows.
 
 **「記事をノートに送る」 (Send article to note)** ([decision 0059](decisions/0059-send-the-article-to-the-note.md))
 
