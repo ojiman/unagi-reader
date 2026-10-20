@@ -44,7 +44,7 @@ extension ReaderStore {
         let candidateIDs = candidates.map(\.id)
         let snapshots = try context.fetch(FetchDescriptor<ContentSnapshot>(predicate: #Predicate { candidateIDs.contains($0.articleID) }))
         let withBody = Set(snapshots.filter { !$0.text.isEmpty }.map(\.articleID))
-        let selected = candidates.filter { !$0.summary.isEmpty || withBody.contains($0.id) }
+        let selected = candidates.filter { !$0.summary.isEmpty || $0.imageURL != nil || withBody.contains($0.id) }
         let ids = Set(selected.map(\.id))
         let bodies = snapshots.filter { ids.contains($0.articleID) && !$0.text.isEmpty }
         let summaries = selected.filter { !$0.summary.isEmpty }
