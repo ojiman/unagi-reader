@@ -47,6 +47,6 @@ struct NotePanel: View {
     }
 
     private var hasText: Bool {
-        !(store.note?.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        link.hasCopyText ?? !(store.note?.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
     }
 }

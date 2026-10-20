@@ -1,7 +1,8 @@
 import AppKit
 import SwiftUI
-import ReaderCore
+@testable import ReaderCore
 import Testing
+import SwiftData
 @testable import UnagiReader
 
 // Checks PRD-04, PRD-05 (specification 7).
@@ -64,10 +65,10 @@ import Testing
     }
     fileprivate func harness(scope: (ReaderStore) throws -> ReaderWorkspaceScope, noteOpen: Bool = false,
                          pasteboard: NSPasteboard = NSPasteboard(name: .init("unagi-reader-test-\(UUID())")),
-                         prepare: (ReaderStore) throws -> Void) throws -> Harness {
+                         providedStore: ReaderStore? = nil, prepare: (ReaderStore) throws -> Void) throws -> Harness {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let store = try inMemoryReaderStore()
+        let store = try providedStore ?? inMemoryReaderStore()
         let entries = (0..<4).map { index in
             ParsedEntry(sourceID: "synthetic-\(index)", title: "合成記事 \(index)", url: URL(string: "http://127.0.0.1:1/article/\(index)"), summary: "合成要約", body: "合成本文", coverage: .feedProvided, publishedAt: .now.addingTimeInterval(Double(-index)))
         }
@@ -76,7 +77,7 @@ import Testing
         let reader = ReaderView(store: store, refresh: FeedRefreshController(store: store),
             imageLoader: ReaderImageLoader(directory: directory.appendingPathComponent("Images")),
             initialScope: try scope(store), initialNoteOpen: noteOpen,
-            notePasteboard: pasteboard)
+            noteEditorLink: NoteEditorLink(), notePasteboard: pasteboard)
         let host = NSHostingView(rootView: reader)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1240, height: 800), styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false; window.toolbar = NSToolbar(identifier: "synthetic-note-reader")
@@ -203,6 +204,45 @@ import Testing
         defer { t.finish(h) }
         try await t.settle(h.host) { t.panelButtons(in: h).count == 3 }                    // two chevrons and the copy button
         #expect(!h.host.rootView.copyNote())
+    }
+
+    /// #361: failed edits stay in the editor and must remain available to Copy Markdown.
+    @Test(arguments: ["", "Saved"])
+    func aFailedSaveCopiesTheVisibleNote(initial: String) async throws {
+        let schema = ReaderStore.schema
+        let configuration = ModelConfiguration(UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        var fail = false
+        let store = try ReaderStore(container: ModelContainer(for: schema, configurations: [configuration]), saveHook: {
+            if fail { throw CocoaError(.fileWriteUnknown) }
+        })
+        let pasteboard = NSPasteboard(name: .init("unagi-copy-recovery-" + UUID().uuidString))
+        let h = try t.harness(scope: { _ in .all }, noteOpen: true, pasteboard: pasteboard, providedStore: store) {
+            try $0.saveNote(text: initial, at: .now)
+        }
+        defer { t.finish(h); pasteboard.releaseGlobally() }
+        try await t.settle(h.host) { t.find(NoteTextView.self, in: h.host) != nil && t.panelButtons(in: h).count == 3 }
+        let editor = try #require(t.find(NoteTextView.self, in: h.host))
+        fail = true
+        editor.insertText(" plus unsaved", replacementRange: NSRange(location: (initial as NSString).length, length: 0))
+        try #require(editor.string == initial + " plus unsaved")
+        #expect(store.note?.text == initial) // The save really failed; copying must not claim that it succeeded.
+        try await t.settle(h.host) { t.panelButtons(in: h).last?.isEnabled == true }
+        #expect(h.host.rootView.copyNote())
+        #expect(pasteboard.string(forType: .string) == initial + " plus unsaved")
+        editor.insertText("", replacementRange: NSRange(location: 0, length: (editor.string as NSString).length))
+        try #require(editor.string.isEmpty && store.note?.text == initial)
+        try await t.settle(h.host) { t.panelButtons(in: h).last?.isEnabled == false }
+        #expect(!h.host.rootView.copyNote())
+        #expect(pasteboard.string(forType: .string) == initial + " plus unsaved") // Even a direct action must not copy the older saved text.
+    }
+
+    @Test func aPasteboardWriteFailureIsNotReportedAsSuccess() throws {
+        let h = try t.harness(scope: { _ in .all }) {
+            try $0.saveNote(text: "Keep this note", at: .now)
+        }
+        defer { t.finish(h) }
+        #expect(!h.host.rootView.copyNote(write: { _ in false }))
+        #expect(h.store.note?.text == "Keep this note")
     }
 
     @Test func theCopyUsesTheExactTextOfTheNote() async throws {
