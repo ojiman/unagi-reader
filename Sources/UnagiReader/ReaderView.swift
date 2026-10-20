@@ -196,10 +196,6 @@ struct ReaderView: View {
             if originalPage.closesWhenSelecting(id) { dismissOriginal { listFocused = true } }
             scrollMemory.state.select(id)
         }
-        .task(id: selection) {
-            if let id = selection { await loading.load(articleID: id) }
-            else { loading.clear() }
-        }
     }
 
     private var readerKeys: some View {
@@ -665,6 +661,11 @@ struct ReaderView: View {
     }
     private func selectArticle(_ id: UUID?) {
         pageForward = ReaderNavigation.isForward(from: selection, to: id, in: visibleArticleIDs)
+        // Cached text is read synchronously: publish it with the selection, without laying out an unavailable body first (#249).
+        if id != selection {
+            if let id { loading.load(articleID: id) }
+            else { loading.clear() }
+        }
         selection = id
     }
     private func perform(_ operation: () throws -> Void) {

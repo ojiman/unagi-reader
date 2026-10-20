@@ -13,7 +13,7 @@ import Observation
     }
     public func clear() { state = ArticleLoadingState(); displayed = nil; availableUpdate = nil }
     /// Shows what the feed gave. The original page is never fetched for the reader (decisions 0033 and 0056): it is read with `v` or `b`.
-    public func load(articleID: UUID) async {
+    public func load(articleID: UUID) {
         state.begin(articleID: articleID)
         error = nil; availableUpdate = nil
         do { displayed = try store.content(articleID: articleID, at: now()) } catch { self.error = error.localizedDescription; displayed = nil }
