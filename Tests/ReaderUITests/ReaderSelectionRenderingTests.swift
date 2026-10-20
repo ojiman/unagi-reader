@@ -10,10 +10,12 @@ import ReaderCore
     /// #249: selecting a cached article must not lay out an unavailable-body document before its saved text.
     @Test func selectingCachedTextDoesNotRenderAnUnavailableBodyFirst() async throws {
         let store = try inMemoryReaderStore()
-        let entries = (0..<3).map { index in
-            ParsedEntry(sourceID: "\(index)", title: "Cached story \(index)", url: URL(string: "https://synthetic.example/\(index)"),
-                summary: index == 2 ? "" : "Synthetic summary", body: index == 2 ? "" : "Cached body \(index)", coverage: .feedProvided,
-                publishedAt: .now.addingTimeInterval(Double(-index)))
+        let entries = (0..<3).map { index -> ParsedEntry in
+            let summary: String = index == 2 ? "" : "Synthetic summary"
+            let body: String = index == 2 ? "" : "Cached body \(index)"
+            let publishedAt = Date.now.addingTimeInterval(Double(-index))
+            return ParsedEntry(sourceID: "\(index)", title: "Cached story \(index)", url: URL(string: "https://synthetic.example/\(index)"),
+                summary: summary, body: body, coverage: .feedProvided, publishedAt: publishedAt)
         }
         _ = try store.importFeed(ParsedFeed(title: "Synthetic", sourceURL: URL(string: "https://synthetic.example/rss")!, entries: entries, skippedEntries: 0))
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
