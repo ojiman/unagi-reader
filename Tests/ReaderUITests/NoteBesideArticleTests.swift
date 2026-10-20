@@ -349,6 +349,35 @@ extension SplitViewFoldTests {
             #expect(overArticle == 4)
         }
 
+        /// Issue #370 (specification 3.5): dragging the note's edge to the right stops at the panel's minimum and never folds the panel.
+        @Test func draggingTheNoteEdgeToTheRightNeverFoldsTheNote() async throws {
+            let h = try harness(noteOpen: true)
+            defer { finish(h) }
+            try await settle(h) { noteVisible(h) }
+            let editor = try #require(editor(in: h))
+            var view: NSView? = editor.superview
+            var found: (NSSplitViewController, Int)?
+            while let current = view, found == nil {
+                if let split = current as? NSSplitView, let controller = split.delegate as? NSSplitViewController,
+                   let index = controller.splitViewItems.firstIndex(where: { editor.isDescendant(of: $0.viewController.view) }) {
+                    found = (controller, index)
+                }
+                view = current.superview
+            }
+            let (controller, index) = try #require(found)
+            #expect(index > 0)
+            // What the person's drag does: the divider before the note moves to the window's right edge, in steps.
+            for step in 1...10 {
+                let position = controller.splitView.frame.width - CGFloat(10 - step) * 40
+                controller.splitView.setPosition(position, ofDividerAt: index - 1)
+                h.host.layoutSubtreeIfNeeded()
+            }
+            try await Task.sleep(for: .milliseconds(300))
+            try await settle(h) { noteVisible(h) && !controller.splitViewItems[index].isCollapsed }
+            let width = try #require(self.editor(in: h)).enclosingScrollView.map { $0.convert($0.bounds, to: nil).width } ?? 0
+            #expect(width >= NotePanelWidth.range.lowerBound - 40, "the note is \(width) pt wide")
+        }
+
         @Test func aNoteOpenAtTheStartHasTheListFolded() async throws {
             let h = try harness(noteOpen: true)
             defer { finish(h) }

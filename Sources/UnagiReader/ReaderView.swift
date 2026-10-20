@@ -592,9 +592,9 @@ struct ReaderView: View {
 
     private var noteOpen: Bool { workspace.noteOpen }
     private var noteOpenBinding: Binding<Bool> {
-        // The panel is closed only by the note button, ⌥⌘I, the ✕ or `Esc` (`toggleNote`). Dragging its edge shut also reports `false` here. The note
-        // stays open, and the panel is shown again on the next turn: ignoring the report left the panel gone while the app still counted it as
-        // open, and the person could lose the panel with no way back that they would find.
+        // The panel is closed only by the note button, ⌥⌘I, the ✕ or `Esc` (`toggleNote`). Its edge cannot be dragged shut (`NoteColumnHold`); if
+        // the system still reports `false` here, the note stays open and the panel is shown again on the next turn: ignoring the report left the
+        // panel gone while the app still counted it as open, and the person could lose the panel with no way back that they would find.
         Binding(get: { noteOpen && !panelReopening }, set: { open in
             if open { workspace.noteOpen = true }
             else if noteOpen { panelReopening = true; Task { @MainActor in panelReopening = false } }
