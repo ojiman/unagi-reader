@@ -15,18 +15,18 @@ import Testing
         try store.context.save(); try store.reload()
     }
 
-    @Test func openingAnArticleShowsTheFeedText() async throws {
+    @Test func openingAnArticleShowsTheFeedText() throws {
         let library = try TestLibrary(); defer { library.cleanup() }
         let store = try ReaderStore(url: library.url)
         _ = try store.importFeed(ArticleMarkupTests.feed())
         let article = try #require(store.articles.first)
         let loading = ArticleLoadingController(store: store)
-        await loading.load(articleID: article.id)
+        loading.load(articleID: article.id)
         #expect(loading.displayed?.coverage == .feedProvided)
         #expect(article.firstReadAt == nil)                                                   // choosing content does not claim display
     }
 
-    @Test func aBodyExtractedByAnEarlierVersionIsStillShown() async throws {
+    @Test func aBodyExtractedByAnEarlierVersionIsStillShown() throws {
         let library = try TestLibrary(); defer { library.cleanup() }
         let store = try ReaderStore(url: library.url)
         let xml = "<rss><channel><item><guid>a</guid><link>https://synthetic.example/posts/1</link><description>合成要約</description></item></channel></rss>"
@@ -34,11 +34,11 @@ import Testing
         let article = try #require(store.articles.first)
         try storeExtractedBody("以前の抽出本文", for: article.id, in: store)
         let loading = ArticleLoadingController(store: store)
-        await loading.load(articleID: article.id)
+        loading.load(articleID: article.id)
         #expect(loading.displayed?.text == "以前の抽出本文")                                     // saved data is not deleted (decision 0003)
     }
 
-    @Test func aRefreshedBodyWaitsWhileThePersonReads() async throws {
+    @Test func aRefreshedBodyWaitsWhileThePersonReads() throws {
         let library = try TestLibrary(); defer { library.cleanup() }
         let store = try ReaderStore(url: library.url)
         func feed(_ body: String) throws -> ParsedFeed {
@@ -48,7 +48,7 @@ import Testing
         _ = try store.importFeed(feed("最初の本文"))
         let article = try #require(store.articles.first)
         let loading = ArticleLoadingController(store: store)
-        await loading.load(articleID: article.id)
+        loading.load(articleID: article.id)
         loading.recordInteraction(articleID: article.id)                                       // the person is reading
         _ = try store.importFeed(feed("新しい本文"))
         loading.refreshCachedContent()
