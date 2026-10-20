@@ -349,11 +349,19 @@ extension SplitViewFoldTests {
             #expect(overArticle == 4)
         }
 
-        /// Issue #370 (specification 3.5): dragging the note's edge to the right stops at the panel's minimum and never folds the panel.
-        @Test func draggingTheNoteEdgeToTheRightNeverFoldsTheNote() async throws {
+        /// Issue #370 (specification 3.3): dragging the note's edge to the right stops at the panel's minimum and never folds the panel.
+        @Test(arguments: [false, true])
+        func draggingTheNoteEdgeToTheRightNeverFoldsTheNote(originalPageOpen: Bool) async throws {
             let h = try harness(noteOpen: true)
             defer { finish(h) }
-            try await settle(h) { noteVisible(h) }
+            try await settle(h) { noteVisible(h) && !sidebarButtonsMounted(h) && table(in: h)?.numberOfRows == 3 }
+            if originalPageOpen {
+                let list = try #require(table(in: h))
+                list.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+                try await settle(h) { article(in: h)?.string.contains("合成記事 0") == true }
+                try press("v", in: h)
+                try await settle(h) { ReaderKeyboardCommands.originalPage(in: h.host) != nil }
+            }
             let noteEditor = try #require(editor(in: h))
             var view: NSView? = noteEditor.superview
             var found: (NSSplitViewController, Int)?
