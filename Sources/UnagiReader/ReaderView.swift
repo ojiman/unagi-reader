@@ -275,6 +275,7 @@ struct ReaderView: View {
             } header: {
                 Text(String(localized: "Feeds", bundle: ReaderLocalization.bundle))
                     .font(.system(size: ListHeader.fontSize, weight: .semibold))
+                    .foregroundStyle(.secondary)
             }
             Section {
                 ForEach(grouped[""] ?? []) { feed in subscriptionRow(feed, folders: folders) }
@@ -286,6 +287,7 @@ struct ReaderView: View {
             } header: {
                 SidebarSectionHeader(title: String(localized: "Subscriptions", bundle: ReaderLocalization.bundle), help: String(localized: "Add a Subscription", bundle: ReaderLocalization.bundle), action: { addingTo = SubscriptionTarget(folder: "") }, onDropFeeds: { dropFeeds($0, into: "") })
                     .font(.system(size: ListHeader.fontSize, weight: .semibold))
+                    .foregroundStyle(.secondary)
             }
         }
         .listStyle(.sidebar)

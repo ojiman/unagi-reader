@@ -72,7 +72,9 @@ extension SplitViewFoldTests {
                 }
                 return CGFloat(try #require(first)) / scale
             }
-            let sidebarTop = try selectionTop(in: sidebar, row: sidebar.rect(ofRow: 1))
+            // Use the actual selection instead of assuming its position among the system's group rows.
+            try #require(sidebar.selectedRow >= 0)
+            let sidebarTop = try selectionTop(in: sidebar, row: sidebar.rect(ofRow: sidebar.selectedRow))
             let articleTop = try selectionTop(in: table, row: table.rect(ofRow: 0))
             #expect(abs(sidebarTop - articleTop) <= 2,
                     "visible selections start at different heights: sidebar \(sidebarTop), list \(articleTop)")
