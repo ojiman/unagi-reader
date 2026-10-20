@@ -236,6 +236,29 @@ import SwiftData
         #expect(pasteboard.string(forType: .string) == initial + " plus unsaved") // Even a direct action must not copy the older saved text.
     }
 
+    @Test(arguments: ["", "Saved"])
+    func undoingAFailedEditRestoresCopyAvailability(initial: String) async throws {
+        let r = try NoteInsertionTests().rig(initial)
+        defer { r.window.close() }
+        r.window.makeFirstResponder(r.view)
+        r.sink.saves = false
+        let edited = initial.isEmpty ? "Unsaved" : ""
+        r.view.insertText(edited, replacementRange: NSRange(location: 0, length: (initial as NSString).length))
+        try #require(r.view.string == edited)
+        // Drain the deferred availability update before Undo, so it cannot hide a missing Undo notification update.
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            RunLoop.main.perform(inModes: [.common]) { continuation.resume() }
+        }
+        #expect(r.link.hasCopyText == !edited.isEmpty)
+        r.view.undoManager?.undo()
+        try #require(r.view.string == initial)
+        #expect(r.link.copyText == initial)
+        #expect(r.link.hasCopyText == !initial.isEmpty)
+        r.view.undoManager?.redo()
+        try #require(r.view.string == edited)
+        #expect(r.link.hasCopyText == !edited.isEmpty)
+    }
+
     @Test func aPasteboardWriteFailureIsNotReportedAsSuccess() throws {
         let h = try t.harness(scope: { _ in .all }) {
             try $0.saveNote(text: "Keep this note", at: .now)

@@ -261,6 +261,7 @@ struct NoteTextEditor: NSViewRepresentable {
         }
 
         private func undoOrRedoDone() {
+            defer { link?.updateCopyAvailability() }
             guard let textView, textView.string != agreedText else { return }
             save(textView.string)
         }
