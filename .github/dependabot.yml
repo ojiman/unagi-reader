@@ -8,3 +8,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      # CodeQL's init and analyze must run the same version in a workflow: one PR for both (#354, #355 failed apart).
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
