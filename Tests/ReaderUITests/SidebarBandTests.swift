@@ -59,9 +59,14 @@ extension SplitViewFoldTests {
                 let x = Int(rect.midX * scale)
                 let sample = try #require(image.colorAt(x: x, y: Int((bottom - 8) * scale))?.usingColorSpace(.sRGB))
                 let background = try #require(image.colorAt(x: x, y: Int(40 * scale))?.usingColorSpace(.sRGB))
-                try #require(abs(sample.redComponent - background.redComponent)
+                let contrast = abs(sample.redComponent - background.redComponent)
                     + abs(sample.greenComponent - background.greenComponent)
-                    + abs(sample.blueComponent - background.blueComponent) > 0.05, "the row must actually be painted as selected")
+                    + abs(sample.blueComponent - background.blueComponent)
+                if contrast <= 0.05, let results = ProcessInfo.processInfo.environment["CI_RESULTS"],
+                   let png = image.representation(using: .png, properties: [:]) {
+                    try png.write(to: URL(fileURLWithPath: results).appendingPathComponent("sidebar-selection-\(Int(width)).png"))
+                }
+                try #require(contrast > 0.05, "the row must actually be painted as selected: \(type(of: view)), row \(row), window rect \(rect), host \(host.bounds), bitmap \(image.pixelsWide)x\(image.pixelsHigh)")
                 // Read the actual background near the bottom of the selected row, away from its text. Then find its first painted
                 // pixel. The list's heading can cover part of a row; its internal rect alone does not describe what the person sees.
                 let first = (Int(max(52, top - 10) * scale)..<Int((top + 20) * scale)).first { y in
