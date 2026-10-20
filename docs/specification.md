@@ -75,7 +75,7 @@ These words mean the same thing in this specification, the user guide, the decis
 |---|---|---|
 | note (ノート) | The app's one Markdown note (3.3) | `Note` |
 | 「Markdownをコピー」 (Copy Markdown) | Puts the note's text, unchanged, on the pasteboard (3.3) | `NotePanel`, `ReaderView.copyNote` |
-| list title | The scope's name and count above the list (3.1.4) | `ListHeader` |
+| list title | The scope's name above the list, with a count only while filtering (3.1.4) | `ListHeader` |
 | ✕ | The button at the top left of the right column. It closes the original page, and the note | `OriginalPageView`, `NotePanel` |
 | Settings (設定) | The settings window: 「一般」, 「記事」 and 「ショートカット」 (3.7) | `ReaderSettingsView` |
 
@@ -155,6 +155,10 @@ normal                original page (v)     note beside article   note with the 
 - Dragging an empty part of a band moves the window; a double-click does what the system setting says.
 - Every band control also has a menu bar command; the keys stay as they are (3.1.5).
 
+**Headings**
+
+- Feeds, 「購読元」, the list's current scope and the article's publisher use a small 12 pt semibold heading. The top headings sit at the same visual height below the bands. When both lists are at the top, the first sidebar row and first article row's selection backgrounds start at the same height.
+
 **Sidebar**
 
 - Choose the scope from Feeds (all articles, unread, Star) and 「購読元」 (folders and subscriptions). Each subscription shows its site icon. The 「購読元」 section can be collapsed.
@@ -166,7 +170,7 @@ normal                original page (v)     note beside article   note with the 
 
 **List**
 
-- The list title (scope name and count) sits below the list's band, at 17 pt (decision 0048).
+- The list title is one line. It keeps the scope name visible when the sidebar folds. Counts stay in the sidebar; only a nonempty keyword filter adds its result count on the heading line. A long scope name ends with an ellipsis inside its column, leaving room for that count.
 - A row: source name on the left and publication time on the right of the top line; title, summary and article image below. The title is the largest (14 pt); the summary (11 pt) and the source name and time (10 pt) are smaller, because the title and the favicon decide interest.
 - The column's edge can be dragged wider.
 - The reading surfaces (list, article, note) are one dark colour, with no separate grey bars or lines in the bands; only the sidebar is slightly lighter.
@@ -188,7 +192,7 @@ normal                original page (v)     note beside article   note with the 
 
 **Article**
 
-- The title is 26 pt semibold. The buttons at the top: Star and the external browser (globe). The theme and the text size are in Settings (3.7).
+- The publisher scrolls with the article. Its heading keeps the same size and starting position when the article text size changes. The title is 26 pt semibold. The buttons at the top: Star and the external browser (globe). The theme and the text size are in Settings (3.7).
 - Opening an article shows the feed's body (or the RSS summary) as it is; it never fetches the original page or swaps the text (RSS first, decision 0033). For more, `v` (in the app) or `b` (the browser).
 - The app never takes text from the original page (decision 0056): no full-text fetch, and no line under the article that says how much text there is.
 - Links and quotes of the feed's text are kept. A link opens in the default browser. Quotes look different from the text. A saved body without layout data is shown as plain text.
@@ -432,7 +436,7 @@ The settings window (Unagi Reader ▸ 「設定…」, `⌘,`) has the panes bel
 **Text size**
 
 - 「文字サイズ」 is a slider with five steps: 14, 16 (standard), 18, 20 and 22 pt.
-- It sets the article's body. The title (26 pt at standard) and the source and date lines scale by the same ratio, so the text keeps its shape.
+- It sets the article's body. The title (26 pt at standard) and date line scale by the same ratio. The publisher keeps the heading size of the other reading areas (3.1.4).
 - The list, the sidebar and the note keep their sizes (decision 0028).
 - A change shows at once in the open article; the paragraph at the top of the article stays at the top.
 - Not now: `⌘+` / `⌘−` / `⌘0`, a size for the note or the list.

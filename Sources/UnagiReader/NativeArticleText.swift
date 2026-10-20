@@ -33,7 +33,7 @@ import ReaderCore
         minSize = NSSize(width: 0, height: 0); maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         autoresizingMask = [.width]
         drawsBackground = true; backgroundColor = AppPalette.surface
-        textContainerInset = NSSize(width: 42, height: 44)
+        textContainerInset = NSSize(width: 42, height: 0)
         setAccessibilityLabel(String(localized: "Article Body", bundle: ReaderLocalization.bundle))
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -42,16 +42,17 @@ import ReaderCore
         if heroView !== view { heroView?.removeFromSuperview(); heroView = view; if let view { addSubview(view) } }
         positionHero()
     }
-    /// `scale` is the article's text size against the standard one (specification 3.7): every size and spacing of the text follows it.
+    /// Body, title and date follow the article text size. The publisher stays a reading-area heading.
     func install(title: String, publisher: String, date: String, paragraphs: [String], unavailable: String?, hero: Bool = false, bodyParagraphs: [BodyParagraph]? = nil, scale: CGFloat = 1) {
         if !paragraphs.isEmpty { onDisplayBegin?() }
         installing = true; defer { installing = false }
         let document = NSMutableAttributedString()
-        func append(_ text: String, size: CGFloat, weight: NSFont.Weight = .regular, secondary: Bool = false, spacing: CGFloat = 22) {
-            let style = NSMutableParagraphStyle(); style.lineSpacing = (size == 16 ? 8 : 5) * scale; style.paragraphSpacing = spacing * scale
-            document.append(NSAttributedString(string: text + "\n", attributes: [.font: NSFont.systemFont(ofSize: size * scale, weight: weight), .foregroundColor: secondary ? NSColor.secondaryLabelColor : NSColor.labelColor, .paragraphStyle: style]))
+        func append(_ text: String, size: CGFloat, weight: NSFont.Weight = .regular, secondary: Bool = false, spacing: CGFloat = 22, scalesWithBody: Bool = true) {
+            let factor = scalesWithBody ? scale : 1
+            let style = NSMutableParagraphStyle(); style.lineSpacing = (size == 16 ? 8 : 5) * factor; style.paragraphSpacing = spacing * factor
+            document.append(NSAttributedString(string: text + "\n", attributes: [.font: NSFont.systemFont(ofSize: size * factor, weight: weight), .foregroundColor: secondary ? NSColor.secondaryLabelColor : NSColor.labelColor, .paragraphStyle: style]))
         }
-        append(publisher, size: 11, weight: .medium, secondary: true)
+        append(publisher, size: ListHeader.fontSize, weight: .semibold, secondary: true, scalesWithBody: false)
         append(title, size: 26, weight: .semibold)
         append(date, size: 12, secondary: true)
         heroRange = nil
@@ -96,7 +97,7 @@ import ReaderCore
         if widthChanged {
             let width = max(1, min(670, newSize.width - 84))
             textContainer?.containerSize = NSSize(width: width, height: .greatestFiniteMagnitude)
-            textContainerInset = NSSize(width: max(42, (newSize.width - width) / 2), height: 44)
+            textContainerInset = NSSize(width: max(42, (newSize.width - width) / 2), height: 0)
             paragraphYs = []
             layoutDocument()
             if let previous { restore(anchor: previous.anchor, offset: previous.offset) }
@@ -106,7 +107,7 @@ import ReaderCore
     private func layoutDocument() {
         guard let manager = layoutManager, let container = textContainer else { return }
         manager.ensureLayout(for: container)
-        let height = max(enclosingScrollView?.contentSize.height ?? 0, manager.usedRect(for: container).maxY + 88)
+        let height = max(enclosingScrollView?.contentSize.height ?? 0, manager.usedRect(for: container).maxY + textContainerInset.height + 44)
         if abs(frame.height - height) > 0.5 { super.setFrameSize(NSSize(width: frame.width, height: height)) }
         positionHero()
     }
