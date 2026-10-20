@@ -29,7 +29,8 @@ struct TranslationEngine {
         self.target = target
         supportedTargets = supported
     }
-    /// The session's configuration: a new one starts `TranslationHost`'s task; nil stops it.
+    /// The session's configuration: a new or invalidated one starts `TranslationHost`'s task. It is kept after a reset (a dropped job's
+    /// answers are ignored by its generation), so that the next press can invalidate it.
     private(set) var configuration: TranslationSession.Configuration?
     @ObservationIgnored private var job: ArticleTranslation.Job?
     @ObservationIgnored private var deciding: Task<Void, Never>?
@@ -68,7 +69,7 @@ struct TranslationEngine {
     /// Back to the original: another article, or a second press. A running translation is dropped.
     func reset() {
         deciding?.cancel(); deciding = nil; decidingKey = nil
-        job = nil; configuration = nil
+        job = nil
         state.reset()
     }
 
@@ -79,7 +80,7 @@ struct TranslationEngine {
             return
         }
         state.contentChanged(title: title, content: content)
-        if state.key == nil, job != nil { job = nil; configuration = nil }
+        if state.key == nil { job = nil }
     }
 
     private func start(_ job: ArticleTranslation.Job) {
@@ -88,10 +89,15 @@ struct TranslationEngine {
             return
         }
         self.job = job
-        var next = TranslationSession.Configuration(source: job.source.map { Locale.Language(identifier: $0) },
-                                                    target: Locale.Language(identifier: job.plan.key.target))
-        if next == configuration { next.invalidate() }      // the same pair again: run the task once more
-        configuration = next
+        let source = job.source.map { Locale.Language(identifier: $0) }, target = Locale.Language(identifier: job.plan.key.target)
+        // The same pair again: the same configuration, invalidated, runs the task once more. Going through nil to a new, equal configuration
+        // did not: after the first translation the task never ran again until the app was restarted (#372).
+        if var same = configuration, same.source == source, same.target == target {
+            same.invalidate()
+            configuration = same
+        } else {
+            configuration = TranslationSession.Configuration(source: source, target: target)
+        }
     }
 
     /// Runs inside `translationTask`: gets the language ready (the system may ask to download it), then translates the plan as a batch
