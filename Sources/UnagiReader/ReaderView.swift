@@ -24,7 +24,7 @@ struct ReaderView: View {
     @State private var saveError: String?
     @State private var noteActionMessage: String?
     /// How 「記事をノートに送る」 reaches the note's editor (specification 3.3).
-    @State private var noteLink = NoteEditorLink()
+    @State private var noteLink: NoteEditorLink
     @State private var loading: ArticleLoadingController
     private var displayedContent: ArticleContent? { loading.displayed }
     /// Set while the "add subscription" sheet is open: the folder the new subscription goes to.
@@ -54,10 +54,12 @@ struct ReaderView: View {
     init(store: ReaderStore, refresh: FeedRefreshController, imageLoader: ReaderImageLoader,
          initialScope: ReaderWorkspaceScope = .all, initialNoteOpen: Bool = false, initialListShown: Bool = false, initialListFilter: String = "",
          translationEngine: TranslationEngine = .system,
+         noteEditorLink: NoteEditorLink = NoteEditorLink(),
          notePasteboard: NSPasteboard = .general,
          chooseOPML: @escaping @MainActor () async -> URL? = OPMLFilePanel.chooseFile) {
         self.store = store; self.refresh = refresh
         self.notePasteboard = notePasteboard
+        _noteLink = State(initialValue: noteEditorLink)
         _opml = State(initialValue: OPMLImportFlow(store: store, refresh: refresh, chooseFile: chooseOPML))
         self.imageLoader = imageLoader
         _loading = State(initialValue: ArticleLoadingController(store: store))
@@ -77,15 +79,17 @@ struct ReaderView: View {
         guard let article = selectedArticle, article.contentDeletedAt == nil else { return nil }
         return RetentionPolicy(days: store.retentionDays).expiresAt(receivedAt: article.firstReceivedAt, firstReadAt: article.firstReadAt)
     }
-    func copyNote() -> Bool {
-        guard let note = store.note, !note.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+    /// Tests replace only the external write; the default uses the system pasteboard.
+    func copyNote(write: ((NSPasteboardItem) -> Bool)? = nil) -> Bool {
+        guard let text = noteLink.copyText ?? store.note?.text,
+              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         let item = NSPasteboardItem()
-        guard item.setString(note.text, forType: .string) else {
+        guard item.setString(text, forType: .string) else {
             saveError = String(localized: "The note could not be copied to the clipboard.", bundle: ReaderLocalization.bundle)
             return false
         }
         notePasteboard.clearContents()
-        guard notePasteboard.writeObjects([item]) else {
+        guard write?(item) ?? notePasteboard.writeObjects([item]) else {
             saveError = String(localized: "The note could not be copied to the clipboard.", bundle: ReaderLocalization.bundle)
             return false
         }

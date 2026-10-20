@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import ReaderCore
+import Observation
 
 /// A text view that takes and gives only plain text: pasting or dropping rich text inserts its plain text, and copying puts only the
 /// characters on the pasteboard (the headings' size and the list marks' colour are not part of the note).
@@ -38,7 +39,7 @@ final class NoteTextView: NSTextView {
 
 /// The way into the note editor from outside, for 「記事をノートに送る」 (specification 3.3). The reader keeps one; the editor that is
 /// shown attaches itself. Text sent while no editor is shown waits, and goes at the end of the note when one is.
-@MainActor final class NoteEditorLink {
+@Observable @MainActor final class NoteEditorLink {
     enum Result: Equatable {
         case inserted
         /// The text is in the editor, but the save failed; the editor shows that, as it does for typing.
@@ -49,7 +50,20 @@ final class NoteTextView: NSTextView {
         case refused
         case noEditor
     }
-    fileprivate weak var coordinator: NoteTextEditor.Coordinator?
+    @ObservationIgnored fileprivate weak var coordinator: NoteTextEditor.Coordinator?
+    /// Nil before the editor attaches; the panel then uses the saved note's empty state.
+    private(set) var hasCopyText: Bool?
+    /// Read at the action, so failed saves and marked text are copied exactly as they are shown.
+    var copyText: String? { coordinator?.textView?.string }
+
+    fileprivate func updateCopyAvailability() {
+        hasCopyText = copyText.map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
+    fileprivate func queueCopyAvailability() {
+        RunLoop.main.perform(inModes: [.common]) { [weak self] in
+            MainActor.assumeIsolated { self?.updateCopyAvailability() }
+        }
+    }
     private var waiting: [String] = []
     private var focusWaiting = false
     /// The number of the latest request to take the keyboard; a cancel or a newer request changes it, so an older callback does nothing.
@@ -126,6 +140,8 @@ final class NoteTextView: NSTextView {
     fileprivate func attach(_ coordinator: NoteTextEditor.Coordinator) {
         guard self.coordinator !== coordinator else { return }
         self.coordinator = coordinator
+        coordinator.link = self
+        queueCopyAvailability()
         if focusWaiting { focusWaiting = false; queueFocus() }                // the same request, now with an editor
         guard !waiting.isEmpty else { return }
         // After this pass of the view update: the editor first gets the store's text, which would otherwise be put back over the insertion.
@@ -200,6 +216,7 @@ struct NoteTextEditor: NSViewRepresentable {
     @MainActor final class Coordinator: NSObject, NSTextViewDelegate, @MainActor NSTextStorageDelegate {
         var onChange: (String) -> Bool
         weak var textView: NSTextView?
+        weak var link: NoteEditorLink?
         /// Each editor has its own undo history: it is not shared with the window, with the article list, or with the editor of another note.
         private let undoHistory = UndoManager()
         private var observers: [NSObjectProtocol] = []
@@ -244,11 +261,13 @@ struct NoteTextEditor: NSViewRepresentable {
         }
 
         private func undoOrRedoDone() {
+            defer { link?.updateCopyAvailability() }
             guard let textView, textView.string != agreedText else { return }
             save(textView.string)
         }
 
         private func save(_ text: String) {
+            defer { link?.updateCopyAvailability() }
             if onChange(text) { agreedText = text; unsaved = false } else { unsaved = true }
         }
 
@@ -256,6 +275,8 @@ struct NoteTextEditor: NSViewRepresentable {
         /// undoable edit, so the selection and the scroll position stay. It waits while a composition is in progress, and it does not
         /// overwrite typed text that could not be saved.
         func show(_ text: String, in textView: NSTextView) {
+            // This runs during a view update; publish the button state after that pass.
+            defer { link?.queueCopyAvailability() }
             if textView.hasMarkedText() {
                 waitingText = text == agreedText ? nil : text
                 return

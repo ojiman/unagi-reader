@@ -86,7 +86,7 @@ There is no backend, no account and no AI proxy. The app has no AI of its own ([
 - `NotePanelWidthMemory` measures with `onGeometryChange` and saves once the width has been still for 0.6 s. The width is not `ReaderView` state: that redrew the whole window on every drag frame and froze it.
 - `ReaderWorkspaceState.noteOpen` and `noteListShown` live in memory only. `toggleNote` changes `noteOpen` and the column visibility in one animation; the note's ✕ calls it too. The layout button calls `switchNoteLayout`, which does nothing while the note is closed. Dragging the edge shut reopens the panel on the next turn (`noteOpenBinding`).
 - `NoteTextEditor` styles headings and list markers through `NoteLineStyle.runs(in:baseOffset:)` (ReaderCore, pure) and `NoteEditorStyle`. It changes display attributes only, in `NSTextStorageDelegate.didProcessEditing` for the edited paragraphs, never the text. It does nothing while `hasMarkedText()` is true. Paste and drop take plain text only; smart quotes, dashes, replacement and link detection are off. `textDidChange` saves once per change.
-- 「Markdownをコピー」 (`ReaderView.copyNote`) writes the saved text as one `NSPasteboardItem` string; a failure shows an error. `LegacyHandoffFolder` deletes the `Handoffs` folder that older builds made (a link is removed, not followed).
+- 「Markdownをコピー」 (`ReaderView.copyNote`) writes the shown editor text, including an edit whose save failed, as one `NSPasteboardItem` string; without an editor it uses the saved note. The copy button follows the shown text's empty state through `NoteEditorLink`. A pasteboard failure shows an error. `LegacyHandoffFolder` deletes the `Handoffs` folder that older builds made (a link is removed, not followed).
 
 ### 4.3 Keys
 
