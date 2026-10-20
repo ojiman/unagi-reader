@@ -14,8 +14,8 @@ struct ArticleBand: View {
     static let compactHeight: CGFloat = controlTop + controlLine + 4
     /// Room for the window buttons when the article column is at the window's left edge (the sidebar and the list are folded).
     static let windowButtonsWidth: CGFloat = 78
-    /// How far below the top the article's text starts, so that its first line keeps the place it had under the old toolbar.
-    static let contentTop: CGFloat = 28
+    /// NSTextView's glyph inset puts the publisher level with the SwiftUI headings, below the controls.
+    static let contentTop: CGFloat = ListHeader.bandHeight + 2
 
     let status: ArticleTranslation.State
     var translationTarget = "ja"

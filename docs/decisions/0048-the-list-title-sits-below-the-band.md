@@ -1,6 +1,6 @@
 # 0048 The list title sits below the toolbar band, level with the ✕
 
-- Status: valid; the ✕ it was level with moves into the band, see [0057](0057-each-column-has-its-own-band.md) (approved by the PdM when the PR that adds this record was merged)
+- Status: the title stays below the band; its old two-line layout, size and alignment are replaced by [specification 3.1.4](../specification.md#314-rules-per-area) (owner, 2026-10-20). The ✕ moved into the band in [0057](0057-each-column-has-its-own-band.md).
 - Date: 2026-10-12
 - Decider: the owner (PdM) saw that the ✕ of the right column sits lower than the list title 「すべての記事」, asked to lower the title to the ✕'s height, and showed a reference app's middle column (the toolbar band with the actions, the title block below it). The owner also plans a keyword filter in the middle column, which will go into the band as an icon, as in that reference. This change is the layout only. The details below are the Product Owner's.
 - Refines: [0047](0047-the-way-back-is-a-cross-in-the-right-column.md) point 4 (the title no longer needs to keep clear of the window buttons).

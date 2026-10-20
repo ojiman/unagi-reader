@@ -32,7 +32,7 @@ struct ArticleDetailView: View {
     }
     var body: some View {
         VStack(spacing: 0) {
-            Color.clear.frame(height: ArticleBand.contentTop)              // the text starts where it did under the old toolbar
+            Color.clear.frame(height: ArticleBand.contentTop)              // the publisher sits below the column controls
             if updateAvailable || error != nil {
                 HStack {
                     if updateAvailable { Button(String(localized: "Show fetched body", bundle: ReaderLocalization.bundle), action: onUpdate).buttonStyle(.link) }

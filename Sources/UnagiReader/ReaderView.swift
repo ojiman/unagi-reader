@@ -268,10 +268,13 @@ struct ReaderView: View {
         let grouped = Dictionary(grouping: store.feeds, by: \.folder)
         let folders = grouped.keys.filter { !$0.isEmpty }.sorted()
         return List(selection: $scope) {
-            Section(String(localized: "Feeds", bundle: ReaderLocalization.bundle)) {
+            Section {
                 sidebarRow(String(localized: "All Articles", bundle: ReaderLocalization.bundle), symbol: "tray", count: store.articles.count).tag(LibraryScope.all)
                 sidebarRow(String(localized: "Unread", bundle: ReaderLocalization.bundle), symbol: "circle.dotted", count: store.unreadCount).tag(LibraryScope.unread)
                 sidebarRow(String(localized: "Star", bundle: ReaderLocalization.bundle), symbol: "star", count: store.starCount).tag(LibraryScope.starred)
+            } header: {
+                Text(String(localized: "Feeds", bundle: ReaderLocalization.bundle))
+                    .font(.system(size: ListHeader.fontSize, weight: .semibold))
             }
             Section {
                 ForEach(grouped[""] ?? []) { feed in subscriptionRow(feed, folders: folders) }
@@ -282,6 +285,7 @@ struct ReaderView: View {
                 }
             } header: {
                 SidebarSectionHeader(title: String(localized: "Subscriptions", bundle: ReaderLocalization.bundle), help: String(localized: "Add a Subscription", bundle: ReaderLocalization.bundle), action: { addingTo = SubscriptionTarget(folder: "") }, onDropFeeds: { dropFeeds($0, into: "") })
+                    .font(.system(size: ListHeader.fontSize, weight: .semibold))
             }
         }
         .listStyle(.sidebar)
@@ -294,12 +298,12 @@ struct ReaderView: View {
     }
 
     private var sidebar: some View {
-        // The sidebar's band belongs to the window buttons and the two buttons (decision 0057): the rows scroll below it, and so does
-        // the scroll bar. The list's own frame starts under the band, as the safe area of a column reports 0 (see `ListHeader`).
+        // Own the top inset once: the system's sidebar safe area would add a second gap below the band.
         VStack(spacing: 0) {
             Color.clear.frame(height: ListHeader.bandHeight).contentShape(Rectangle()).gesture(WindowDragGesture())
             sidebarList
         }
+        .ignoresSafeArea(.container, edges: .top)
         .modifier(SidebarPaper())
         .navigationTitle("Unagi Reader")
         .toolbar(removing: .sidebarToggle)
@@ -406,7 +410,7 @@ struct ReaderView: View {
             }
         }
         .overlay(alignment: .top) {
-            ListHeader(title: scopeTitle, count: visibleArticleIDs.count).ignoresSafeArea(.container, edges: .top)
+            ListHeader(title: scopeTitle, count: visibleArticleIDs.count, isFiltering: !workspace.listFilter.isEmpty).ignoresSafeArea(.container, edges: .top)
         }
         .overlay(alignment: .top) {
             // A band folds with its column (decision 0057): the folded list's view still draws, so its controls are taken away.
@@ -500,9 +504,10 @@ struct ReaderView: View {
                     .id([expectedID.uuidString, url.absoluteString]).transition(.move(edge: .trailing))
                     .offset(x: originalSlide)
                     .padding(.top, ArticleBand.compactHeight)              // right below the article band, which holds its ✕ and host name
-                    .ignoresSafeArea(.container, edges: .top)              // the title bar's safe area would add to the gap (#204)
             }
         }.clipped()
+            // This container stays mounted across page and note folds (#222). Each child reserves its own band.
+            .ignoresSafeArea(.container, edges: .top)
             .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { originalColumnWidth = $0 }
     }
 

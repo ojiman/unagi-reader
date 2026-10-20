@@ -14,7 +14,8 @@ extension SplitViewFoldTests {
             return view.subviews.lazy.compactMap { find(type, in: $0) }.first
         }
 
-        @Test func theSidebarsScrollViewStartsBelowTheBand() async throws {
+        @Test(arguments: [960.0, 1240.0, 1600.0])
+        func theSidebarStaysBelowTheBandAndItsFirstRowAlignsWithTheList(width: Double) async throws {
             let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: directory) }
@@ -24,8 +25,8 @@ extension SplitViewFoldTests {
             let reader = ReaderView(store: store, refresh: FeedRefreshController(store: store),
                 imageLoader: ReaderImageLoader(directory: directory.appendingPathComponent("Images")))
             let host = NSHostingView(rootView: reader)
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1240, height: 800), styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
-            window.isReleasedWhenClosed = false; window.toolbar = NSToolbar(identifier: "synthetic-sidebar-band")
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 800), styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false; window.titlebarAppearsTransparent = true; window.titleVisibility = .hidden
             window.contentView = host
             window.orderFront(nil)
             defer { window.close() }
@@ -40,6 +41,41 @@ extension SplitViewFoldTests {
             // Window coordinates run upward from the bottom: the distance from the top of the window is the height minus the top edge.
             let top = 800 - scroll.convert(scroll.bounds, to: nil).maxY
             #expect(top >= ListHeader.bandHeight - 0.5, "the sidebar's scroll view starts \(top) pt from the window's top")
+            let sidebar = try #require(outline)
+            let table = try #require(find(NativeArticleList.Table.self, in: host))
+            table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+            for _ in 0..<250 where store.articles.first?.firstReadAt == nil {
+                host.layoutSubtreeIfNeeded()
+                try await Task.sleep(for: .milliseconds(20))
+            }
+            try #require(store.articles.first?.firstReadAt != nil)
+            host.layoutSubtreeIfNeeded(); window.displayIfNeeded()
+            let image = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            host.cacheDisplay(in: host.bounds, to: image)
+            let scale = CGFloat(image.pixelsHigh) / host.bounds.height
+            func selectionTop(in view: NSView, row: NSRect) throws -> CGFloat {
+                let rect = view.convert(row, to: nil)
+                let top = 800 - rect.maxY, bottom = 800 - rect.minY
+                let x = Int(rect.midX * scale)
+                let sample = try #require(image.colorAt(x: x, y: Int((bottom - 8) * scale))?.usingColorSpace(.sRGB))
+                let background = try #require(image.colorAt(x: x, y: Int(40 * scale))?.usingColorSpace(.sRGB))
+                try #require(abs(sample.redComponent - background.redComponent)
+                    + abs(sample.greenComponent - background.greenComponent)
+                    + abs(sample.blueComponent - background.blueComponent) > 0.05, "the row must actually be painted as selected")
+                // Read the actual background near the bottom of the selected row, away from its text. Then find its first painted
+                // pixel. The list's heading can cover part of a row; its internal rect alone does not describe what the person sees.
+                let first = (Int(max(52, top - 10) * scale)..<Int((top + 20) * scale)).first { y in
+                    guard let colour = image.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { return false }
+                    return abs(colour.redComponent - sample.redComponent) < 0.02
+                        && abs(colour.greenComponent - sample.greenComponent) < 0.02
+                        && abs(colour.blueComponent - sample.blueComponent) < 0.02
+                }
+                return CGFloat(try #require(first)) / scale
+            }
+            let sidebarTop = try selectionTop(in: sidebar, row: sidebar.rect(ofRow: 1))
+            let articleTop = try selectionTop(in: table, row: table.rect(ofRow: 0))
+            #expect(abs(sidebarTop - articleTop) <= 2,
+                    "visible selections start at different heights: sidebar \(sidebarTop), list \(articleTop)")
         }
     }
 }

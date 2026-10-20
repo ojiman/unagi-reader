@@ -12,16 +12,35 @@ import ReaderCore
         return (view.textStorage?.attribute(.font, at: location, effectiveRange: nil) as? NSFont)?.pointSize
     }
 
-    @Test func everySizeInTheArticleFollowsTheBody() throws {
+    @Test func bodyTitleAndDateScaleWhileThePublisherStaysAHeading() throws {
         let view = ArticleTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         view.install(title: "合成記事", publisher: "SYNTHETIC", date: "2026年10月17日", paragraphs: ["合成本文"], unavailable: nil, scale: 1)
-        #expect(fontSize(view, of: "合成本文") == 16 && fontSize(view, of: "合成記事") == 26 && fontSize(view, of: "SYNTHETIC") == 11)
+        #expect(fontSize(view, of: "合成本文") == 16 && fontSize(view, of: "合成記事") == 26 && fontSize(view, of: "SYNTHETIC") == 12)
         let scale = CGFloat(ArticleTextSize.scale(22))
         view.install(title: "合成記事", publisher: "SYNTHETIC", date: "2026年10月17日", paragraphs: ["合成本文"], unavailable: nil, scale: scale)
         #expect(fontSize(view, of: "合成本文") == 22)
         #expect(fontSize(view, of: "合成記事") == 35.75)
-        #expect(fontSize(view, of: "SYNTHETIC") == 15.125)
+        #expect(fontSize(view, of: "SYNTHETIC") == 12)
         #expect(fontSize(view, of: "2026年10月17日") == 16.5)
+    }
+
+    @Test func resizingAndBodySizeChangesKeepThePublisherAtTheTop() throws {
+        let view = ArticleTextView(frame: NSRect(x: 0, y: 0, width: 700, height: 500))
+        func install(_ scale: CGFloat) {
+            view.install(title: "合成記事", publisher: "SYNTHETIC", date: "", paragraphs: ["合成本文"], unavailable: nil, scale: scale)
+        }
+        func publisherTop() throws -> CGFloat {
+            let manager = try #require(view.layoutManager), container = try #require(view.textContainer)
+            manager.ensureLayout(for: container)
+            return manager.boundingRect(forGlyphRange: NSRange(location: 0, length: 9), in: container).minY + view.textContainerInset.height
+        }
+        install(1)
+        let top = try publisherTop()
+        for width in [360.0, 1200.0] {
+            view.setFrameSize(NSSize(width: width, height: 500))
+            install(CGFloat(ArticleTextSize.scale(22)))
+            #expect(abs(try publisherTop() - top) < 0.5)
+        }
     }
 
     /// The largest step in the narrowest article (360 pt, the note beside it): a long Japanese title still wraps into a few lines.

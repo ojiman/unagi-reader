@@ -8,8 +8,8 @@ import ReaderCore
 /// name left the column and ran over the article pane.)
 @Suite(EnglishLanguage()) @MainActor struct ListHeaderTests {
     /// Draws the header on a dark surface in a column `width` points wide and returns the x range (points) that has any ink.
-    private func inkRange(title: String, width: CGFloat) throws -> (min: CGFloat, max: CGFloat) {
-        let host = NSHostingView(rootView: ListHeader(title: title, count: 367).environment(\.colorScheme, .dark).background(Color.black))
+    private func inkRange(title: String, width: CGFloat, count: Int = 367, isFiltering: Bool = false) throws -> (min: CGFloat, max: CGFloat) {
+        let host = NSHostingView(rootView: ListHeader(title: title, count: count, isFiltering: isFiltering).environment(\.colorScheme, .dark).background(Color.black))
         host.frame = NSRect(x: 0, y: 0, width: width, height: ListHeader.bandHeight + ListHeader.height)
         let window = NSWindow(contentRect: host.frame, styleMask: [.titled], backing: .buffered, defer: false)
         window.contentView = host
@@ -32,10 +32,12 @@ import ReaderCore
 
     @Test func aLongNameStaysInsideTheColumnMargins() throws {
         let long = "はてなブックマーク - 人気エントリー - テクノロジー - ここにさらに長い名前が続きます"
-        for width in [280.0, 400.0] {                                              // 280 is the narrowest the column can be
-            let ink = try inkRange(title: long, width: width)
-            #expect(ink.max <= width - ListHeader.sideMargin + 1)                  // it is cut with an ellipsis before the right margin
-            #expect(ink.min >= ListHeader.sideMargin - 1)
+        for width in [280.0, 400.0] {
+            for filtering in [false, true] {
+                let ink = try inkRange(title: long, width: width, count: 999999, isFiltering: filtering)
+                #expect(ink.max <= width - ListHeader.sideMargin + 1)
+                #expect(ink.min >= ListHeader.sideMargin - 1)
+            }
         }
     }
 
@@ -77,12 +79,22 @@ import ReaderCore
         #expect(abs((table.bounds.width - timeRect.maxX) - NativeArticleList.Metrics.contentMargin) < 0.5)   // the right edge
     }
 
-    /// The title block sits below the toolbar band, and the first line of the title is level with the ✕ of the right column
-    /// (decision 0048). `ListHeader.crossCentre` was measured in the running app, on the ✕ of the original page and of the note screen.
-    @Test func theTitleSitsBelowTheBandLevelWithTheCross() throws {
-        let width: CGFloat = 400
-        let host = NSHostingView(rootView: ListHeader(title: "すべての記事", count: 12).environment(\.colorScheme, .dark).background(Color.black))
-        host.frame = NSRect(x: 0, y: 0, width: width, height: ListHeader.bandHeight + ListHeader.height)
+    @Test func theNormalHeadingDoesNotRepeatTheSidebarCount() throws {
+        let one = try inkRange(title: "S", width: 280, count: 1)
+        let many = try inkRange(title: "S", width: 280, count: 999999)
+        #expect(abs(one.max - many.max) < 1, "normal headings must not change with the count")
+    }
+
+    @Test func filteringShowsTheResultCountOnTheHeadingLine() throws {
+        let one = try inkRange(title: "S", width: 280, count: 1, isFiltering: true)
+        let many = try inkRange(title: "S", width: 280, count: 999999, isFiltering: true)
+        #expect(many.max > one.max + 10)
+    }
+
+    @Test func theHeadingUsesOneCompactLineBelowTheBand() throws {
+        let host = NSHostingView(rootView: ListHeader(title: "All Articles", count: 12)
+            .environment(\.colorScheme, .dark).background(Color.black))
+        host.frame = NSRect(x: 0, y: 0, width: 400, height: ListHeader.bandHeight + ListHeader.height)
         let window = NSWindow(contentRect: host.frame, styleMask: [.titled], backing: .buffered, defer: false)
         window.contentView = host
         host.appearance = NSAppearance(named: .darkAqua)
@@ -90,15 +102,14 @@ import ReaderCore
         let rep = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
         host.cacheDisplay(in: host.bounds, to: rep)
         let scale = CGFloat(rep.pixelsHigh) / host.bounds.height
-        var rows: [Int] = []
-        for y in 0..<rep.pixelsHigh {
-            for x in 0..<rep.pixelsWide where (rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB)?.brightnessComponent ?? 0) > 0.3 { rows.append(y); break }
+        let rows = (0..<rep.pixelsHigh).filter { y in
+            (0..<rep.pixelsWide).contains { x in
+                (rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB)?.brightnessComponent ?? 0) > 0.3
+            }
         }
-        let first = try #require(rows.first)
-        #expect(CGFloat(first) / scale >= ListHeader.bandHeight)                                   // nothing in the band
-        var lastOfFirstLine = first
-        for y in rows.dropFirst() { if y - lastOfFirstLine <= 1 { lastOfFirstLine = y } else { break } }
-        let centre = (CGFloat(first) + CGFloat(lastOfFirstLine)) / 2 / scale - ListHeader.bandHeight
-        #expect(abs(centre - ListHeader.crossCentre) <= 4)                                         // the first line is level with the ✕
+        let first = CGFloat(try #require(rows.first)) / scale
+        let last = CGFloat(try #require(rows.last)) / scale
+        #expect(first >= ListHeader.bandHeight)
+        #expect(last < ListHeader.bandHeight + 19, "a second line must not take space above the articles")
     }
 }
