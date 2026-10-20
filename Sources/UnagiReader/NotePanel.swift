@@ -9,13 +9,15 @@ struct NotePanel: View {
     let canNext: Bool
     let onPrevious: () -> Void
     let onNext: () -> Void
-    let onCopy: () -> Void
+    /// Copies the note; true when the text is on the pasteboard.
+    let onCopy: () -> Bool
     let onClose: () -> Void
     /// The note shows the list beside it (the layout button's state).
     let listShown: Bool
     let onSwitchLayout: () -> Void
     /// How 「記事をノートに送る」 reaches the editor (specification 3.3).
     let link: NoteEditorLink
+    @State private var copySign = CopySign()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -41,12 +43,37 @@ struct NotePanel: View {
             BandButton(id: "next", symbol: "chevron.down", help: String(localized: "Next Article (⌥⌘↓)", bundle: ReaderLocalization.bundle), label: String(localized: "Next Article", bundle: ReaderLocalization.bundle), enabled: canNext,
                        shortcut: KeyboardShortcut(.downArrow, modifiers: [.option, .command]), action: onNext)
             // The text is copied as it is; the person pastes it into any AI they like (decision 0049).
-            BandButton(id: "copy", symbol: "doc.on.doc", help: String(localized: "Copy Markdown", bundle: ReaderLocalization.bundle), label: String(localized: "Copy Markdown", bundle: ReaderLocalization.bundle), enabled: hasText, action: onCopy)
+            // A check mark for a moment says the copy worked (#374); nothing changes when it did not.
+            BandButton(id: "copy", symbol: copySign.symbol, help: String(localized: "Copy Markdown", bundle: ReaderLocalization.bundle), label: String(localized: "Copy Markdown", bundle: ReaderLocalization.bundle), enabled: hasText) {
+                guard onCopy() else { return }
+                copySign.show()
+                AccessibilityNotification.Announcement(String(localized: "Note copied", bundle: ReaderLocalization.bundle)).post()
+            }
         }
         .bandLayout()
     }
 
     private var hasText: Bool {
         link.hasCopyText ?? !(store.note?.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+    }
+}
+
+/// The copy button's symbol: a check mark for a moment after a copy, then the copy symbol again. The symbol changes at once, so Reduce
+/// Motion needs nothing of its own.
+@Observable @MainActor final class CopySign {
+    private(set) var symbol = "doc.on.doc"
+    @ObservationIgnored private let duration: Duration
+    @ObservationIgnored private var hiding: Task<Void, Never>?
+
+    init(duration: Duration = .seconds(1.5)) { self.duration = duration }
+
+    func show() {
+        symbol = "checkmark"
+        hiding?.cancel()
+        hiding = Task { [weak self, duration] in
+            try? await Task.sleep(for: duration)
+            guard !Task.isCancelled else { return }
+            self?.symbol = "doc.on.doc"
+        }
     }
 }
