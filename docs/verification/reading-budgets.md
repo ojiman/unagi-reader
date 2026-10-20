@@ -1,7 +1,11 @@
 # Reading budgets (issue #164)
 
-Result: W1 PASS; W2 FAIL while reading and refreshing (no typing gaps in three replays); W3 PASS (791–823 ms on a copy's second launch). These are measurements, not product acceptance. The budget values in specification 2.1 are unchanged; since 2026-10-19 W3 counts a copy's second and later launches.
-Scope: `b99a92d` (main `c93b978` plus the note-context fix `49637f3`), Release, ad hoc signed synthetic copies, macOS 27.0.1 (26A434), arm64 Mac14,2, Xcode 27.1 (27A9275), Swift 6.4, display at 60 Hz. Three copies on 2026-10-19 between 06:08 and 06:11 JST, each launched once and then for the replay; screen unlocked throughout; no other build, test or Unagi Reader process.
+Result: at `ad39e24`, W1 PASS (p95 27.660 / 28.541 ms); W2 still FAIL while reading and refreshing; W3 PASS (823.730 / 795.568 ms). The cached-selection fix below is partial progress on #249, which stays open. These are measurements, not product acceptance; specification 2.1 budgets are unchanged.
+Scope: Release, ad hoc signed synthetic copies, macOS 27.0.1 (26A434), arm64 Mac14,2, Xcode 27.1 (27A9275), Swift 6.4, display at 60 Hz. Each record below names its source commit and runs; since 2026-10-19 W3 counts a copy's second and later launches.
+
+## Integrated replay before the refresh work
+
+Historical scope: `b99a92d` (main `c93b978` plus the note-context fix `49637f3`). Three copies on 2026-10-19 between 06:08 and 06:11 JST, each launched once and then for the replay; screen unlocked throughout; no other build, test or Unagi Reader process. W1 and W3 passed; W2 failed while reading and refreshing.
 
 | Budget | Measured result (copies 1 / 2 / 3) | Status |
 |---|---|---|
@@ -21,6 +25,34 @@ The reported pane bounds, in points, are reading: sidebar 185, list 280, article
 Raw output SHA-256, copies 1 to 3: `1a2f2cb57c3f4fad7a14f6a32e1382a162d9c8cc06fcc4a20a1ac60602b7cec7`, `279a3c0009b75eb6acaa442057c2287520553fc58d80fdb7ca1a7ae1ef3ba22e`, `1659ffe88c619ba03f40b87de6fa6ae7352c875b676e45408344c45e8aa5b6d2`. Executed synthetic app's executable SHA-256: `1a955272903eac159e4e6ae4937fc9b72e12c7ebde267ba5adff6d6b5623229f`. Where the time went for W3 before PR #324 is in the comments of #250; for refresh, in #252.
 
 The kernel timestamp is for this process only (`proc_pidinfo`, `PROC_PIDTBSDINFO`). W3 ends after the first visible, nonempty table draw, so it includes loading the store and process initialization. It excludes Launch Services work before process creation and does not measure the render server's first visible pixel. A copy's first launch is recorded separately; the cause of its extra cost is not established. W1 keeps the existing meaning of display start: entry into installing the article's nonempty text, before all its layout has finished. W2 is a 20 ms main-actor heartbeat; it records interval minus 20 ms when that delay is over 100 ms. It is a scheduling-delay measurement, not a full thread trace or a motion-frame measurement.
+
+## Cached selection follow-up (#249)
+
+On 2026-10-20, the hosted regression test reproduced an extra native text installation: changing selection to another cached article first installed "The article body is unavailable.", then the saved body. `ArticleLoadingController.load` has no suspension or network request, but `ReaderView` called it in a separate selection task. At `ad39e24f29b34bad7c071264be38ac4e53540c9d`, selection loads that cached text before publishing the changed ID. The same-ID guard preserves interaction state. Missing content still shows its real unavailable message, and a read mark still waits for the native body draw.
+
+A separate 25-second `sample` of baseline `bb7147a` found the native text install doing substantial font-attribute fixing and fallback-font matching, alongside layout. That diagnostic adds overhead and does not locate the remaining occasional heartbeat gap. The regression test identifies the redundant document; the unprofiled runs below measure its removal. No profiler, accessibility inspection, other build, test or app copy ran during these measurements.
+
+The fixture, replay, thresholds and pane bounds above are unchanged. Two baseline replays at `bb7147ae5fd02ce087a17516213d955beb501d13` finished at 09:02 and 09:13 JST; two fixed replays finished at 09:25 and 09:27 JST. Every replay completed without an error, produced 100 selections, checked the exact saved typing text, and finished all 100 feed refreshes. After both fixed apps quit, read-only checks of their temporary databases confirmed the exact 64-character note, 10,000 articles and 51 read / first-read records (the fixture starts with one). Each new synthetic app had a first launch on one fresh fixture copy, then the replay on another. The screen stayed awake and unlocked; HID idle time increased throughout each accepted replay. An interleaved third baseline replay had input activity and is excluded.
+
+| Measurement | Baseline, runs 1 / 2 | Fixed, runs 1 / 2 |
+|---|---|---|
+| W1 p95 / maximum, ms | 59.252 / 67.303; 58.897 / 64.089 | 27.660 / 32.160; 28.541 / 39.847 |
+| Reading gaps over 100 ms / longest, ms | 2 / 150.047; 5 / 119.232 | 1 / 139.881; 1 / 111.145 |
+| Typing gaps over 100 ms | 0 / 0 | 0 / 0 |
+| Refresh gaps over 100 ms / longest, ms | 17 / 189.679; 17 / 169.292 | 18 / 186.406; 18 / 174.004 |
+| W3, second launch, ms | 1,062.365 (FAIL) / 814.233 | 823.730 / 795.568 |
+| First launch, ms (no budget) | 1,770.987 / 1,477.161 | 1,878.688 / 1,213.114 |
+| Reading / typing / refresh heartbeats | 1,486 / 160 / 157; 1,493 / 160 / 158 | 1,482 / 162 / 159; 1,487 / 161 / 158 |
+
+W1 improves, but **reading W2 still fails**. This change does not establish the cause of the remaining gap, solve #249, or change the refresh path (#303 / #348). The refresh uses the original `changed` scenario, where every body changes; these are not measurements of `typical` or `morning`. W3 is recorded without claiming a launch fix: one baseline run exceeded its limit.
+
+Output SHA-256, baseline runs 1 / 2: `64d984002865eef89d009da739e8812a6c23475a88fa4548bc4748c4844e1218` / `3079cfd92af44d80eecb6cd5e5485400cfac4bed65f01e91d9b66456223870a4`; fixed runs 1 / 2: `539d3b57ba70ad647112d5676e79ba5c7fd06f90561fc916b74d58be6e62ce38` / `551ef558290ea184cbada6ec4c666d5ad9ce9bf2838b0acf391c3fad37b608ba`. Fixed synthetic executable SHA-256: `02e908ddb047d155be1559e8c04869c3486bc56e454c4fe8942e6b5d87f64cc3`. The fixture was exported from `4475e9e`; its `BenchmarkFixtureTests` source is identical to `bb7147a`.
+
+`ReaderSelectionRenderingTests.selectingCachedTextDoesNotRenderAnUnavailableBodyFirst` failed on the baseline with the unavailable-document assertion, then passed with the fix. It also covers the real missing-body message and read history. The four `ArticleLoadingTests` passed. A separate agent reviewed the fixed `bb7147a` → `ad39e24` diff against checklist 1–5, including selection, focus, scroll, original-page dismissal, missing text and read-history guards, and reported no findings. That was static review, not independent performance or device acceptance.
+
+At `ad39e24`, `swift test -c release --scratch-path /private/tmp/unagi-reader-v1-release --disable-automatic-resolution --skip 'ArticleFilterStoreTests/tenThousandArticlesAreNarrowedQuickly'` passed: UI 184 tests and Core 313 tests, with six opt-in Core checks skipped. `scripts/check-test-log.sh` confirmed completion and no failures; no continuation-misuse warning was present. The unchanged baseline's earlier full Release run failed the immediate-note-`t` test, which passed alone; that separate intermittent failure is tracked in [#351](https://github.com/ojiman/unagi-reader/issues/351). It passed in this fixed full run; this change does not claim to fix it.
+
+Three subsequent, separate Release test processes ran the cached-filter test: 16.717 / 16.299 / 15.760 ms, each below its unchanged 50 ms limit. Another three processes ran `--filter 'ReaderSelectionRenderingTests|ArticleLoadingTests|OriginalKeyboardTests'`: 11 UI and four Core tests passed each time, including the new regression. All six logs passed the completion guard. Both groups used the same scratch path with `--skip-build`; neither ran beside another local build, test or app. `git diff --check` and `python3 scripts/check_docs.py --online` passed.
 
 ## Note-typing follow-up (#327)
 
