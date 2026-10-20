@@ -14,8 +14,19 @@ extension SplitViewFoldTests {
             return view.subviews.lazy.compactMap { find(type, in: $0) }.first
         }
 
-        @Test(arguments: [960.0, 1240.0, 1600.0])
-        func theSidebarStaysBelowTheBandAndItsFirstRowAlignsWithTheList(width: Double) async throws {
+        @Test func theSidebarStaysBelowTheWindowButtonsBand() async throws {
+            try await checkLayout(width: 1240, captureSelections: false)
+        }
+
+        // macOS 26 cacheDisplay omits the native outline and table layers entirely. Keep the geometry check above on
+        // every runtime, and compare painted selections on the supported macOS 27 runtime, where both layers are captured.
+        @Test(.enabled(if: ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 27,
+            "Native list layer capture requires macOS 27"), arguments: [960.0, 1240.0, 1600.0])
+        func theFirstVisibleSelectionsAlign(width: Double) async throws {
+            try await checkLayout(width: width, captureSelections: true)
+        }
+
+        private func checkLayout(width: Double, captureSelections: Bool) async throws {
             let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: directory) }
@@ -41,6 +52,7 @@ extension SplitViewFoldTests {
             // Window coordinates run upward from the bottom: the distance from the top of the window is the height minus the top edge.
             let top = 800 - scroll.convert(scroll.bounds, to: nil).maxY
             #expect(top >= ListHeader.bandHeight - 0.5, "the sidebar's scroll view starts \(top) pt from the window's top")
+            guard captureSelections else { return }
             let sidebar = try #require(outline)
             let table = try #require(find(NativeArticleList.Table.self, in: host))
             table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
