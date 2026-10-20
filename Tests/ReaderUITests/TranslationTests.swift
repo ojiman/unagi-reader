@@ -190,6 +190,23 @@ extension SplitViewFoldTests {
         #expect(!controller.isOn(for: content.articleID) && controller.state.state == .idle)
     }
 
+    /// Issue #372: with the system's session, the second article was never translated. Going through nil to a new configuration equal to the
+    /// first did not run the session's task again; the same configuration, invalidated, does.
+    @Test func anotherArticleInvalidatesTheSameConfiguration() async throws {
+        let controller = TranslationController(engine: TranslationEngine(decide: { _, _ in .translate(source: "en") }, batch: nil))
+        controller.setTarget("ja", supported: ["en", "ja"])
+        controller.toggle(title: "Title", content: content)
+        for _ in 0..<100 where controller.configuration == nil { try await Task.sleep(for: .milliseconds(10)) }
+        let first = try #require(controller.configuration)
+        controller.reset()                                                                      // `j`: another article
+        #expect(controller.configuration == first)
+        let other = ArticleContent(articleID: UUID(), text: "Three.", summary: "", coverage: .feedProvided, originalURL: nil)
+        controller.toggle(title: "Other", content: other)
+        for _ in 0..<100 where controller.configuration == first { try await Task.sleep(for: .milliseconds(10)) }
+        let second = try #require(controller.configuration)
+        #expect(second != first && second.source == first.source && second.target == first.target)
+    }
+
     @Test func theStatusRowNamesTheLanguagesInJapanese() {
         #expect(TranslationStatusRow.pair(source: "en", target: "ja") == "English → Japanese")
         #expect(TranslationStatusRow.pair(source: nil, target: "ja") == "→ Japanese")
