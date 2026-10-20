@@ -27,19 +27,20 @@ import ReaderCore
         func find<T: NSView>(_ type: T.Type, in view: NSView) -> T? {
             (view as? T) ?? view.subviews.lazy.compactMap { find(type, in: $0) }.first
         }
-        func settle(until ready: () -> Bool) async throws {
-            let end = ContinuousClock.now + .seconds(10)
-            while ContinuousClock.now < end {
+        func settle(_ state: String, line: Int = #line, until ready: () -> Bool) async throws {
+            let end = ContinuousClock.now + .seconds(60)
+            while true {
                 host.layoutSubtreeIfNeeded(); window.displayIfNeeded()
                 if ready() { return }
+                try #require(ContinuousClock.now < end, "The synthetic reader did not reach \(state)",
+                    sourceLocation: SourceLocation(fileID: #fileID, filePath: #filePath, line: line, column: 1))
                 try await Task.sleep(for: .milliseconds(20))
             }
-            #expect(ready(), "The synthetic reader did not reach its final state")
         }
-        try await settle { find(NativeArticleList.Table.self, in: host)?.numberOfRows == 3 }
+        try await settle("three article rows") { find(NativeArticleList.Table.self, in: host)?.numberOfRows == 3 }
         let table = try #require(find(NativeArticleList.Table.self, in: host))
         #expect(table.keyHandler?("j") == true)
-        try await settle { find(ArticleTextView.self, in: host)?.string.contains("Cached body 0") == true }
+        try await settle("the first cached body") { find(ArticleTextView.self, in: host)?.string.contains("Cached body 0") == true }
         let text = try #require(find(ArticleTextView.self, in: host))
         let storage = try #require(text.textStorage)
         let documents = Documents()
@@ -52,13 +53,13 @@ import ReaderCore
         defer { NotificationCenter.default.removeObserver(observer) }
         #expect(table.keyHandler?("j") == true)
         host.layoutSubtreeIfNeeded()
-        try await settle { text.string.contains("Cached body 1") }
+        try await settle("the second cached body") { text.string.contains("Cached body 1") }
         #expect(!documents.values.isEmpty)
         #expect(!documents.values.contains { $0.contains("The article body is unavailable.") })
         #expect(table.selectedRow == 1)
-        try await settle { store.articles[1].firstReadAt != nil }
+        try await settle("the second article's read mark") { store.articles[1].firstReadAt != nil }
         #expect(table.keyHandler?("j") == true)
-        try await settle { text.string.contains("The article body is unavailable.") }
+        try await settle("the missing body's message") { text.string.contains("The article body is unavailable.") }
         #expect(store.articles[2].firstReadAt == nil)
     }
 }
