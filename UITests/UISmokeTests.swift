@@ -253,7 +253,8 @@ import Carbon
         for row in 0..<min(image.pixelsHigh, Int(100 * scale)) {
             let count = (max(0, centerX - radius)...min(image.pixelsWide - 1, centerX + radius)).filter { column in
                 guard let colour = image.colorAt(x: column, y: row)?.usingColorSpace(.deviceRGB) else { return false }
-                return colour.greenComponent > 0.5 && colour.greenComponent > colour.redComponent * 1.5 && colour.greenComponent > colour.blueComponent * 1.3
+                // Light appearance uses a paler native green than Dark. Neutral backgrounds still fail these ratios.
+                return colour.greenComponent > 0.5 && colour.greenComponent > colour.redComponent * 1.25 && colour.greenComponent > colour.blueComponent * 1.3
             }.count
             if count >= 3 { rows.append(row) }
         }
