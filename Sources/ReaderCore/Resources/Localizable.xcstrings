@@ -414,7 +414,7 @@
       }
     },
     "Add Subscription": {
-      "comment": "Sources/UnagiReader/SidebarTitlebarControls.swift",
+      "comment": "Sources/UnagiReader/LibraryToolbarControls.swift",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -461,7 +461,7 @@
       }
     },
     "Add Subscription from URL": {
-      "comment": "Sources/UnagiReader/SidebarTitlebarControls.swift",
+      "comment": "Sources/UnagiReader/LibraryToolbarControls.swift",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -5913,7 +5913,7 @@
       }
     },
     "Refresh Subscriptions": {
-      "comment": "Sources/UnagiReader/SidebarTitlebarControls.swift",
+      "comment": "Sources/UnagiReader/LibraryToolbarControls.swift",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -6054,7 +6054,7 @@
       }
     },
     "Refreshing": {
-      "comment": "Sources/UnagiReader/SidebarTitlebarControls.swift",
+      "comment": "Sources/UnagiReader/LibraryToolbarControls.swift",
       "localizations": {
         "en": {
           "stringUnit": {

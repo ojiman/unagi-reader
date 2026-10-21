@@ -13,6 +13,8 @@ struct ListHeader: View {
     static let bandHeight: CGFloat = 52
     /// One heading line; the first article starts level with the first sidebar row.
     static let height: CGFloat = 19
+    /// The inset table and its quiet selection already leave 12 pt before the first painted row.
+    static let rowInset: CGFloat = height - 12
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {

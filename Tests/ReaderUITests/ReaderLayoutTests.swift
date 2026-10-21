@@ -41,15 +41,17 @@ extension SplitViewFoldTests {
             window.contentView = host
             window.orderFront(nil)      // the fold is an animation; a window that is never shown does not run it on time
             defer { window.close() }
-            try await settle(host) { find(NativeArticleList.Table.self, in: host)?.numberOfRows == 3 && window.titlebarAccessoryViewControllers.contains { $0.view is NSHostingView<SidebarTitlebarControls.Buttons> } }
+            func sidebarVisible() -> Bool {
+                guard let sidebar = find(NSOutlineView.self, in: host) else { return false }
+                return !sidebar.isHiddenOrHasHiddenAncestor && sidebar.visibleRect.width > 80
+            }
+            try await settle(host) { find(NativeArticleList.Table.self, in: host)?.numberOfRows == 3 && sidebarVisible() }
             let table = try #require(find(NativeArticleList.Table.self, in: host))
             table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
             try await settle(host) { find(ArticleTextView.self, in: host)?.string.contains("合成記事 0") == true }
-            let accessory = try #require(window.titlebarAccessoryViewControllers.first { $0.view is NSHostingView<SidebarTitlebarControls.Buttons> })
             let frame = table.convert(table.bounds, to: nil)
-            func accessoryMounted() -> Bool { window.titlebarAccessoryViewControllers.contains { $0 === accessory } }
             func listIsBack() -> Bool { abs(table.convert(table.bounds, to: nil).minX - frame.minX) < 1 && abs(table.bounds.width - frame.width) < 1 }
-            func state() -> String { "[accessory \(accessoryMounted()), list x \(table.convert(table.bounds, to: nil).minX), page \(pageIsClosed() ? "closed" : "open")]" }
+            func state() -> String { "[sidebar \(sidebarVisible()), list x \(table.convert(table.bounds, to: nil).minX), page \(pageIsClosed() ? "closed" : "open")]" }
             func pageIsClosed() -> Bool { find(OriginalReaderWebView.self, in: host) == nil && find(OriginalFailureHostingView<AnyView>.self, in: host) == nil }
             try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))      // the window has just appeared; a person does not press `v` in its first frame
             for row in [1, 2, 0] {
@@ -62,23 +64,22 @@ extension SplitViewFoldTests {
                 }
                 try await settle(host) {
                     let listRight = table.convert(table.bounds, to: nil).maxX
-                    return bandButtons(host).contains { $0.minY >= 800 - ArticleBand.height && $0.minX >= listRight && $0.minX < listRight + 60 }
+                    return bandButtons(host).contains { $0.minY >= window.contentLayoutRect.maxY - ArticleBand.height && $0.minX >= listRight && $0.minX < listRight + 60 }
                 }
                 // Issue #204: the page starts right below the band's controls, with no dark strip of empty band above it.
                 func pageTop() -> CGFloat? {
                     let page: NSView? = find(OriginalReaderWebView.self, in: host) ?? find(OriginalFailureHostingView<AnyView>.self, in: host)
-                    return page.map { 800 - $0.convert($0.bounds, to: nil).maxY }
+                    return page.map { window.contentLayoutRect.maxY - $0.convert($0.bounds, to: nil).maxY }
                 }
                 try await settle(host) { (pageTop() ?? 99) < 40 }
-                // Decision 0046: the sidebar folds with the page, so its titlebar buttons leave and the list moves to the window's left edge with the same width.
-                try await settle(host, state: state) { !accessoryMounted() && table.convert(table.bounds, to: nil).minX < 1 }
+                // Decision 0046: the sidebar folds with the page, and the list moves to the window's left edge with the same width.
+                try await settle(host, state: state) { !sidebarVisible() && table.convert(table.bounds, to: nil).minX < 1 }
                 #expect(abs(table.bounds.width - frame.width) < 1)
                 try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))      // let the fold finish, as a person reading the page would
                 table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
                 try await settle(host) { pageIsClosed() }
-                // Closing the page, however it is closed, brings the sidebar and its buttons back.
-                try await settle(host, state: state) { accessoryMounted() && listIsBack() }
-                #expect(!accessory.view.isHidden)
+                // Closing the page, however it is closed, brings the sidebar back.
+                try await settle(host, state: state) { sidebarVisible() && listIsBack() }
             }
         }
         /// Closing the page while the sidebar is still folding (a quick `v` then `Esc`, or a quick `v` then `j`) must still bring the sidebar
@@ -105,10 +106,13 @@ extension SplitViewFoldTests {
             table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
             try await settle(host) { find(ArticleTextView.self, in: host)?.string.contains("合成記事 0") == true }
             let frame = table.convert(table.bounds, to: nil)
-            func sidebarButtons() -> Bool { window.titlebarAccessoryViewControllers.contains { $0.view is NSHostingView<SidebarTitlebarControls.Buttons> } }
+            func sidebarVisible() -> Bool {
+                guard let sidebar = find(NSOutlineView.self, in: host) else { return false }
+                return !sidebar.isHiddenOrHasHiddenAncestor && sidebar.visibleRect.width > 80
+            }
             func listIsBack() -> Bool { abs(table.convert(table.bounds, to: nil).minX - frame.minX) < 1 && abs(table.bounds.width - frame.width) < 1 }
             func pageIsClosed() -> Bool { find(OriginalReaderWebView.self, in: host) == nil && find(OriginalFailureHostingView<AnyView>.self, in: host) == nil }
-            func state() -> String { "[sidebar buttons \(sidebarButtons()), list x \(table.convert(table.bounds, to: nil).minX), page \(pageIsClosed() ? "closed" : "open")]" }
+            func state() -> String { "[sidebar \(sidebarVisible()), list x \(table.convert(table.bounds, to: nil).minX), page \(pageIsClosed() ? "closed" : "open")]" }
             try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))      // the window has just appeared
             let coordinator = try #require(table.delegate as? NativeArticleList.Coordinator)
             for row in [1, 2, 0] {
@@ -117,10 +121,10 @@ extension SplitViewFoldTests {
                 // At once, without waiting for the fold to end:
                 table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
                 try await settle(host, state: state) { pageIsClosed() }
-                try await settle(host, state: state) { sidebarButtons() && listIsBack() }
+                try await settle(host, state: state) { sidebarVisible() && listIsBack() }
                 // It must also stay back, not come back for a moment.
                 try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
-                #expect(sidebarButtons() && listIsBack(), "the sidebar did not stay back \(state())")
+                #expect(sidebarVisible() && listIsBack(), "the sidebar did not stay back \(state())")
             }
         }
     }

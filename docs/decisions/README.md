@@ -51,7 +51,7 @@ A decision record says who decided what, when and why. It is not where the curre
 | [0054](0054-translation-on-the-mac-not-stored.md) | Translation runs on the Mac with the system's framework, and is not stored | valid |
 | [0055](0055-a-keyword-filter-for-the-list.md) | A keyword filter for the article list | valid (the magnifier's place: 0057) |
 | [0056](0056-the-feed-text-only.md) | The article shows the feed's text only: no full-text fetch, no coverage line | valid |
-| [0057](0057-each-column-has-its-own-band.md) | Each column has its own band; no system toolbar | valid |
+| [0057](0057-each-column-has-its-own-band.md) | Each column has its own band; no system toolbar | valid in part (window and sidebar controls: 0065) |
 | [0058](0058-unagi-reader-defines-its-own-requirements.md) | Unagi Reader defines its own requirements | valid |
 | [0059](0059-send-the-article-to-the-note.md) | Send the article to the note: an insertion the person asks for; no AI summary | valid |
 | [0060](0060-language-settings-and-ui-localization.md) | Language settings, independent defaults and AI-prepared UI localization | valid (built; product acceptance is separate) |
@@ -59,6 +59,7 @@ A decision record says who decided what, when and why. It is not where the curre
 | [0062](0062-several-writers-under-review.md) | Several writers at once, each on its own issue, under the owner's review | valid |
 | [0063](0063-export-opml.md) | Export the subscriptions as an OPML file | valid (approved when its PR is merged) |
 | [0064](0064-opening-the-note-gives-it-the-keyboard.md) | Opening the note gives it the keyboard | valid (built) |
+| [0065](0065-native-window-controls-and-column-bands.md) | Native window controls above the column bands | valid (owner approved the prototype; product acceptance is separate) |
 
 ## Removed from the working tree
 

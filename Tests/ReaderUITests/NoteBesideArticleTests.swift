@@ -61,11 +61,12 @@ extension SplitViewFoldTests {
         private func article(in h: Harness) -> ArticleTextView? { find(ArticleTextView.self, in: h.host) }
         private func x(_ view: NSView?) -> CGFloat? { view.map { $0.convert($0.bounds, to: nil).minX } }
         private func right(_ view: NSView?) -> CGFloat? { view.map { $0.convert($0.bounds, to: nil).maxX } }
-        private func sidebarButtonsMounted(_ h: Harness) -> Bool {
-            h.window.titlebarAccessoryViewControllers.contains { $0.view is NSHostingView<SidebarTitlebarControls.Buttons> }
+        private func sidebarVisible(_ h: Harness) -> Bool {
+            guard let sidebar = find(NSOutlineView.self, in: h.host) else { return false }
+            return !sidebar.isHiddenOrHasHiddenAncestor && sidebar.visibleRect.width > 80
         }
         private func state(_ h: Harness) -> String {
-            "[frame \(h.window.frame), list viewport \(String(describing: table(in: h)?.enclosingScrollView?.bounds)), list focused \(h.window.firstResponder === table(in: h)), note focused \(h.window.firstResponder === editor(in: h)), sidebar buttons \(sidebarButtonsMounted(h)), list x \(x(table(in: h)).map { "\($0)" } ?? "none"), article x \(x(article(in: h)).map { "\($0)" } ?? "none"), note x \(x(editor(in: h)).map { "\($0)" } ?? "none")]"
+            "[frame \(h.window.frame), list viewport \(String(describing: table(in: h)?.enclosingScrollView?.bounds)), list focused \(h.window.firstResponder === table(in: h)), note focused \(h.window.firstResponder === editor(in: h)), sidebar \(sidebarVisible(h)), list x \(x(table(in: h)).map { "\($0)" } ?? "none"), article x \(x(article(in: h)).map { "\($0)" } ?? "none"), note x \(x(editor(in: h)).map { "\($0)" } ?? "none")]"
         }
         private func settle(_ h: Harness, line: Int = #line, until ready: () -> Bool) async throws {
             for _ in 0..<250 {
@@ -99,7 +100,7 @@ extension SplitViewFoldTests {
         @Test func nOpensTheNoteBesideTheArticleAndFoldsTheSidebarAndTheList() async throws {
             let h = try harness()
             defer { finish(h) }
-            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
+            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarVisible(h) }
             let list = try #require(table(in: h))
             list.selectRowIndexes(IndexSet(integer: 1), byExtendingSelection: false)
             try await settle(h) { article(in: h)?.string.contains("合成記事 1") == true }
@@ -108,7 +109,7 @@ extension SplitViewFoldTests {
             try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))                 // the window has just appeared
 
             try press("n", in: h)
-            try await settle(h) { noteVisible(h) && !sidebarButtonsMounted(h) && (x(article(in: h)) ?? 999) < 40 }
+            try await settle(h) { noteVisible(h) && !sidebarVisible(h) && (x(article(in: h)) ?? 999) < 40 }
             // Article on the left, note on the right; the list is folded away, so it takes no room.
             let articleRight = try #require(right(article(in: h)))
             #expect(try #require(x(editor(in: h))) >= articleRight - 1)
@@ -124,7 +125,7 @@ extension SplitViewFoldTests {
             let exact = ProcessInfo.processInfo.isOperatingSystemAtLeast(OperatingSystemVersion(majorVersion: 27, minorVersion: 0, patchVersion: 0))
                 && SidebarFold.animatesListFold(windowWidth: 1_240)
             try await settle(h) {
-                !noteVisible(h) && sidebarButtonsMounted(h) && (exact ? abs((x(list) ?? 0) - listX) < 1 && abs(list.bounds.width - listWidth) < 1
+                !noteVisible(h) && sidebarVisible(h) && (exact ? abs((x(list) ?? 0) - listX) < 1 && abs(list.bounds.width - listWidth) < 1
                                                                       : (x(list) ?? 0) > 150 && list.bounds.width > 200)
             }
             #expect(list.selectedRow == 1)                                                      // the selection did not change
@@ -139,12 +140,12 @@ extension SplitViewFoldTests {
             defer { if let saved { UserDefaults.standard.set(saved, forKey: NotePanelWidth.key) } else { UserDefaults.standard.removeObject(forKey: NotePanelWidth.key) } }
             let h = try harness()
             defer { finish(h) }
-            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
+            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarVisible(h) }
             try #require(table(in: h)).selectRowIndexes(IndexSet(integer: 1), byExtendingSelection: false)
             try await settle(h) { article(in: h)?.string.contains("合成記事 1") == true }
             try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
             try press("n", in: h)
-            try await settle(h) { noteVisible(h) && !sidebarButtonsMounted(h) }
+            try await settle(h) { noteVisible(h) && !sidebarVisible(h) }
             try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
             h.host.layoutSubtreeIfNeeded()
             let articleView = try #require(article(in: h)), noteView = try #require(editor(in: h))
@@ -188,13 +189,13 @@ extension SplitViewFoldTests {
             try await settle(h) { article(in: h)?.string.contains("合成記事 0") == true }
             try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
             try press("n", in: h)
-            try await settle(h) { noteVisible(h) && !sidebarButtonsMounted(h) && h.window.firstResponder === editor(in: h) }
+            try await settle(h) { noteVisible(h) && !sidebarVisible(h) && h.window.firstResponder === editor(in: h) }
             try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
             let note = try #require(editor(in: h))
             #expect(h.window.firstResponder === note)                                       // the end of the fold does not take it away
             #expect(note.selectedRange() == NSRange(location: (noteText as NSString).length, length: 0))
             try press("n", in: h)
-            try await settle(h) { !noteVisible(h) && sidebarButtonsMounted(h) && h.window.firstResponder === list }
+            try await settle(h) { !noteVisible(h) && sidebarVisible(h) && h.window.firstResponder === list }
         }
 
         /// Decision 0050 point 3: the ✕ sits at the top left of the note, as the original page's ✕ sits at the top left of the page. Pressing
@@ -221,14 +222,14 @@ extension SplitViewFoldTests {
         /// The window with the note open and the keyboard in its editor (decision 0064): article 1 is shown.
         private func openNote(_ h: Harness) async throws -> NativeArticleList.Table {
             h.window.makeKeyAndOrderFront(nil)
-            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
+            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarVisible(h) }
             let list = try #require(table(in: h))
             list.selectRowIndexes(IndexSet(integer: 1), byExtendingSelection: false)
             h.window.makeFirstResponder(list)
             try await settle(h) { article(in: h)?.string.contains("合成記事 1") == true }
             try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
             try press("n", in: h)
-            try await settle(h) { noteVisible(h) && !sidebarButtonsMounted(h) }
+            try await settle(h) { noteVisible(h) && !sidebarVisible(h) }
             try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
             return list
         }
@@ -242,7 +243,7 @@ extension SplitViewFoldTests {
             let reader = try #require(article(in: h))
             h.window.makeFirstResponder(reader)
             try escape(to: reader, in: h)
-            try await settle(h) { !noteVisible(h) && sidebarButtonsMounted(h) && h.window.firstResponder === list }
+            try await settle(h) { !noteVisible(h) && sidebarVisible(h) && h.window.firstResponder === list }
             #expect(list.selectedRow == 1 && article(in: h)?.string.contains("合成記事 1") == true)
         }
 
@@ -259,7 +260,7 @@ extension SplitViewFoldTests {
             #expect(shown())                                                                  // composing: the note stays
             note.unmarkText()
             try escape(to: note, in: h)
-            try await settle(h) { !shown() && sidebarButtonsMounted(h) && h.window.firstResponder === list }
+            try await settle(h) { !shown() && sidebarVisible(h) && h.window.firstResponder === list }
             #expect(list.selectedRow == 1)
         }
 
@@ -303,7 +304,7 @@ extension SplitViewFoldTests {
             list.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
             try await settle(h) { article(in: h)?.string.contains("合成記事 0") == true }
             // List, article and note, from the left; the sidebar is folded.
-            try await settle(h) { !sidebarButtonsMounted(h) && (x(list) ?? 999) < 1 }
+            try await settle(h) { !sidebarVisible(h) && (x(list) ?? 999) < 1 }
             try await settle(h) { (x(article(in: h)) ?? 0) >= (right(list) ?? 99_999) - 1 }
             try await settle(h) { (x(editor(in: h)) ?? 0) >= (right(article(in: h)) ?? 99_999) - 1 }
         }
@@ -313,7 +314,7 @@ extension SplitViewFoldTests {
         @Test func aListFoldedByTheSystemComesBackWhileTheNoteIsClosed() async throws {
             let h = try harness()
             defer { finish(h) }
-            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
+            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarVisible(h) }
             let list = try #require(table(in: h))
             try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
             var view: NSView? = list.superview
@@ -331,7 +332,7 @@ extension SplitViewFoldTests {
             try await settle(h) { !column.isCollapsed && list.bounds.width >= 280 - 1 && (x(list) ?? 0) > 100 }
         }
 
-        /// Decision 0057: the note's controls (✕, layout, previous, next, copy) sit in the note's own band at the top of the window.
+        /// Decision 0057: the note's controls (✕, layout, previous, next, copy) sit in the note's own band below the native toolbar.
         @Test func theNoteControlsSitInTheNoteBand() async throws {
             let h = try harness(noteOpen: true)
             defer { finish(h) }
@@ -343,7 +344,7 @@ extension SplitViewFoldTests {
             // Kept in small steps: the CI compiler (Swift 6.3.3) gave up on one long expression here.
             func bandFrames() -> [NSRect] {
                 let frames: [NSRect] = buttons(h.host).map { $0.convert($0.bounds, to: nil) }
-                let bandBottom: CGFloat = 800 - ArticleBand.height
+                let bandBottom = h.window.contentLayoutRect.maxY - ArticleBand.height
                 return frames.filter { $0.minY >= bandBottom && $0.width >= 20 }
             }
             try await settle(h) { bandFrames().filter { $0.minX >= noteLeft - 1 }.count == 5 }
@@ -357,7 +358,7 @@ extension SplitViewFoldTests {
         func draggingTheNoteEdgeToTheRightNeverFoldsTheNote(originalPageOpen: Bool) async throws {
             let h = try harness(noteOpen: true)
             defer { finish(h) }
-            try await settle(h) { noteVisible(h) && !sidebarButtonsMounted(h) && table(in: h)?.numberOfRows == 3 }
+            try await settle(h) { noteVisible(h) && !sidebarVisible(h) && table(in: h)?.numberOfRows == 3 }
             if originalPageOpen {
                 let list = try #require(table(in: h))
                 list.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
@@ -394,7 +395,7 @@ extension SplitViewFoldTests {
         func theWindowKeepsItsWidthWhileTheListFoldsAndReturns(width: Double) async throws {
             let h = try harness(width: width)
             defer { finish(h) }
-            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
+            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarVisible(h) }
             let list = try #require(table(in: h))
             list.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
             try await settle(h) { article(in: h)?.string.contains("合成記事 0") == true }
@@ -434,7 +435,7 @@ extension SplitViewFoldTests {
         @Test func theListKeepsItsFrameAndWidthInAWideWindow() async throws {
             let h = try harness(width: 1600)
             defer { finish(h) }
-            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
+            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarVisible(h) }
             let list = try #require(table(in: h))
             list.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
             try await settle(h) { article(in: h) != nil }
@@ -466,7 +467,7 @@ extension SplitViewFoldTests {
             defer { finish(h) }
             let list = try #require(table(in: h))
             list.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
-            try await settle(h) { noteVisible(h) && !sidebarButtonsMounted(h) && (x(article(in: h)) ?? 999) < 40 }
+            try await settle(h) { noteVisible(h) && !sidebarVisible(h) && (x(article(in: h)) ?? 999) < 40 }
             // Decision 0050 point 5: the note is 640 pt wide at first (in this test's own defaults, nothing saved by the person), or what the
             // 1,240 pt window leaves after the article's 360 pt and the list's 280 pt (specification 3.5).
             if UserDefaults.standard.object(forKey: NotePanelWidth.key) == nil {

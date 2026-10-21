@@ -4,7 +4,7 @@ import ReaderCore
 import Testing
 @testable import UnagiReader
 
-/// Decision 0057: the article's buttons sit in the article column's own band at the top of the window, at its right end.
+/// Decision 0057: the article's buttons sit in the article column's own band below the native toolbar, at its right end.
 @Suite(EnglishLanguage(), .serialized) @MainActor struct ArticleBandTests {
     @Test func theArticleButtonsSitInTheArticleBand() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -39,8 +39,8 @@ import Testing
         let article = try #require(find(ArticleTextView.self, in: host))
         try await Task.sleep(for: .milliseconds(300)); host.layoutSubtreeIfNeeded()
         let column = article.enclosingScrollView.map { $0.convert($0.bounds, to: nil) } ?? .zero
-        // The band is the top 52 pt of the window (AppKit counts y from the bottom).
-        let inBand = buttons(host).map { $0.convert($0.bounds, to: nil) }.filter { $0.minY >= 800 - ArticleBand.height && $0.width >= 20 }
+        // The band is below the native toolbar (AppKit counts y from the bottom).
+        let inBand = buttons(host).map { $0.convert($0.bounds, to: nil) }.filter { $0.minY >= window.contentLayoutRect.maxY - ArticleBand.height && $0.width >= 20 }
         let articleButtons = inBand.filter { $0.minX >= column.minX && $0.maxX <= column.maxX + 1 }
         #expect(articleButtons.count == 4, "buttons in the band: \(inBand)")                       // note, Star, translate, globe
         #expect((articleButtons.map(\.maxX).max() ?? 0) > column.maxX - 60)                         // at the right end of the column

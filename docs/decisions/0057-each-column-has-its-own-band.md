@@ -1,6 +1,6 @@
 # 0057 Each column has its own band; no system toolbar
 
-- Status: valid (approved by the PdM when the PR that adds this record is merged)
+- Status: valid in part; window and sidebar control placement is replaced by [0065](0065-native-window-controls-and-column-bands.md). Column actions, button style and menu commands remain.
 - Date: 2026-10-14
 - Decider: the owner (PdM), in the chat of 2026-10-14: the header felt inconsistent ("ガチャガチャしている"), two reference apps were shown, and the owner asked for it "to reach Unagi's vision". The three rules are the agent's proposal, which the owner accepted.
 - Replaces the placement parts of: [0047](0047-the-way-back-is-a-cross-in-the-right-column.md) (the ✕ sat below the band), [0050](0050-the-note-screen-closes-like-the-original-page.md) point 4 (the layout button sat in the toolbar next to the note button), [0055](0055-a-keyword-filter-for-the-list.md) (the magnifier sat on the list title's line). Their behavior stays.

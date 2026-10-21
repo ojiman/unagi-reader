@@ -80,7 +80,7 @@ import Testing
         let field = try #require(find(NSSearchField.self, in: h.host)), table = try #require(find(NativeArticleList.Table.self, in: h.host))
         let fieldFrame = field.convert(field.bounds, to: nil), list = table.convert(table.bounds, to: nil)
         #expect(fieldFrame.minX >= list.minX && fieldFrame.maxX <= list.maxX)
-        #expect(fieldFrame.minY >= 800 - ArticleBand.height)                                       // in the list's band (decision 0057)
+        #expect(fieldFrame.minY >= h.window.contentLayoutRect.maxY - ArticleBand.height)                                       // in the list's band (decision 0057)
         #expect(field.stringValue == "swift")
     }
 

@@ -8,8 +8,6 @@ import AppKit
 struct ListFilterBar: View {
     @Binding var text: String
     let shown: Bool
-    /// The list starts at the window's left edge (the sidebar is folded), under the window buttons.
-    var atLeftEdge = false
     let open: () -> Void
     /// `Esc` in the empty field: closes it and gives the list the keyboard.
     let close: () -> Void
@@ -37,7 +35,6 @@ struct ListFilterBar: View {
             .frame(maxWidth: shown ? .infinity : 28, alignment: .trailing)
         }
         .padding(.horizontal, 12)
-        .padding(.leading, atLeftEdge ? ArticleBand.windowButtonsWidth : 0)
         .frame(height: ArticleBand.controlLine)
         .padding(.top, ArticleBand.controlTop)
         .frame(maxWidth: .infinity, alignment: .top)

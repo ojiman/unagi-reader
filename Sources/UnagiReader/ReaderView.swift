@@ -165,13 +165,21 @@ struct ReaderView: View {
                 .modifier(ListColumnCollapse(collapsed: SidebarFold.listFolded(noteOpen: noteOpen, listShown: workspace.noteListShown), animated: !reduceMotion, space: windowSpace))
         } detail: {
             originalColumn.frame(minWidth: NotePanelWidth.articleMinimum)
-                .overlay(alignment: .top) { articleBand.ignoresSafeArea(.container, edges: .top) }
+                .overlay(alignment: .top) { articleBand }
                 // The width goes on the panel's content. Put on the inspector itself it had no effect, and the panel stayed about 270 pt wide.
                 .inspector(isPresented: noteOpenBinding) {
                     NoteInspectorColumn(space: windowSpace, startingWidth: startingPanelWidth) { limit in notePanel(limit: limit) }
                 }
         }
         .navigationSplitViewStyle(.balanced)
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                LibraryToolbarControls(refreshing: refresh.refreshing,
+                    onAdd: { addingTo = SubscriptionTarget(folder: "") },
+                    onRefresh: { Task { await refresh.refresh() } })
+                    .frame(width: 100, height: 28)
+            }
+        }
         .frame(minWidth: 960, minHeight: 600)
         .onGeometryChange(for: Double.self, of: { Double($0.size.width) }) { windowSpace.width = $0 }
         .tint(AppPalette.accentColor)
@@ -287,18 +295,14 @@ struct ReaderView: View {
     }
 
     private var sidebar: some View {
-        // Own the top inset once: the system's sidebar safe area would add a second gap below the band.
+        // Match the column bands below the native window toolbar (decision 0065).
         VStack(spacing: 0) {
             Color.clear.frame(height: ListHeader.bandHeight).contentShape(Rectangle()).gesture(WindowDragGesture())
             sidebarList
         }
-        .ignoresSafeArea(.container, edges: .top)
         .modifier(SidebarPaper())
         .navigationTitle("Unagi Reader")
         .toolbar(removing: .sidebarToggle)
-        .background(SidebarTitlebarControls(refreshing: refresh.refreshing,
-            visible: columnVisibility != .doubleColumn && columnVisibility != .detailOnly,
-            onAdd: { addingTo = SubscriptionTarget(folder: "") }, onRefresh: { Task { await refresh.refresh() } }))
     }
 
     private func subscriptionRow(_ feed: Feed, folders: [String]) -> some View {
@@ -387,10 +391,12 @@ struct ReaderView: View {
                 return ImageMetadata.favicon(iconURL: feed?.iconURL, siteURL: feed?.siteURL, sourceURL: feed?.sourceURL)
             }, initialTopOffset: scrollMemory.state.listScrollOffset,
             onTopOffset: { id, offset in scrollMemory.state.listScrollAnchor = id; scrollMemory.state.listScrollOffset = offset },
-            headerInset: ListHeader.height)
+            headerInset: ListHeader.rowInset)
+        // Reserve the band below the native toolbar, also in full screen (#373).
+        .padding(.top, ListHeader.bandHeight)
         .focused($listFocused)
         // The list's band: its empty part moves the window (decision 0057).
-        .overlay(alignment: .top) { BandDragArea().frame(height: ListHeader.bandHeight).ignoresSafeArea(.container, edges: .top) }
+        .overlay(alignment: .top) { BandDragArea().frame(height: ListHeader.bandHeight) }
         .navigationTitle("")                                           // the list draws its own title (ListHeader); the system one ran out of the column
         .overlay {
             if visibleArticleIDs.isEmpty {
@@ -399,22 +405,18 @@ struct ReaderView: View {
             }
         }
         .overlay(alignment: .top) {
-            ListHeader(title: scopeTitle, count: visibleArticleIDs.count, isFiltering: !workspace.listFilter.isEmpty).ignoresSafeArea(.container, edges: .top)
+            ListHeader(title: scopeTitle, count: visibleArticleIDs.count, isFiltering: !workspace.listFilter.isEmpty)
         }
         .overlay(alignment: .top) {
             // A band folds with its column (decision 0057): the folded list's view still draws, so its controls are taken away.
-            // The safe area is ignored by a container that stays: the modifier on the control itself, which comes and goes with the
-            // fold, made the layout loop until AppKit raised an exception in narrow windows (#222).
             Group {
                 if !SidebarFold.listFolded(noteOpen: noteOpen, listShown: workspace.noteListShown) {
                     ListFilterBar(text: $workspace.listFilter, shown: filterShown,
-                                  atLeftEdge: SidebarFold.folded(pageOpen: originalPage.url != nil, noteOpen: noteOpen),
                                   open: { ReaderPerformance.motionBegan("filter-open", duration: 0.25); filterPresented = true },
                                   close: { filterPresented = false; listFocused = true },
                                   dismiss: { filterPresented = false })
                 }
             }
-            .ignoresSafeArea(.container, edges: .top)
         }
         .onKeyPress("j") { guard shortcutsEnabled else { return .ignored }; move(1); return .handled }
         .onKeyPress("k") { guard shortcutsEnabled else { return .ignored }; move(-1); return .handled }
@@ -458,9 +460,6 @@ struct ReaderView: View {
                 BandButton(id: "browser", symbol: "globe", help: String(localized: "Open Original Page in Browser (b)", bundle: ReaderLocalization.bundle), label: String(localized: "Open original page in browser", bundle: ReaderLocalization.bundle),
                            enabled: article?.originalURL.flatMap { ArticleURL.validated($0) } != nil, action: openExternal),
             ],
-            // The sidebar and the list are folded: the note beside the article (decision 0049).
-            atLeftEdge: SidebarFold.folded(pageOpen: originalPage.url != nil, noteOpen: noteOpen)
-                && SidebarFold.listFolded(noteOpen: noteOpen, listShown: workspace.noteListShown),
             originalHost: originalPage.url.map { $0.host ?? $0.absoluteString }, closeOriginal: closeOriginal)
     }
 
@@ -495,8 +494,7 @@ struct ReaderView: View {
                     .padding(.top, ArticleBand.compactHeight)              // right below the article band, which holds its ✕ and host name
             }
         }.clipped()
-            // This container stays mounted across page and note folds (#222). Each child reserves its own band.
-            .ignoresSafeArea(.container, edges: .top)
+            // This container stays mounted across page and note folds (#222). Each child reserves its band below the toolbar.
             .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { originalColumnWidth = $0 }
     }
 

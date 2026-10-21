@@ -138,14 +138,17 @@ normal                original page (v)     note beside article   note with the 
 
 #### 3.1.4 Rules per area
 
-**Bands** (decision 0057)
+**Window toolbar and column bands** (decisions [0057](decisions/0057-each-column-has-its-own-band.md), [0065](decisions/0065-native-window-controls-and-column-bands.md))
 
-- The window has no system toolbar and no visible title bar. Each column has its own band at the top of the window, as high as the window buttons' band (52 pt), in the column's colour, with no line under it. A band folds with its column. No column has a second row of controls below its band.
+- The window uses a native title bar and compact toolbar above the columns. The toolbar holds the window buttons, add subscription and refresh; it stays when the sidebar folds.
+- While a refresh runs, the toolbar's refresh arrow turns (not with Reduce Motion) and its button stays enabled (pressing it again does nothing).
+- Each column has its own 52 pt band below the native toolbar, in the column's colour, with no line under it. A band folds with its column. The native toolbar adds about 40 pt to the top of the window on macOS 27.0.1.
+- Full screen can be left with the green window button, the View menu or the system shortcut shown in that menu. At the top of a scrolled list, the first row stays below its heading, also when the menu bar is revealed.
 - What each band holds, left to right:
 
 | Column | Left | Right |
 |---|---|---|
-| sidebar | the window buttons | add subscription, refresh (as now) |
+| sidebar | empty (keeps the headings aligned) | |
 | list | | the filter's magnifier, which opens into the system's search field across the band (List filter, below) |
 | article | the translation status as short text (3.6) | the note button, Star, translate, globe |
 | original page (in the article band, in place of the status; the band is then only as high as its controls and the page starts right below it) | ✕, the page's host name | |
@@ -163,8 +166,7 @@ normal                original page (v)     note beside article   note with the 
 
 - Choose the scope from Feeds (all articles, unread, Star) and 「購読元」 (folders and subscriptions). Each subscription shows its site icon. The 「購読元」 section can be collapsed.
 - Each folder stays open or closed as the person left it, also after a restart; at the first launch all are closed, and a folder made again after it disappeared starts closed.
-- The rows and their scroll bar start below the sidebar's band: scrolled rows stop at its lower edge and never pass under the window buttons.
-- At the top right, right-aligned: add subscription, then refresh. While a refresh runs, the refresh arrow itself turns (not with Reduce Motion) and the button stays enabled (pressing it again does nothing).
+- The rows and their scroll bar start below the sidebar's band: scrolled rows stop at its lower edge.
 - A small orange ＋ appears at the right end of the 「購読元」 heading on mouse-over and adds a subscription. The heading stays in place however long the list is.
 - No Hide Sidebar button and no folder-management button.
 
@@ -350,7 +352,7 @@ A button translates the open article into another language, on the Mac, with the
 
 **Button and key**
 
-- A button 「翻訳」 (Translate) sits in the article band, before 「元ページをブラウザで開く」. Its help names the target, for example 「日本語に翻訳／原文に戻す (t)」; its icon (`character.bubble`; the system's `translate` has no filled form) is filled while a translation is shown. It is always there and is disabled when no article is open or while the target is being resolved (the toolbar does not change height).
+- A button 「翻訳」 (Translate) sits in the article band, before 「元ページをブラウザで開く」. Its help names the target, for example 「日本語に翻訳／原文に戻す (t)」; its icon (`character.bubble`; the system's `translate` has no filled form) is filled while a translation is shown. It is always there and is disabled when no article is open or while the target is being resolved (the band does not change height).
 - The same command is in the menu bar: 「表示 ▸ 翻訳 / 原文に戻す」, without a key.
 - `t` does the same, when no editable field is being typed in (3.1.5).
 - Pressing it translates the title and the body of the open article, in place. Pressing it again shows the original.

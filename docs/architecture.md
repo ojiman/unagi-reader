@@ -74,9 +74,11 @@ There is no backend, no account and no AI proxy. The app has no AI of its own ([
 - Moving to the next or previous article animates the reading view's layer (`CAAnimationGroup`); the direction comes from the list order. It does not play for a body update of the same article.
 - `NativeArticleList` inserts rows (`insertRows`) only when `ListInsertion.insertedIndexes` says the new order is the old order with rows put in, and the selection did not change; any other change reloads and keeps the visible article in place. At the top of the list the rows slide in (a fade with Reduce Motion). Further down, rows above the visible article go in without motion and the scroll position is restored; the rest fade in.
 
-- The window has no title bar and no system toolbar (`.windowStyle(.hiddenTitleBar)`; decision 0057). Each column draws its own band (`bandLayout()`: the controls on the window buttons' line, `BandDragArea` behind): `ArticleBand` (status and `BandButton`s) over the article column, `ListFilterBar` (the magnifier or the search field) in the list's band (taken away while the list is folded), `NotePanel`'s band (it ignores the top safe area, as the inspector keeps one), `BandDragArea` (a `WindowDragGesture`) on empty band space. A SwiftUI `.toolbar` must not come back: the system toolbar lies over the bands and takes their clicks. The menu bar holds the band's actions (`ReaderMenuCommands`, `TranslationCommands`).
+- The window uses `.windowStyle(.titleBar)` and `.windowToolbarStyle(.unifiedCompact)` (decision 0065). A SwiftUI `.toolbar` on the split view holds `LibraryToolbarControls` (add subscription and refresh). These library actions stay mounted across column folds. The system owns the window buttons and full-screen title bar; there is no title-bar accessory bridge.
 
-- The sidebar and the persistent article/page container ignore the top safe area once and reserve their own bands. `ListHeader` owns the compact heading size and list inset; the sidebar headings and `ArticleTextView`'s publisher share its type size. The publisher stays in the native text document, so selection, copying and scrolling keep their existing paths. It does not scale with the body. The article starts below its band without adding the native text view's old top padding.
+- Columns respect the native top safe area and reserve their own bands below the toolbar. `ArticleBand` holds the article/original-page controls and translation status; `ListFilterBar` holds the list filter and leaves with the folded list; `NotePanel` holds the note controls. `BandDragArea` (`WindowDragGesture`) moves the window from empty column-band space. The menu bar holds the same actions (`ReaderMenuCommands`, `TranslationCommands`).
+
+- `ListHeader` owns the compact heading size. The native article list reserves the column band above its heading inset, independently of the native toolbar's safe area. The sidebar headings and `ArticleTextView`'s publisher share its type size. The publisher stays in the native text document, so selection, copying and scrolling keep their existing paths. It does not scale with the body. The article starts below its band without adding the native text view's old top padding.
 
 - Motions are measured with `--performance-output <file>`: `MotionMeter` records each named motion's frames with the window's display link (`motions` in the file), and `--motion-benchmark` plays every motion ten times and quits. The baseline is in [verification/motion-baseline.md](verification/motion-baseline.md).
 
@@ -100,7 +102,7 @@ There is no backend, no account and no AI proxy. The app has no AI of its own ([
 
 ### 4.4 Colours and the window
 
-- `AppPalette` holds every colour. The reading surface is one fixed value (`surface`) for the list, the article, the note and the window; `textBackgroundColor` is not used because it turns vibrant inside split view columns. The toolbar background is hidden.
+- `AppPalette` holds the reading colours. The reading surface is one fixed value (`surface`) for the list, the article, the note and the window; `textBackgroundColor` is not used because it turns vibrant inside split view columns. The native toolbar uses the system appearance.
 - `SoftRow` draws the list selection with `isEmphasized` always false (no system blue). The accent is a calm orange with light and dark values.
 
 ### 4.5 Images and icons

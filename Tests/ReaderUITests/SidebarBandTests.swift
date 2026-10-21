@@ -4,9 +4,7 @@ import ReaderCore
 import Testing
 @testable import UnagiReader
 
-/// The sidebar's rows scrolled up under the window buttons, and the scroll bar ran up to the top of the window (seen while dogfooding,
-/// 2026-10-17). Decision 0057: the sidebar's band, as high as the window buttons' band, belongs to the window buttons and the two
-/// buttons; the rows and their scroll bar start below it.
+/// Rows and scroll bars stay below their column bands and the native toolbar; the first visible selections align (#299).
 extension SplitViewFoldTests {
     @Suite(.serialized) @MainActor struct SidebarBandTests {
         private func find<T: NSView>(_ type: T.Type, in view: NSView) -> T? {
@@ -14,7 +12,7 @@ extension SplitViewFoldTests {
             return view.subviews.lazy.compactMap { find(type, in: $0) }.first
         }
 
-        @Test func theSidebarStaysBelowTheWindowButtonsBand() async throws {
+        @Test func theSidebarStaysBelowItsColumnBand() async throws {
             try await checkLayout(width: 1240, captureSelections: false)
         }
 
@@ -51,7 +49,8 @@ extension SplitViewFoldTests {
             let scroll = try #require(outline?.enclosingScrollView)
             // Window coordinates run upward from the bottom: the distance from the top of the window is the height minus the top edge.
             let top = 800 - scroll.convert(scroll.bounds, to: nil).maxY
-            #expect(top >= ListHeader.bandHeight - 0.5, "the sidebar's scroll view starts \(top) pt from the window's top")
+            let nativeInset = 800 - window.contentLayoutRect.maxY
+            #expect(top >= nativeInset + ListHeader.bandHeight - 0.5, "the sidebar's scroll view starts \(top) pt from the window's top")
             guard captureSelections else { return }
             let sidebar = try #require(outline)
             let table = try #require(find(NativeArticleList.Table.self, in: host))

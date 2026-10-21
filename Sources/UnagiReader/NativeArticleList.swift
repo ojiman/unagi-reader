@@ -17,7 +17,7 @@ struct NativeArticleList: NSViewRepresentable {
     var iconURL: (Article) -> URL? = { _ in nil }
     var initialTopOffset: Double = 0
     var onTopOffset: ((UUID, Double) -> Void)? = nil
-    /// Room above the first row for the title block (`ListHeader`), on top of the toolbar's own inset.
+    /// Extra room above the inset table's first painted row for `ListHeader`.
     var headerInset: CGFloat = 0
 
     /// The list is drawn on the same surface as the article and the note.

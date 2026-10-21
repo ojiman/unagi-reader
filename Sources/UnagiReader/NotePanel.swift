@@ -24,7 +24,6 @@ struct NotePanel: View {
             header
             NoteEditor(store: store, link: link)
         }
-        .ignoresSafeArea(.container, edges: .top)                          // the band is at the top of the window, like the others
         .accessibilityElement(children: .contain).accessibilityLabel(String(localized: "Note", bundle: ReaderLocalization.bundle))
     }
 

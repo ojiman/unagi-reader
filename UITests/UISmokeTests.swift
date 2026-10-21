@@ -1,6 +1,7 @@
 import XCTest
 import AppKit
 import Carbon
+import AppKit
 
 @MainActor final class UISmokeTests: XCTestCase {
     private var app: XCUIApplication!
@@ -83,7 +84,7 @@ import Carbon
     }
 
     // Checks PRD-01: a real click and j/k must select and display the corresponding article.
-    func testLaunchSelectionAndReadingKeys() {
+    func testLaunchSelectionAndReadingKeys() throws {
         let table = app.tables["Article List"]
         XCTAssertEqual(table.tableRows.count, 6)
         // Native cell accessibility clicks can select without giving the table the keyboard.
@@ -97,6 +98,9 @@ import Carbon
         waitForValue(body, containing: "朝の空気")
         table.typeText("k")
         waitForValue(body, containing: "毎日届く情報")
+        try checkFullScreenExit(preserving: "毎日届く情報")
+        table.tableRows.element(boundBy: 1).click()
+        waitForValue(body, containing: "毎日届く情報")
     }
 
     // Checks PRD-04 and decision 0050: the panel's own close button and Esc close the note.
@@ -105,6 +109,7 @@ import Carbon
         app.windows.firstMatch.typeKey("n", modifierFlags: [])
         let editor = app.textViews["Note"]
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        assertLibraryControls()
         app.groups["Note"].buttons["Close Note"].click()
         XCTAssertTrue(editor.waitForNonExistence(timeout: 5))
         app.windows.firstMatch.typeKey("n", modifierFlags: [])
@@ -129,6 +134,7 @@ import Carbon
         app.buttons["Show Article List"].click()
         XCTAssertTrue(app.buttons["Hide Article List"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.tables["Article List"].tableRows.firstMatch.isHittable)
+        assertLibraryControls()
         XCTAssertEqual(editor.value as? String, "jkn")
         app.buttons["Hide Article List"].click()
         XCTAssertTrue(app.buttons["Show Article List"].waitForExistence(timeout: 5))
@@ -151,6 +157,7 @@ import Carbon
         waitForValue(body, containing: "Smoke local article body.")
         app.windows.firstMatch.typeKey("v", modifierFlags: [])
         XCTAssertTrue(app.buttons["Return to Article"].waitForExistence(timeout: 5))
+        assertLibraryControls()
         XCTAssertTrue(app.webViews.staticTexts["Smoke original page"].waitForExistence(timeout: 10))
         app.windows.firstMatch.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(app.buttons["Return to Article"].waitForNonExistence(timeout: 5))
@@ -184,6 +191,84 @@ import Carbon
         XCTAssertTrue(app.menuItems["Import OPML…"].exists)
         XCTAssertTrue(app.menuItems["Import OPML…"].isEnabled)
         app.windows.firstMatch.typeKey(.escape, modifierFlags: [])
+    }
+
+    // #373: click the actual native green control after revealing the full-screen title bar.
+    // The transient title-bar window does not expose this control in the app's AX tree.
+    private func checkFullScreenExit(preserving text: String) throws {
+        let window = app.windows.firstMatch
+        let normal = window.frame
+        let green = app.buttons[XCUIIdentifierFullScreenWindow]
+        XCTAssertTrue(green.exists)
+        let greenX = green.frame.midX - normal.minX
+        func fullScreen() -> Bool { window.frame.width > normal.width + 1 || window.frame.height > normal.height + 1 }
+        func normalSize() -> Bool { abs(window.frame.width - normal.width) < 1 && abs(window.frame.height - normal.height) < 1 }
+        green.click()
+        XCTAssertTrue(waitForCondition(fullScreen))
+        let top = window.coordinate(withNormalizedOffset: .zero)
+        for y: CGFloat in [100, 0, 1] { top.withOffset(CGVector(dx: greenX, dy: y)).hover() }
+        XCTAssertTrue(waitForCondition { self.greenPoint(x: greenX, in: window) != nil })
+        let point = try XCTUnwrap(greenPoint(x: greenX, in: window), "The revealed green control must be visible before clicking it")
+        top.withOffset(point).click()
+        XCTAssertTrue(waitForCondition(normalSize), "The green control did not leave full screen")
+        green.click()
+        XCTAssertTrue(waitForCondition(fullScreen))
+        let viewMenu = app.menuBars.menuBarItems["View"]
+        for y: CGFloat in [0, 1] { top.withOffset(CGVector(dx: viewMenu.frame.midX, dy: y)).hover() }
+        viewMenu.click()
+        let exit = app.menuItems["Exit Full Screen"]
+        XCTAssertTrue(exit.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForCondition { exit.isHittable })
+        exit.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        XCTAssertTrue(waitForCondition(normalSize), "The View menu did not leave full screen")
+        waitForValue(app.textViews["Article Body"], containing: text)
+        green.click()
+        XCTAssertTrue(waitForCondition(fullScreen))
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.tables["Article List"].waitForExistence(timeout: 15))
+        // macOS may close windows on quit. If it restores full screen, its revealed green control must still work.
+        if fullScreen() {
+            print("Restored full-screen window: checking the green control")
+            let restoredTop = window.coordinate(withNormalizedOffset: .zero)
+            for y: CGFloat in [100, 0, 1] { restoredTop.withOffset(CGVector(dx: greenX, dy: y)).hover() }
+            XCTAssertTrue(waitForCondition { self.greenPoint(x: greenX, in: window) != nil })
+            let restoredGreen = try XCTUnwrap(greenPoint(x: greenX, in: window))
+            restoredTop.withOffset(restoredGreen).click()
+            XCTAssertTrue(waitForCondition(normalSize), "The restored full-screen window did not leave full screen")
+        } else {
+            print("macOS reopened a normal window; full-screen restoration was not exercised")
+        }
+        assertLibraryControls()
+    }
+
+    private func greenPoint(x: CGFloat, in window: XCUIElement) -> CGVector? {
+        guard let image = NSBitmapImageRep(data: XCUIScreen.main.screenshot().pngRepresentation) else { return nil }
+        let scale = CGFloat(image.pixelsWide) / window.frame.width
+        let centerX = Int(x * scale), radius = Int(7 * scale)
+        var rows: [Int] = []
+        for row in 0..<min(image.pixelsHigh, Int(100 * scale)) {
+            let count = (max(0, centerX - radius)...min(image.pixelsWide - 1, centerX + radius)).filter { column in
+                guard let colour = image.colorAt(x: column, y: row)?.usingColorSpace(.deviceRGB) else { return false }
+                return colour.greenComponent > 0.5 && colour.greenComponent > colour.redComponent * 1.5 && colour.greenComponent > colour.blueComponent * 1.3
+            }.count
+            if count >= 3 { rows.append(row) }
+        }
+        guard rows.count >= 6, let first = rows.first, let last = rows.last else { return nil }
+        return CGVector(dx: x, dy: CGFloat(first + last) / (2 * scale))
+    }
+
+    private func waitForCondition(_ ready: @escaping () -> Bool) -> Bool {
+        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in ready() }, object: nil)
+        return XCTWaiter.wait(for: [expectation], timeout: 5) == .completed
+    }
+
+    private func assertLibraryControls() {
+        for name in ["Add Subscription", "Refresh Subscriptions"] {
+            let control = app.buttons[name]
+            XCTAssertTrue(control.exists, name)
+            XCTAssertTrue(control.isHittable, name)
+        }
     }
 
     private func selectFirst() {
