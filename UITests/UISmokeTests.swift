@@ -99,6 +99,7 @@ import Carbon
         waitForValue(body, containing: "毎日届く情報")
         try checkFullScreenExit(preserving: "毎日届く情報")
         table.tableRows.element(boundBy: 1).click()
+        XCTAssertTrue(body.waitForExistence(timeout: 5))
         waitForValue(body, containing: "毎日届く情報")
     }
 
@@ -290,7 +291,11 @@ import Carbon
     private func addLocalFeed() throws {
         let address = try XCTUnwrap(ProcessInfo.processInfo.environment["UNAGI_UI_SMOKE_FEED"])
         XCTAssertTrue(address.hasPrefix("http://127.0.0.1:"))
-        app.buttons["Add Subscription"].click()
+        let adds = app.buttons.matching(identifier: "Add Subscription")
+        // The article list can be ready before the native toolbar accessibility tree.
+        // Require one ready control; a persistent duplicate must fail.
+        XCTAssertTrue(waitForCondition { adds.count == 1 && adds.element.isHittable }, "Add must resolve to one ready button")
+        adds.element.click()
         let field = app.textFields["Feed URL"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.click()
