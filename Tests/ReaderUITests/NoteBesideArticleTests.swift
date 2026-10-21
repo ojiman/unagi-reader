@@ -33,11 +33,11 @@ extension SplitViewFoldTests {
                 initialNoteOpen: noteOpen, initialListShown: listShown,
                 notePasteboard: NSPasteboard(name: .init("unagi-reader-test-\(UUID())")))
             let host = NSHostingView(rootView: reader)
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 800), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
-            window.titlebarAppearsTransparent = true; window.titleVisibility = .hidden
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 800), styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false; window.toolbar = NSToolbar(identifier: "synthetic-note-beside")
             window.contentView = host
             window.orderFront(nil)
+            #expect(window.frame.size == NSSize(width: width, height: 800), "the hosted fixture must keep its requested dimensions")
             return Harness(store: store, host: host, window: window, directory: directory)
         }
         private func finish(_ h: Harness) { h.window.close(); try? FileManager.default.removeItem(at: h.directory) }
