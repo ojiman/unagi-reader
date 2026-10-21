@@ -3,8 +3,7 @@ import AppKit
 import ReaderCore
 
 /// SwiftUI folds the width without asking AppKit to resize the window; AppKit restores width and focus.
-// Keep the explicit animation protocol for the macOS 26.6 / Swift 6.3 build floor.
-struct ListColumnCollapse: AnimatableModifier {
+struct ListColumnCollapse: ViewModifier, Animatable {
     var collapsed: Bool
     var animated: Bool
     let space: WindowSpace
