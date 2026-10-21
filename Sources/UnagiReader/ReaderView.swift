@@ -123,6 +123,7 @@ struct ReaderView: View {
         windowContent
             .modifier(OPMLImportPresentation(flow: opml, store: store))
             .modifier(RenameOnReturn(begin: beginRenamingSelection))
+            .background(FullScreenTitlebarFix())
             // `Esc` from the article, the list or the note's editor closes the note, also while the original page is open beside it (decision 0050).
             // The original page has its own `Esc` (`closeOriginal`), and a field of the page keeps it.
             .onExitCommand {
@@ -387,7 +388,8 @@ struct ReaderView: View {
                 return ImageMetadata.favicon(iconURL: feed?.iconURL, siteURL: feed?.siteURL, sourceURL: feed?.sourceURL)
             }, initialTopOffset: scrollMemory.state.listScrollOffset,
             onTopOffset: { id, offset in scrollMemory.state.listScrollAnchor = id; scrollMemory.state.listScrollOffset = offset },
-            headerInset: ListHeader.height)
+            headerInset: ListHeader.listTopInset)
+        .ignoresSafeArea(.container, edges: .top)
         .focused($listFocused)
         // The list's band: its empty part moves the window (decision 0057).
         .overlay(alignment: .top) { BandDragArea().frame(height: ListHeader.bandHeight).ignoresSafeArea(.container, edges: .top) }

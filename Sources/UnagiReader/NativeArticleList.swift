@@ -17,7 +17,8 @@ struct NativeArticleList: NSViewRepresentable {
     var iconURL: (Article) -> URL? = { _ in nil }
     var initialTopOffset: Double = 0
     var onTopOffset: ((UUID, Double) -> Void)? = nil
-    /// Room above the first row for the title block (`ListHeader`), on top of the toolbar's own inset.
+    /// Room above the first row: the band and the title block (`ListHeader`), from the top of the column. It does not depend on the
+    /// window's title bar, which is under the content in a normal window and not in full screen (#373).
     var headerInset: CGFloat = 0
 
     /// The list is drawn on the same surface as the article and the note.
@@ -53,7 +54,8 @@ struct NativeArticleList: NSViewRepresentable {
         Self.applySurface(scroll: scroll, table: table)
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
-        scroll.additionalSafeAreaInsets = NSEdgeInsets(top: headerInset, left: 0, bottom: 0, right: 0)
+        scroll.automaticallyAdjustsContentInsets = false
+        scroll.contentInsets = NSEdgeInsets(top: headerInset, left: 0, bottom: 0, right: 0)
         context.coordinator.table = table
         context.coordinator.scroll = scroll
         scroll.contentView.postsBoundsChangedNotifications = true
@@ -68,7 +70,7 @@ struct NativeArticleList: NSViewRepresentable {
             context.coordinator.sepia = ThemeState.shared.sepia
             scroll.needsDisplay = true; context.coordinator.table?.redrawAll()
         }
-        if scroll.additionalSafeAreaInsets.top != headerInset { scroll.additionalSafeAreaInsets = NSEdgeInsets(top: headerInset, left: 0, bottom: 0, right: 0) }
+        if scroll.contentInsets.top != headerInset { scroll.contentInsets = NSEdgeInsets(top: headerInset, left: 0, bottom: 0, right: 0) }
         context.coordinator.update(self)
     }
     static func dismantleNSView(_ scroll: NSScrollView, coordinator: Coordinator) {

@@ -13,6 +13,9 @@ struct ListHeader: View {
     static let bandHeight: CGFloat = 52
     /// One heading line; the first article starts level with the first sidebar row.
     static let height: CGFloat = 19
+    /// From the top of the column to the first article, level with the first sidebar row. It was the window's title bar (32 pt on
+    /// macOS 27) plus `height`; a fixed value keeps it in full screen, where the title bar is not under the content (#373).
+    static let listTopInset: CGFloat = 51
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
