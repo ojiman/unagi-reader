@@ -389,6 +389,79 @@ extension SplitViewFoldTests {
             #expect(width >= NotePanelWidth.range.lowerBound - 40, "the note is \(width) pt wide")
         }
 
+        /// The split view item that holds `view`, found the way `ListColumnCollapse` and `NoteColumnHold` find it.
+        private func splitItem(holding view: NSView) -> (item: NSSplitViewItem, controller: NSSplitViewController)? {
+            var current: NSView? = view.superview
+            while let candidate = current {
+                if let split = candidate as? NSSplitView, let controller = split.delegate as? NSSplitViewController,
+                   let item = controller.splitViewItems.first(where: { view.isDescendant(of: $0.viewController.view) }) {
+                    return (item, controller)
+                }
+                current = candidate.superview
+            }
+            return nil
+        }
+
+        /// What the two probes assume about the system's split view. They reach into it from the list's and the note's views, so a macOS
+        /// update can break them; this test names the assumption that broke (#371, #370). The fold itself is SwiftUI's width, not
+        /// `isCollapsed`: the system must not collapse the item, or the window grows when the list returns.
+        @Test func theSplitViewStillHasTheShapeTheProbesAssume() async throws {
+            let h = try harness(width: 1_240)
+            defer { finish(h) }
+            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
+            let list = try #require(table(in: h))
+            let listScroll = try #require(list.enclosingScrollView)
+            try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
+            let found = try #require(splitItem(holding: list), "assumption 1: an NSSplitViewController is above the list")
+            #expect(found.controller.splitViewItems.count >= 3, "assumption 2: sidebar, list and article are separate items, \(found.controller.splitViewItems.count) found")
+            #expect(!found.item.canCollapse, "assumption 3: the list's item cannot be collapsed by the person (the system's default; the probe keeps it so)")
+            try press("n", in: h)
+            try await settle(h) { noteVisible(h) && listScroll.bounds.width < 1 }
+            #expect(!found.item.isCollapsed, "assumption 4: the list folds by its width; the system's item stays expanded \(state(h))")
+            let note = try #require(editor(in: h))
+            let noteItem = try #require(splitItem(holding: note), "assumption 5: the note's panel is in a split view item too")
+            #expect(!noteItem.item.canCollapse, "assumption 6: the probe turns off collapsing of the note's item")
+            try press("n", in: h)
+            try await settle(h) { !noteVisible(h) && listScroll.bounds.width >= NotePanelWidth.listMinimum - 1 }
+            #expect(!found.item.isCollapsed)
+        }
+
+        /// Fail-soft: when the list is not inside a system split view (a macOS update that builds the columns differently), the probe finds
+        /// nothing and does nothing. The SwiftUI width still folds the list, and the keyboard stays where it was.
+        @Test func theListStillFoldsWhenNoSplitViewItemCanBeFound() async throws {
+            final class Sensor: NSView {}
+            struct SensorView: NSViewRepresentable {
+                func makeNSView(context: Context) -> Sensor { Sensor() }
+                func updateNSView(_ view: Sensor, context: Context) {}
+            }
+            let space = WindowSpace()
+            func root(collapsed: Bool) -> AnyView {
+                AnyView(SensorView().modifier(ListColumnCollapse(collapsed: collapsed, animated: false, space: space)))
+            }
+            let host = NSHostingView(rootView: root(collapsed: false))
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = host
+            window.orderFront(nil)
+            defer { window.close() }
+            func sensor() -> Sensor? { find(Sensor.self, in: host) }
+            func settleSensor(_ ready: () -> Bool) async throws {
+                for _ in 0..<100 {
+                    host.layoutSubtreeIfNeeded()
+                    if ready() { return }
+                    try await Task.sleep(for: .milliseconds(20))
+                }
+                #expect(ready(), "sensor width \(String(describing: sensor()?.frame.width))")
+            }
+            try await settleSensor { (sensor()?.frame.width ?? 0) > 100 }
+            let responder = window.firstResponder
+            host.rootView = root(collapsed: true)
+            try await settleSensor { (sensor()?.frame.width ?? 99) < 1 }
+            host.rootView = root(collapsed: false)
+            try await settleSensor { (sensor()?.frame.width ?? 0) > 100 }
+            #expect(window.firstResponder === responder)
+        }
+
         /// Issue #371: in a window narrower than 1,400 pt the list folds and comes back at once; the window's own width never changes.
         @Test(arguments: [1_170.0, 1_240.0])
         func theWindowKeepsItsWidthWhileTheListFoldsAndReturns(width: Double) async throws {
