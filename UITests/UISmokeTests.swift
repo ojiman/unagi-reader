@@ -228,6 +228,8 @@ import Carbon
         waitForValue(app.textViews["Article Body"], containing: text)
         green.click()
         XCTAssertTrue(waitForCondition(fullScreen))
+        // A pointer left on green can reopen macOS's layout popover on relaunch and consume the next row click.
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.5)).hover()
         app.terminate()
         app.launch()
         app.activate()
