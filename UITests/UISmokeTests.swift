@@ -98,7 +98,7 @@ import Carbon
         table.typeText("k")
         waitForValue(body, containing: "毎日届く情報")
         try checkFullScreenExit(preserving: "毎日届く情報")
-        table.tableRows.element(boundBy: 1).click()
+        table.tableRows.element(boundBy: 1).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         XCTAssertTrue(body.waitForExistence(timeout: 5))
         waitForValue(body, containing: "毎日届く情報")
     }
