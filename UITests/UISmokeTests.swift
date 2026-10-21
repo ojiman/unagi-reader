@@ -230,6 +230,7 @@ import Carbon
         XCTAssertTrue(waitForCondition(fullScreen))
         app.terminate()
         app.launch()
+        app.activate()
         XCTAssertTrue(app.tables["Article List"].waitForExistence(timeout: 15))
         // macOS may close windows on quit. If it restores full screen, its revealed green control must still work.
         if fullScreen() {
