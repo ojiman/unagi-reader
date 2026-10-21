@@ -65,7 +65,7 @@ extension SplitViewFoldTests {
             h.window.titlebarAccessoryViewControllers.contains { $0.view is NSHostingView<SidebarTitlebarControls.Buttons> }
         }
         private func state(_ h: Harness) -> String {
-            "[sidebar buttons \(sidebarButtonsMounted(h)), list x \(x(table(in: h)).map { "\($0)" } ?? "none"), article x \(x(article(in: h)).map { "\($0)" } ?? "none"), note x \(x(editor(in: h)).map { "\($0)" } ?? "none")]"
+            "[frame \(h.window.frame), list viewport \(String(describing: table(in: h)?.enclosingScrollView?.bounds)), list focused \(h.window.firstResponder === table(in: h)), note focused \(h.window.firstResponder === editor(in: h)), sidebar buttons \(sidebarButtonsMounted(h)), list x \(x(table(in: h)).map { "\($0)" } ?? "none"), article x \(x(article(in: h)).map { "\($0)" } ?? "none"), note x \(x(editor(in: h)).map { "\($0)" } ?? "none")]"
         }
         private func settle(_ h: Harness, line: Int = #line, until ready: () -> Bool) async throws {
             for _ in 0..<250 {
@@ -452,7 +452,8 @@ extension SplitViewFoldTests {
                     try await Task.sleep(for: .milliseconds(5))
                 }
                 if folding { #expect((widths.max() ?? 0) <= starting + 1) }
-                #expect(widths.contains { $0 > 1 && $0 < starting - 1 })
+                #expect(widths.contains { $0 > 1 && $0 < starting - 1 },
+                        "folding \(folding), widths \(widths), window \(h.window.frame), host \(h.host.bounds), measured width \(String(describing: find(ListColumnCollapse.Probe.self, in: h.host)?.space?.width))")
             }
             try await settle(h) { !noteVisible(h) && abs(scroll.bounds.width - starting) < 1 }
         }
