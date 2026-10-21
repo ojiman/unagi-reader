@@ -421,6 +421,7 @@ extension SplitViewFoldTests {
             let note = try #require(editor(in: h))
             let noteItem = try #require(splitItem(holding: note), "assumption 5: the note's panel is in a split view item too")
             #expect(!noteItem.item.canCollapse, "assumption 6: the probe turns off collapsing of the note's item")
+            try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))                 // let the move finish, as the tests above do
             try press("n", in: h)
             try await settle(h) { !noteVisible(h) && listScroll.bounds.width >= NotePanelWidth.listMinimum - 1 }
             #expect(!found.item.isCollapsed)
