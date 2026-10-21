@@ -1,7 +1,6 @@
 import XCTest
 import AppKit
 import Carbon
-import AppKit
 
 @MainActor final class UISmokeTests: XCTestCase {
     private var app: XCUIApplication!
@@ -201,16 +200,20 @@ import AppKit
         let green = app.buttons[XCUIIdentifierFullScreenWindow]
         XCTAssertTrue(green.exists)
         let greenX = green.frame.midX - normal.minX
-        func fullScreen() -> Bool { window.frame.width > normal.width + 1 || window.frame.height > normal.height + 1 }
-        func normalSize() -> Bool { abs(window.frame.width - normal.width) < 1 && abs(window.frame.height - normal.height) < 1 }
+        var fullHeight: CGFloat = 0
+        func fullScreen() -> Bool { !green.exists && window.frame.height > normal.height + 1 }
+        // On a small display macOS can restore the requested window width, wider than its initial clamped frame.
+        // Check native normal-window controls and the end of full-screen geometry, not an exact restored width.
+        func normalWindow() -> Bool { green.exists && window.frame.height < fullHeight - 1 }
         green.click()
         XCTAssertTrue(waitForCondition(fullScreen))
+        fullHeight = window.frame.height
         let top = window.coordinate(withNormalizedOffset: .zero)
         for y: CGFloat in [100, 0, 1] { top.withOffset(CGVector(dx: greenX, dy: y)).hover() }
         XCTAssertTrue(waitForCondition { self.greenPoint(x: greenX, in: window) != nil })
         let point = try XCTUnwrap(greenPoint(x: greenX, in: window), "The revealed green control must be visible before clicking it")
         top.withOffset(point).click()
-        XCTAssertTrue(waitForCondition(normalSize), "The green control did not leave full screen")
+        XCTAssertTrue(waitForCondition(normalWindow), "The green control did not leave full screen")
         green.click()
         XCTAssertTrue(waitForCondition(fullScreen))
         let viewMenu = app.menuBars.menuBarItems["View"]
@@ -220,7 +223,7 @@ import AppKit
         XCTAssertTrue(exit.waitForExistence(timeout: 5))
         XCTAssertTrue(waitForCondition { exit.isHittable })
         exit.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
-        XCTAssertTrue(waitForCondition(normalSize), "The View menu did not leave full screen")
+        XCTAssertTrue(waitForCondition(normalWindow), "The View menu did not leave full screen")
         waitForValue(app.textViews["Article Body"], containing: text)
         green.click()
         XCTAssertTrue(waitForCondition(fullScreen))
@@ -235,7 +238,7 @@ import AppKit
             XCTAssertTrue(waitForCondition { self.greenPoint(x: greenX, in: window) != nil })
             let restoredGreen = try XCTUnwrap(greenPoint(x: greenX, in: window))
             restoredTop.withOffset(restoredGreen).click()
-            XCTAssertTrue(waitForCondition(normalSize), "The restored full-screen window did not leave full screen")
+            XCTAssertTrue(waitForCondition(normalWindow), "The restored full-screen window did not leave full screen")
         } else {
             print("macOS reopened a normal window; full-screen restoration was not exercised")
         }
