@@ -33,6 +33,33 @@ extension SplitViewFoldTests {
         }
     }
 
+    @Suite(.serialized) @MainActor struct FullScreenFrameTests {
+        @Test func eachExitRestoresTheActualNormalSize() throws {
+            let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 1024, height: 674),
+                                  styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            defer { window.close() }
+            let center = NotificationCenter()
+            let anchor = FullScreenTitlebarFix.Anchor(center: center)
+            try #require(window.contentView).addSubview(anchor)
+            for size in [NSSize(width: 1024, height: 674), NSSize(width: 1000, height: 650)] {
+                window.setFrame(NSRect(origin: NSPoint(x: 100, y: 100), size: size), display: false)
+                center.post(name: NSWindow.willEnterFullScreenNotification, object: window)
+                center.post(name: NSWindow.willExitFullScreenNotification, object: window)
+                // Reproduce a different normal size after the full-screen transition on a small desktop (#373).
+                window.setFrame(NSRect(x: 150, y: 200, width: 1240, height: 810), display: false)
+                let nativeTop = window.frame.maxY
+                center.post(name: NSWindow.didExitFullScreenNotification, object: window)
+                #expect(window.frame.size == size)
+                #expect(window.frame.minX == 150)
+                #expect(window.frame.maxY == nativeTop, "Keep AppKit's restored top-left position")
+            }
+            let restored = window.frame
+            center.post(name: NSWindow.didExitFullScreenNotification, object: window)
+            #expect(window.frame == restored, "An extra exit notification must not reuse an old size")
+        }
+    }
+
     @Suite(.serialized) @MainActor struct FullScreenFailureTests {
         @MainActor private final class WindowDelegate: NSObject, NSWindowDelegate {
             var entryFailures = 0
@@ -53,14 +80,21 @@ extension SplitViewFoldTests {
             let center = NotificationCenter()
             let anchor = FullScreenTitlebarFix.Anchor(center: center)
             try #require(window.contentView).addSubview(anchor)
+            let normalSize = window.frame.size
             center.post(name: NSWindow.willEnterFullScreenNotification, object: window)
             if entering {
+                window.setFrame(NSRect(x: 0, y: 0, width: 1240, height: 810), display: false)
                 window.delegate?.windowDidFailToEnterFullScreen?(window)
                 #expect(window.styleMask.contains(.fullSizeContentView))
+                #expect(window.frame.size == normalSize)
             } else {
                 center.post(name: NSWindow.willExitFullScreenNotification, object: window)
                 window.delegate?.windowDidFailToExitFullScreen?(window)
                 #expect(!window.styleMask.contains(.fullSizeContentView))
+                center.post(name: NSWindow.willExitFullScreenNotification, object: window)
+                window.setFrame(NSRect(x: 0, y: 0, width: 1240, height: 810), display: false)
+                center.post(name: NSWindow.didExitFullScreenNotification, object: window)
+                #expect(window.frame.size == normalSize, "A failed exit must keep the original size for the next attempt")
             }
             #expect(original.entryFailures == (entering ? 1 : 0))
             #expect(original.exitFailures == (entering ? 0 : 1))

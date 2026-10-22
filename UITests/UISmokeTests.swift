@@ -199,9 +199,10 @@ import Carbon
         var fullScreenFrame = CGRect.zero
         func normalWindow() -> Bool { green.exists && window.frame.height < fullScreenFrame.height - 1 }
         func checkRestoredSize() {
-            print("Full-screen frames: before=\(normal), full=\(fullScreenFrame), after=\(window.frame), green=\(green.exists)")
-            XCTAssertEqual(window.frame.height, normal.height, accuracy: 1, "The window must regain its old height")
-            XCTAssertEqual(window.frame.width, normal.width, accuracy: 1, "The window must regain its old width")
+            let frames = "before=\(normal), full=\(fullScreenFrame), after=\(window.frame), green=\(green.exists)"
+            print("Full-screen frames: \(frames)")
+            XCTAssertEqual(window.frame.height, normal.height, accuracy: 1, "The window must regain its old height: \(frames)")
+            XCTAssertEqual(window.frame.width, normal.width, accuracy: 1, "The window must regain its old width: \(frames)")
         }
         green.click()
         XCTAssertTrue(waitForCondition(fullScreen))
@@ -224,6 +225,11 @@ import Carbon
         XCTAssertTrue(waitForCondition { exit.isHittable })
         exit.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         XCTAssertTrue(waitForCondition(normalWindow), "The View menu must leave full screen")
+        checkRestoredSize()
+        window.typeKey("f", modifierFlags: [.control, .command])
+        XCTAssertTrue(waitForCondition(fullScreen))
+        window.typeKey("f", modifierFlags: [.control, .command])
+        XCTAssertTrue(waitForCondition(normalWindow), "The system shortcut must leave full screen")
         checkRestoredSize()
     }
 
