@@ -17,6 +17,21 @@ import Darwin
     static var selectionCount: Int { samples.count }
     static var columnWidths: [String: [String: Double]] = [:]
     static var refreshScenario: String?
+    static var fullScreenFrames: [[String: Any]] = []
+    static func fullScreenFrame(_ event: String, anchor: NSView, size: NSSize?) {
+        guard output != nil else { return }
+        var frame: [String: Any] = ["time": ProcessInfo.processInfo.systemUptime, "event": event, "anchor": String(describing: ObjectIdentifier(anchor)),
+                                  "savedSize": size.map(NSStringFromSize) ?? "nil"]
+        if let window = anchor.window {
+            frame["window"] = window.windowNumber
+            frame["frame"] = NSStringFromRect(window.frame)
+            frame["contentFrame"] = window.contentView.map { NSStringFromRect($0.frame) } ?? "nil"
+            frame["layoutRect"] = NSStringFromRect(window.contentLayoutRect)
+            frame["style"] = window.styleMask.rawValue
+        }
+        fullScreenFrames.append(frame)
+        write()
+    }
     static var output: URL? {
         let args = ProcessInfo.processInfo.arguments
         guard let index = args.firstIndex(of: "--performance-output"), args.indices.contains(index + 1) else { return nil }
@@ -86,6 +101,7 @@ import Darwin
             "os": ProcessInfo.processInfo.operatingSystemVersionString,
             "displayRefreshRate": CGDisplayCopyDisplayMode(CGMainDisplayID())?.refreshRate ?? 0]
         if !columnWidths.isEmpty { values["columnWidthsPoints"] = columnWidths }
+        if !fullScreenFrames.isEmpty { values["fullScreenFrames"] = fullScreenFrames }
         if let refreshScenario { values["refreshScenario"] = refreshScenario }
         if let milliseconds = launch.milliseconds { values["launchMilliseconds"] = milliseconds }
         if !phaseGaps.isEmpty { values["phaseGapsOver100ms"] = phaseGaps; values["phaseHeartbeatCounts"] = phaseHeartbeats }
