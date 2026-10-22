@@ -25,6 +25,15 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
             observedWindow = window
             windowDelegate = delegate
             window.delegate = delegate
+            trace("attached")
+            if ProcessInfo.processInfo.environment["UNAGI_FULLSCREEN_TRACE"] != nil {
+                for name in [NSWindow.willEnterFullScreenNotification, NSWindow.didEnterFullScreenNotification, NSWindow.didResizeNotification, NSWindow.willExitFullScreenNotification, NSWindow.didExitFullScreenNotification] {
+                    let event = name.rawValue, stack = name == NSWindow.didResizeNotification
+                    observers.append(center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                        MainActor.assumeIsolated { self?.trace(event, stack: stack) }
+                    })
+                }
+            }
             for name in [NSWindow.willExitFullScreenNotification, NSWindow.didExitFullScreenNotification] {
                 observers.append(center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
                     MainActor.assumeIsolated { self?.showToolbar(false) }
@@ -32,8 +41,21 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
             }
             if window.styleMask.contains(.fullScreen) { showToolbar(true) }
         }
+        func trace(_ event: String, stack: Bool = false) {
+            guard let path = ProcessInfo.processInfo.environment["UNAGI_FULLSCREEN_TRACE"], let window = observedWindow else { return }
+            let line = "\(ProcessInfo.processInfo.systemUptime) \(event) frame=\(window.frame) min=\(window.minSize) contentMin=\(window.contentMinSize) content=\(window.contentView?.frame ?? .zero) layout=\(window.contentLayoutRect) style=\(window.styleMask.rawValue) toolbar=\(window.toolbar != nil) delegate=\(String(describing: windowDelegate?.original))\n" + (stack ? Thread.callStackSymbols.joined(separator: "\n") + "\n" : "")
+            let url = URL(fileURLWithPath: path)
+            if !FileManager.default.fileExists(atPath: path) { FileManager.default.createFile(atPath: path, contents: nil) }
+            do {
+                let file = try FileHandle(forWritingTo: url)
+                defer { try? file.close() }
+                try file.seekToEnd()
+                try file.write(contentsOf: Data(line.utf8))
+            } catch { print("Full-screen trace failed: \(error)") }
+        }
         func showToolbar(_ visible: Bool) {
             guard let window = observedWindow else { return }
+            trace("toolbar before \(visible)")
             if visible {
                 if window.toolbar !== toolbar {
                     originalToolbar = window.toolbar
@@ -48,6 +70,7 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
                 }
                 originalToolbar = nil
             }
+            trace("toolbar after \(visible)")
         }
         func stopObserving() {
             for observer in observers { center.removeObserver(observer) }
