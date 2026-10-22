@@ -226,9 +226,9 @@ import Carbon
         exit.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         XCTAssertTrue(waitForCondition(normalWindow), "The View menu must leave full screen")
         checkRestoredSize()
-        window.typeKey("f", modifierFlags: [.control, .command])
+        window.typeKey("f", modifierFlags: .function)
         XCTAssertTrue(waitForCondition(fullScreen))
-        window.typeKey("f", modifierFlags: [.control, .command])
+        window.typeKey("f", modifierFlags: .function)
         XCTAssertTrue(waitForCondition(normalWindow), "The system shortcut must leave full screen")
         checkRestoredSize()
     }
