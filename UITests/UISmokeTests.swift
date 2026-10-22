@@ -21,11 +21,15 @@ import Carbon
                 app.launchArguments += ["-AppleMenuBarVisibleInFullscreen", "NO"]
             }
             app.launch()
-            app.activate()
+            let launchedState = app.state
             inputSource = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
             let ascii = TISCopyCurrentASCIICapableKeyboardLayoutInputSource().takeRetainedValue()
             XCTAssertEqual(TISSelectInputSource(ascii), noErr)
-            XCTAssertTrue(app.tables["Article List"].waitForExistence(timeout: 15), app.windows.debugDescription)
+            let inputState = app.state
+            // Selecting an input source is a system interaction; reclaim the app before asking for its UI.
+            app.activate()
+            XCTAssertEqual(app.state, .runningForeground, "Startup states: launched=\(launchedState), after input=\(inputState), current=\(app.state)")
+            XCTAssertTrue(app.tables["Article List"].waitForExistence(timeout: 15), "Startup states: launched=\(launchedState), after input=\(inputState), current=\(app.state)\n\(app.windows.debugDescription)")
             XCTAssertTrue(app.outlines.staticTexts["開発ノート"].exists)
         }
     }
