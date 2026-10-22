@@ -56,9 +56,6 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
                     self.trace("willExit.after")
                 }
             })
-            observers.append(center.addObserver(forName: NSWindow.didExitFullScreenNotification, object: window, queue: .main) { [weak self, weak window] _ in
-                MainActor.assumeIsolated { if let window { self?.restoreNormalSize(window) } }
-            })
             observers.append(center.addObserver(forName: NSWindow.didResizeNotification, object: window, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { if let self { self.trace("resized") } }
             })
@@ -79,7 +76,7 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
             window.setFrame(frame, display: true)
             trace("didExit.after")
         }
-        private func trace(_ event: String) {
+        fileprivate func trace(_ event: String) {
             guard let path = ProcessInfo.processInfo.environment["UNAGI_FULLSCREEN_TRACE"] else { return }
             let frame = window.map { NSStringFromRect($0.frame) } ?? "nil"
             let content = window?.contentView.map { NSStringFromRect($0.frame) } ?? "nil"
@@ -106,7 +103,7 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
         }
     }
 
-    /// Failure callbacks have no notification equivalent. Every other delegate message keeps SwiftUI's receiver.
+    /// Run the existing exit handler before correcting its restored frame; forward other delegate messages unchanged.
     final class FailureDelegate: NSObject, NSWindowDelegate {
         weak var original: (any NSWindowDelegate)?
         private weak var anchor: Anchor?
@@ -122,6 +119,13 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
         nonisolated override func forwardingTarget(for selector: Selector!) -> Any? {
             if let original, original.responds(to: selector) { return original }
             return super.forwardingTarget(for: selector)
+        }
+        func windowDidExitFullScreen(_ notification: Notification) {
+            anchor?.trace("delegateExit.beforeOriginal")
+            original?.windowDidExitFullScreen?(notification)
+            anchor?.trace("delegateExit.afterOriginal")
+            if let window = notification.object as? NSWindow { anchor?.restoreNormalSize(window) }
+            anchor?.trace("delegateExit.afterCorrection")
         }
         func windowDidFailToEnterFullScreen(_ window: NSWindow) {
             original?.windowDidFailToEnterFullScreen?(window)

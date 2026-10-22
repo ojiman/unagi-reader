@@ -198,6 +198,13 @@ import Carbon
     private func checkFullScreenControls() throws {
         let window = app.windows.firstMatch
         let normal = window.frame
+        func keepImage(_ name: String, _ screenshot: XCUIScreenshot) {
+            let attachment = XCTAttachment(screenshot: screenshot)
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        keepImage("Normal window", window.screenshot())
         let green = app.buttons[XCUIIdentifierFullScreenWindow]
         XCTAssertTrue(green.exists)
         let greenX = green.frame.midX - normal.minX
@@ -214,10 +221,12 @@ import Carbon
         green.click()
         XCTAssertTrue(waitForCondition(fullScreen))
         fullScreenFrame = window.frame
+        keepImage("Full screen", window.screenshot())
         print("Full-screen frames: before=\(normal), full=\(fullScreenFrame)")
         let top = window.coordinate(withNormalizedOffset: .zero)
         for y: CGFloat in [100, 0, 1] { top.withOffset(CGVector(dx: greenX, dy: y)).hover() }
         XCTAssertTrue(waitForCondition { self.greenPoint(x: greenX, in: window) != nil })
+        keepImage("Revealed full-screen controls", window.screenshot())
         let point = try XCTUnwrap(greenPoint(x: greenX, in: window))
         top.withOffset(point).click()
         XCTAssertTrue(waitForCondition(normalWindow), "The revealed green control must leave full screen")
