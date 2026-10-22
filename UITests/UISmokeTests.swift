@@ -17,6 +17,9 @@ import Carbon
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
             app = XCUIApplication(url: url)
             app.launchArguments = ["--data-directory", directory.path, "--seed-demo"]
+            if name.contains("testLaunchSelectionAndReadingKeys") {
+                app.launchArguments += ["-AppleMenuBarVisibleInFullscreen", "NO"]
+            }
             app.launch()
             app.activate()
             inputSource = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
@@ -97,7 +100,17 @@ import Carbon
         waitForValue(body, containing: "朝の空気")
         table.typeText("k")
         waitForValue(body, containing: "毎日届く情報")
-        try checkFullScreenControls()
+        try checkFullScreenControls(alwaysVisibleMenu: false)
+        waitForValue(body, containing: "毎日届く情報")
+        // NSArgumentDomain applies this setting only to the synthetic app; do not change the person's menu-bar preference.
+        app.terminate()
+        app.launchArguments = ["--data-directory", directory.path, "--seed-demo", "-AppleMenuBarVisibleInFullscreen", "YES"]
+        app.launch()
+        app.activate()
+        XCTAssertTrue(table.waitForExistence(timeout: 15))
+        table.tableRows.element(boundBy: 1).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        waitForValue(body, containing: "毎日届く情報")
+        try checkFullScreenControls(alwaysVisibleMenu: true)
         waitForValue(body, containing: "毎日届く情報")
     }
 
@@ -189,7 +202,7 @@ import Carbon
     }
 
     // #373: use real input on the packaged window, including the transient green control that has no AX element.
-    private func checkFullScreenControls() throws {
+    private func checkFullScreenControls(alwaysVisibleMenu: Bool) throws {
         let window = app.windows.firstMatch
         // The CI desktop initially clamps the requested 1240 × 810 pt size. Also exercise a smaller, person-resized
         // window locally: restoring the requested default instead of this frame must fail on either desktop.
@@ -202,7 +215,7 @@ import Carbon
         let normal = window.frame
         func keepImage(_ name: String, _ screenshot: XCUIScreenshot) {
             let attachment = XCTAttachment(screenshot: screenshot)
-            attachment.name = name
+            attachment.name = (alwaysVisibleMenu ? "Always-visible menu: " : "Auto-hidden menu: ") + name
             attachment.lifetime = .keepAlways
             add(attachment)
         }
@@ -210,7 +223,7 @@ import Carbon
         let green = app.buttons[XCUIIdentifierFullScreenWindow]
         XCTAssertTrue(green.exists)
         let greenX = green.frame.midX - normal.minX
-        func fullScreen() -> Bool { !green.exists && window.frame.height > normal.height + 1 }
+        func fullScreen() -> Bool { window.frame.height > normal.height + 1 }
         var fullScreenFrame = CGRect.zero
         func normalWindow() -> Bool { green.exists && window.frame.height < fullScreenFrame.height - 1 }
         func checkRestoredSize() {
@@ -222,10 +235,11 @@ import Carbon
         green.click()
         XCTAssertTrue(waitForCondition(fullScreen))
         fullScreenFrame = window.frame
+        XCTAssertEqual(fullScreenFrame.minY > 0, alwaysVisibleMenu, "The synthetic menu preference must take effect: \(fullScreenFrame)")
         keepImage("Full screen", window.screenshot())
         print("Full-screen frames: before=\(normal), full=\(fullScreenFrame)")
         let top = window.coordinate(withNormalizedOffset: .zero)
-        for y: CGFloat in [100, 0, 1] { top.withOffset(CGVector(dx: greenX, dy: y)).hover() }
+        for y: CGFloat in [100, 0, 1] { top.withOffset(CGVector(dx: greenX, dy: y - window.frame.minY)).hover() }
         XCTAssertTrue(waitForCondition { self.greenPoint(x: greenX, in: window) != nil })
         keepImage("Revealed full-screen controls", window.screenshot())
         let point = try XCTUnwrap(greenPoint(x: greenX, in: window))
@@ -235,7 +249,7 @@ import Carbon
         green.click()
         XCTAssertTrue(waitForCondition(fullScreen))
         let menu = app.menuBars.menuBarItems["View"]
-        for y: CGFloat in [0, 1] { top.withOffset(CGVector(dx: menu.frame.midX, dy: y)).hover() }
+        for y: CGFloat in [0, 1] { top.withOffset(CGVector(dx: menu.frame.midX - window.frame.minX, dy: y - window.frame.minY)).hover() }
         menu.click()
         let exit = app.menuItems["Exit Full Screen"]
         XCTAssertTrue(exit.waitForExistence(timeout: 5))
@@ -253,7 +267,7 @@ import Carbon
     private func greenPoint(x: CGFloat, in window: XCUIElement) -> CGVector? {
         guard let image = NSBitmapImageRep(data: XCUIScreen.main.screenshot().pngRepresentation) else { return nil }
         let scale = CGFloat(image.pixelsWide) / window.frame.width
-        let centerX = Int(x * scale), radius = Int(20 * scale)
+        let centerX = Int((window.frame.minX + x) * scale), radius = Int(20 * scale)
         var points: [(x: Int, y: Int)] = []
         for row in 0..<min(image.pixelsHigh, Int(100 * scale)) {
             let columns = (max(0, centerX - radius)...min(image.pixelsWide - 1, centerX + radius)).filter { column in
@@ -265,7 +279,8 @@ import Carbon
         guard let minX = points.map(\.x).min(), let maxX = points.map(\.x).max(),
               let minY = points.map(\.y).min(), let maxY = points.map(\.y).max(), maxY - minY >= 6 else { return nil }
         // Detached native controls can move horizontally: click the observed green circle, not its normal-window x.
-        return CGVector(dx: CGFloat(minX + maxX) / (2 * scale), dy: CGFloat(minY + maxY) / (2 * scale))
+        return CGVector(dx: CGFloat(minX + maxX) / (2 * scale) - window.frame.minX,
+                        dy: CGFloat(minY + maxY) / (2 * scale) - window.frame.minY)
     }
 
     private func waitForCondition(_ ready: @escaping () -> Bool) -> Bool {

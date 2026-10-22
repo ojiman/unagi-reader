@@ -113,8 +113,8 @@ extension SplitViewFoldTests {
     }
 
     @Suite(.serialized) @MainActor struct FullScreenListTopTests {
-        /// The first article stays at the same height below the band and the heading, whether the title bar lies under the content
-        /// (a normal window) or not (full screen). In full screen it went up under the heading (#373).
+        /// The first article keeps its place below the band and heading across native title-bar layouts. It previously moved
+        /// under the heading in full screen (#373).
         @Test func theFirstArticleKeepsItsPlaceWithOrWithoutTheTitleBar() async throws {
             let underTitleBar = try await firstRowTop(styleMask: [.titled, .fullSizeContentView])
             let withoutTitleBar = try await firstRowTop(styleMask: [.titled])
