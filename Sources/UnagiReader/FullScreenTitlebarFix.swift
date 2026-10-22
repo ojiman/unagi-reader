@@ -12,7 +12,7 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
         private let center: NotificationCenter
         private var observers: [NSObjectProtocol] = []
         private weak var observedWindow: NSWindow?
-        private var failureDelegate: FailureDelegate?
+        private var windowDelegate: WindowDelegate?
         private var normalSize: NSSize?
 
         init(center: NotificationCenter = .default) {
@@ -23,41 +23,25 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            trace("move.beforeStop")
             stopObserving()
             guard let window else { return }
-            let delegate = FailureDelegate(original: window.delegate, anchor: self)
+            let delegate = WindowDelegate(original: window.delegate, anchor: self)
             observedWindow = window
-            failureDelegate = delegate
+            windowDelegate = delegate
             window.delegate = delegate
             observers.append(center.addObserver(forName: NSWindow.willEnterFullScreenNotification, object: window, queue: .main) { [weak self, weak window] _ in
                 MainActor.assumeIsolated {
                     guard let self, let window else { return }
-                    self.trace("willEnter.before")
                     if self.normalSize == nil { self.normalSize = window.frame.size }
-                    self.trace("willEnter.after")
                 }
             })
             // Changing a normal window's content mode changes its frame; let AppKit enter first.
-            observers.append(center.addObserver(forName: NSWindow.didEnterFullScreenNotification, object: window, queue: .main) { [weak self, weak window] _ in
-                MainActor.assumeIsolated {
-                    guard let self, let window else { return }
-                    self.trace("didEnter.before")
-                    Self.entering(window)
-                    self.trace("didEnter.after")
-                }
+            observers.append(center.addObserver(forName: NSWindow.didEnterFullScreenNotification, object: window, queue: .main) { [weak window] _ in
+                MainActor.assumeIsolated { if let window { Self.entering(window) } }
             })
             // Put the content mode back before AppKit restores the normal frame.
-            observers.append(center.addObserver(forName: NSWindow.willExitFullScreenNotification, object: window, queue: .main) { [weak self, weak window] _ in
-                MainActor.assumeIsolated {
-                    guard let self, let window else { return }
-                    self.trace("willExit.before")
-                    Self.leaving(window)
-                    self.trace("willExit.after")
-                }
-            })
-            observers.append(center.addObserver(forName: NSWindow.didResizeNotification, object: window, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { if let self { self.trace("resized") } }
+            observers.append(center.addObserver(forName: NSWindow.willExitFullScreenNotification, object: window, queue: .main) { [weak window] _ in
+                MainActor.assumeIsolated { if let window { Self.leaving(window) } }
             })
             // A window restored in full screen is already there.
             if window.styleMask.contains(.fullScreen) { Self.entering(window) }
@@ -65,7 +49,6 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
         static func entering(_ window: NSWindow) { window.styleMask.remove(.fullSizeContentView) }
         static func leaving(_ window: NSWindow) { window.styleMask.insert(.fullSizeContentView) }
         func restoreNormalSize(_ window: NSWindow) {
-            trace("didExit.before")
             guard let size = normalSize else { return }
             normalSize = nil
             guard window.frame.size != size else { return }
@@ -74,37 +57,21 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
             frame.origin.y += frame.height - size.height
             frame.size = size
             window.setFrame(frame, display: true)
-            trace("didExit.after")
-        }
-        fileprivate func trace(_ event: String) {
-            guard let path = ProcessInfo.processInfo.environment["UNAGI_FULLSCREEN_TRACE"] else { return }
-            let frame = window.map { NSStringFromRect($0.frame) } ?? "nil"
-            let content = window?.contentView.map { NSStringFromRect($0.frame) } ?? "nil"
-            let saved = normalSize.map(NSStringFromSize) ?? "nil"
-            let line = "\(ProcessInfo.processInfo.systemUptime) \(ObjectIdentifier(self)) \(event) frame=\(frame) content=\(content) saved=\(saved) style=\(window?.styleMask.rawValue ?? 0)\n"
-            let url = URL(fileURLWithPath: path)
-            if !FileManager.default.fileExists(atPath: path) { FileManager.default.createFile(atPath: path, contents: nil) }
-            if let file = try? FileHandle(forWritingTo: url) {
-                defer { try? file.close() }
-                _ = try? file.seekToEnd()
-                try? file.write(contentsOf: Data(line.utf8))
-            }
         }
         func stopObserving() {
-            trace("stop")
             for observer in observers { center.removeObserver(observer) }
             observers = []
-            if let window = observedWindow, window.delegate === failureDelegate {
-                window.delegate = failureDelegate?.original
+            if let window = observedWindow, window.delegate === windowDelegate {
+                window.delegate = windowDelegate?.original
             }
             observedWindow = nil
-            failureDelegate = nil
+            windowDelegate = nil
             normalSize = nil
         }
     }
 
     /// Run the existing exit handler before correcting its restored frame; forward other delegate messages unchanged.
-    final class FailureDelegate: NSObject, NSWindowDelegate {
+    final class WindowDelegate: NSObject, NSWindowDelegate {
         weak var original: (any NSWindowDelegate)?
         private weak var anchor: Anchor?
         init(original: (any NSWindowDelegate)?, anchor: Anchor) {
@@ -121,11 +88,8 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
             return super.forwardingTarget(for: selector)
         }
         func windowDidExitFullScreen(_ notification: Notification) {
-            anchor?.trace("delegateExit.beforeOriginal")
             original?.windowDidExitFullScreen?(notification)
-            anchor?.trace("delegateExit.afterOriginal")
             if let window = notification.object as? NSWindow { anchor?.restoreNormalSize(window) }
-            anchor?.trace("delegateExit.afterCorrection")
         }
         func windowDidFailToEnterFullScreen(_ window: NSWindow) {
             original?.windowDidFailToEnterFullScreen?(window)
