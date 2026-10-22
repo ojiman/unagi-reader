@@ -97,10 +97,11 @@ extension SplitViewFoldTests {
 
         /// #373: macOS 26 can restore the scene's unconstrained default size before announcing completed exit.
         @Test func completedExitRestoresTheActualFrameAfterTheOriginalDelegate() throws {
-            let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 1000, height: 650),
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 500),
                                   styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
             defer { window.close() }
+            window.center()
             let original = WindowDelegate()
             window.delegate = original
             let anchor = FullScreenTitlebarFix.Anchor(center: NotificationCenter())
@@ -119,6 +120,29 @@ extension SplitViewFoldTests {
             original.exitFrame = nil
             window.delegate?.windowDidExitFullScreen?(Notification(name: NSWindow.didExitFullScreenNotification, object: window))
             #expect(window.frame == later)
+        }
+
+        /// A display removed during full screen can leave the captured frame outside every current screen.
+        @Test func completedExitKeepsTheRestoredWindowOnTheCurrentScreen() throws {
+            let screen = try #require(NSScreen.main)
+            let visible = screen.visibleFrame
+            let window = NSWindow(contentRect: NSRect(x: visible.minX + 40, y: visible.minY + 40, width: 600, height: 400),
+                                  styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            defer { window.close() }
+            let reachable = window.frame
+            let anchor = FullScreenTitlebarFix.Anchor(center: NotificationCenter())
+            try #require(window.contentView).addSubview(anchor)
+            let rightmostEdge = try #require(NSScreen.screens.map(\.frame.maxX).max())
+            window.setFrameOrigin(NSPoint(x: rightmostEdge + 1000, y: reachable.minY))
+            #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(window.frame) })
+            _ = window.delegate?.window?(window, willUseFullScreenPresentationOptions: [.fullScreen, .autoHideMenuBar])
+            // AppKit has already adapted its exit frame to the remaining display.
+            window.setFrame(reachable, display: false)
+            window.delegate?.windowDidExitFullScreen?(Notification(name: NSWindow.didExitFullScreenNotification, object: window))
+            #expect(visible.contains(window.frame), "Restoration must not undo AppKit's recovery from a removed display")
+            #expect(window.frame.size == reachable.size)
+            #expect(window.toolbar == nil)
         }
 
         @Test(arguments: [false, true], [false, true])

@@ -25,12 +25,11 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
             let delegate = WindowDelegate(original: window.delegate, anchor: self)
             observedWindow = window
             windowDelegate = delegate
+            // This relies on SwiftUI not replacing window.delegate while the anchor remains attached.
             window.delegate = delegate
-            for name in [NSWindow.willExitFullScreenNotification] {
-                observers.append(center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.showToolbar(false) }
-                })
-            }
+            observers.append(center.addObserver(forName: NSWindow.willExitFullScreenNotification, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.showToolbar(false) }
+            })
             if window.styleMask.contains(.fullScreen) { showToolbar(true) }
         }
         func prepareForFullScreen() {
@@ -40,9 +39,11 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
         func finishFullScreen() {
             showToolbar(false)
             defer { normalFrame = nil }
-            guard let window = observedWindow, let normalFrame, window.frame != normalFrame else { return }
+            guard let window = observedWindow, let normalFrame, window.frame != normalFrame, let screen = window.screen else { return }
             // macOS 26 can restore the scene's unconstrained default, then fit it to the screen before didExit.
-            window.setFrame(normalFrame, display: true)
+            // Fit the captured frame to the current screen in case displays changed during full screen.
+            let frame = window.constrainFrameRect(normalFrame, to: screen)
+            if window.frame != frame { window.setFrame(frame, display: true) }
         }
         func showToolbar(_ visible: Bool) {
             guard let window = observedWindow else { return }
