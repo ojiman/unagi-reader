@@ -46,15 +46,8 @@ struct NoteColumnHold: NSViewRepresentable {
             hold()
         }
         func hold() {
-            var view: NSView? = superview
-            while let current = view {
-                if let split = current as? NSSplitView, let controller = split.delegate as? NSSplitViewController,
-                   let item = controller.splitViewItems.first(where: { isDescendant(of: $0.viewController.view) }) {
-                    if item.canCollapse { item.canCollapse = false }
-                    return
-                }
-                view = current.superview
-            }
+            guard let item = SplitViewItemLookup(holding: self)?.item else { return }
+            if item.canCollapse { item.canCollapse = false }
         }
     }
 }

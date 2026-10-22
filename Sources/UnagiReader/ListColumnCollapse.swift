@@ -101,7 +101,7 @@ struct ListColumnCollapse: ViewModifier, Animatable {
             }
         }
         private func update() {
-            guard let wanted, let window, let item = listItem() else { return }
+            guard let wanted, let window, let item = SplitViewItemLookup(holding: self)?.item else { return }
             // A saved native split-view state may contain a collapsed middle column (#195).
             // Normal folds use the SwiftUI width preference instead.
             if item.isCollapsed { item.isCollapsed = false }
@@ -126,35 +126,18 @@ struct ListColumnCollapse: ViewModifier, Animatable {
             restoring = Task { @MainActor [weak self, weak item] in
                 for _ in 0..<40 {
                     guard let self, let item, self.wanted == false, !Task.isCancelled else { return }
-                    var ancestor = self.superview
-                    while let current = ancestor {
-                        if let split = current as? NSSplitView, let controller = split.delegate as? NSSplitViewController,
-                           let index = controller.splitViewItems.firstIndex(of: item) {
-                            let others = controller.splitViewItems.filter { $0 !== item && !$0.isCollapsed }
-                                .reduce(0.0) { $0 + max($1.minimumThickness, $1.viewController.view.fittingSize.width) }
-                            if width + others + Double(controller.splitViewItems.count - 1) <= split.bounds.width {
-                                let missing = width - self.bounds.width
-                                if abs(missing) < 1 { return }
-                                split.setPosition(item.viewController.view.frame.maxX + missing, ofDividerAt: index)
-                            }
-                            break
+                    if let found = SplitViewItemLookup(holding: self), found.item === item {
+                        let others = found.controller.splitViewItems.filter { $0 !== item && !$0.isCollapsed }
+                            .reduce(0.0) { $0 + max($1.minimumThickness, $1.viewController.view.fittingSize.width) }
+                        if width + others + Double(found.controller.splitViewItems.count - 1) <= found.split.bounds.width {
+                            let missing = width - self.bounds.width
+                            if abs(missing) < 1 { return }
+                            found.split.setPosition(item.viewController.view.frame.maxX + missing, ofDividerAt: found.index)
                         }
-                        ancestor = current.superview
                     }
                     try? await Task.sleep(for: .milliseconds(50))
                 }
             }
-        }
-        private func listItem() -> NSSplitViewItem? {
-            var view = superview
-            while let current = view {
-                if let split = current as? NSSplitView, let controller = split.delegate as? NSSplitViewController,
-                   let item = controller.splitViewItems.first(where: { isDescendant(of: $0.viewController.view) }) {
-                    return item
-                }
-                view = current.superview
-            }
-            return nil
         }
         private static func first<T: NSView>(_ type: T.Type, in view: NSView) -> T? {
             if let result = view as? T { return result }
