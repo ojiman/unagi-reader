@@ -100,7 +100,10 @@ import Carbon
         waitForValue(body, containing: "朝の空気")
         table.typeText("k")
         waitForValue(body, containing: "毎日届く情報")
-        try checkFullScreenControls(alwaysVisibleMenu: false)
+        // Keep the initial, screen-clamped frame case that exposed the native restoration bug on CI (#373).
+        try checkFullScreenControls(alwaysVisibleMenu: false, resize: false)
+        waitForValue(body, containing: "毎日届く情報")
+        try checkFullScreenControls(alwaysVisibleMenu: false, resize: true)
         waitForValue(body, containing: "毎日届く情報")
         // NSArgumentDomain applies this setting only to the synthetic app; do not change the person's menu-bar preference.
         app.terminate()
@@ -110,7 +113,7 @@ import Carbon
         XCTAssertTrue(table.waitForExistence(timeout: 15))
         table.tableRows.element(boundBy: 1).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         waitForValue(body, containing: "毎日届く情報")
-        try checkFullScreenControls(alwaysVisibleMenu: true)
+        try checkFullScreenControls(alwaysVisibleMenu: true, resize: true)
         waitForValue(body, containing: "毎日届く情報")
     }
 
@@ -202,20 +205,22 @@ import Carbon
     }
 
     // #373: use real input on the packaged window, including the transient green control that has no AX element.
-    private func checkFullScreenControls(alwaysVisibleMenu: Bool) throws {
+    private func checkFullScreenControls(alwaysVisibleMenu: Bool, resize: Bool) throws {
         let window = app.windows.firstMatch
-        // The CI desktop initially clamps the requested 1240 × 810 pt size. Also exercise a smaller, person-resized
-        // window locally: restoring the requested default instead of this frame must fail on either desktop.
-        let targetSize = CGSize(width: 1000, height: 650)
-        let beforeResize = window.frame
-        // Keep the resize handles inside the display, including CI's edge-to-edge starting window.
-        let right = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5)).withOffset(CGVector(dx: -1, dy: 0))
-        let rightTarget = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: targetSize.width - 1, dy: 0))
-        right.click(forDuration: 0.1, thenDragTo: rightTarget)
-        let bottom = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1)).withOffset(CGVector(dx: 0, dy: -1))
-        let bottomTarget = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: targetSize.height - 1))
-        bottom.click(forDuration: 0.1, thenDragTo: bottomTarget)
-        XCTAssertTrue(waitForCondition { abs(window.frame.width - targetSize.width) < 3 && abs(window.frame.height - targetSize.height) < 3 }, "Resized window: \(window.frame), before: \(beforeResize)")
+        if resize {
+            // The CI desktop initially clamps the requested 1240 × 810 pt size. Also exercise a smaller, person-resized
+            // window locally: restoring the requested default instead of this frame must fail on either desktop.
+            let targetSize = CGSize(width: 1000, height: 650)
+            let beforeResize = window.frame
+            // Keep the resize handles inside the display, including CI's edge-to-edge starting window.
+            let right = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5)).withOffset(CGVector(dx: -1, dy: 0))
+            let rightTarget = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: targetSize.width - 1, dy: 0))
+            right.click(forDuration: 0.1, thenDragTo: rightTarget)
+            let bottom = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1)).withOffset(CGVector(dx: 0, dy: -1))
+            let bottomTarget = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: targetSize.height - 1))
+            bottom.click(forDuration: 0.1, thenDragTo: bottomTarget)
+            XCTAssertTrue(waitForCondition { abs(window.frame.width - targetSize.width) < 3 && abs(window.frame.height - targetSize.height) < 3 }, "Resized window: \(window.frame), before: \(beforeResize)")
+        }
         let normal = window.frame
         func keepImage(_ name: String, _ screenshot: XCUIScreenshot) {
             let attachment = XCTAttachment(screenshot: screenshot)
