@@ -18,7 +18,7 @@ import Carbon
             app = XCUIApplication(url: url)
             app.launchArguments = ["--data-directory", directory.path, "--seed-demo"]
             if name.contains("testLaunchSelectionAndReadingKeys") {
-                app.launchArguments += ["--performance-output", directory.appending(path: "fullscreen-performance.json").path]
+                app.launchEnvironment["UNAGI_FULLSCREEN_TRACE"] = directory.appending(path: "fullscreen-trace.log").path
             }
             app.launch()
             app.activate()
@@ -33,6 +33,9 @@ import Carbon
     override func tearDown() async throws {
         try await MainActor.run {
             if let inputSource { XCTAssertEqual(TISSelectInputSource(inputSource), noErr) }
+            if let directory, let trace = try? String(contentsOf: directory.appending(path: "fullscreen-trace.log"), encoding: .utf8) {
+                print("Native frame trace at teardown: \(trace)")
+            }
             app?.terminate()
             if let directory { try FileManager.default.removeItem(at: directory) }
         }
@@ -202,8 +205,8 @@ import Carbon
         var fullScreenFrame = CGRect.zero
         func normalWindow() -> Bool { green.exists && window.frame.height < fullScreenFrame.height - 1 }
         func checkRestoredSize() {
-            let trace = (try? String(contentsOf: directory.appending(path: "fullscreen-performance.json"), encoding: .utf8)) ?? "no native frame trace"
-            let frames = "before=\(normal), full=\(fullScreenFrame), after=\(window.frame), green=\(green.exists), native=\(trace)"
+            let trace = (try? String(contentsOf: directory.appending(path: "fullscreen-trace.log"), encoding: .utf8)) ?? "no native frame trace"
+            let frames = "before=\(normal), full=\(fullScreenFrame), after=\(window.frame), green=\(green.exists), native=\(trace.replacingOccurrences(of: "\n", with: " | "))"
             print("Full-screen frames: \(frames)")
             XCTAssertEqual(window.frame.height, normal.height, accuracy: 1, "The window must regain its old height: \(frames)")
             XCTAssertEqual(window.frame.width, normal.width, accuracy: 1, "The window must regain its old width: \(frames)")

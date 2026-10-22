@@ -23,7 +23,7 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            ReaderPerformance.fullScreenFrame("move.beforeStop", anchor: self, size: normalSize)
+            trace("move.beforeStop")
             stopObserving()
             guard let window else { return }
             let delegate = FailureDelegate(original: window.delegate, anchor: self)
@@ -33,26 +33,34 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
             observers.append(center.addObserver(forName: NSWindow.willEnterFullScreenNotification, object: window, queue: .main) { [weak self, weak window] _ in
                 MainActor.assumeIsolated {
                     guard let self, let window else { return }
-                    ReaderPerformance.fullScreenFrame("willEnter.before", anchor: self, size: self.normalSize)
+                    self.trace("willEnter.before")
                     if self.normalSize == nil { self.normalSize = window.frame.size }
+                    self.trace("willEnter.after")
+                }
+            })
+            // Changing a normal window's content mode changes its frame; let AppKit enter first.
+            observers.append(center.addObserver(forName: NSWindow.didEnterFullScreenNotification, object: window, queue: .main) { [weak self, weak window] _ in
+                MainActor.assumeIsolated {
+                    guard let self, let window else { return }
+                    self.trace("didEnter.before")
                     Self.entering(window)
-                    ReaderPerformance.fullScreenFrame("willEnter.after", anchor: self, size: self.normalSize)
+                    self.trace("didEnter.after")
                 }
             })
             // Put the content mode back before AppKit restores the normal frame.
             observers.append(center.addObserver(forName: NSWindow.willExitFullScreenNotification, object: window, queue: .main) { [weak self, weak window] _ in
                 MainActor.assumeIsolated {
                     guard let self, let window else { return }
-                    ReaderPerformance.fullScreenFrame("willExit.before", anchor: self, size: self.normalSize)
+                    self.trace("willExit.before")
                     Self.leaving(window)
-                    ReaderPerformance.fullScreenFrame("willExit.after", anchor: self, size: self.normalSize)
+                    self.trace("willExit.after")
                 }
             })
             observers.append(center.addObserver(forName: NSWindow.didExitFullScreenNotification, object: window, queue: .main) { [weak self, weak window] _ in
                 MainActor.assumeIsolated { if let window { self?.restoreNormalSize(window) } }
             })
             observers.append(center.addObserver(forName: NSWindow.didResizeNotification, object: window, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { if let self { ReaderPerformance.fullScreenFrame("resized", anchor: self, size: self.normalSize) } }
+                MainActor.assumeIsolated { if let self { self.trace("resized") } }
             })
             // A window restored in full screen is already there.
             if window.styleMask.contains(.fullScreen) { Self.entering(window) }
@@ -60,7 +68,7 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
         static func entering(_ window: NSWindow) { window.styleMask.remove(.fullSizeContentView) }
         static func leaving(_ window: NSWindow) { window.styleMask.insert(.fullSizeContentView) }
         func restoreNormalSize(_ window: NSWindow) {
-            ReaderPerformance.fullScreenFrame("didExit.before", anchor: self, size: normalSize)
+            trace("didExit.before")
             guard let size = normalSize else { return }
             normalSize = nil
             guard window.frame.size != size else { return }
@@ -69,10 +77,24 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
             frame.origin.y += frame.height - size.height
             frame.size = size
             window.setFrame(frame, display: true)
-            ReaderPerformance.fullScreenFrame("didExit.after", anchor: self, size: size)
+            trace("didExit.after")
+        }
+        private func trace(_ event: String) {
+            guard let path = ProcessInfo.processInfo.environment["UNAGI_FULLSCREEN_TRACE"] else { return }
+            let frame = window.map { NSStringFromRect($0.frame) } ?? "nil"
+            let content = window?.contentView.map { NSStringFromRect($0.frame) } ?? "nil"
+            let saved = normalSize.map(NSStringFromSize) ?? "nil"
+            let line = "\(ProcessInfo.processInfo.systemUptime) \(ObjectIdentifier(self)) \(event) frame=\(frame) content=\(content) saved=\(saved) style=\(window?.styleMask.rawValue ?? 0)\n"
+            let url = URL(fileURLWithPath: path)
+            if !FileManager.default.fileExists(atPath: path) { FileManager.default.createFile(atPath: path, contents: nil) }
+            if let file = try? FileHandle(forWritingTo: url) {
+                defer { try? file.close() }
+                _ = try? file.seekToEnd()
+                try? file.write(contentsOf: Data(line.utf8))
+            }
         }
         func stopObserving() {
-            ReaderPerformance.fullScreenFrame("stop", anchor: self, size: normalSize)
+            trace("stop")
             for observer in observers { center.removeObserver(observer) }
             observers = []
             if let window = observedWindow, window.delegate === failureDelegate {

@@ -8,6 +8,22 @@ extension SplitViewFoldTests {
     /// A private notification center tests the wiring without sending synthetic full-screen notices to AppKit.
     /// Real green-button clicks still need the packaged app (#373).
     @Suite(.serialized) @MainActor struct FullScreenTitlebarTests {
+        @Test func entryLeavesTheNormalFrameAloneUntilTheSystemHasEntered() throws {
+            let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 1024, height: 674),
+                                  styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            defer { window.close() }
+            let center = NotificationCenter()
+            let anchor = FullScreenTitlebarFix.Anchor(center: center)
+            try #require(window.contentView).addSubview(anchor)
+            let normal = window.frame
+            center.post(name: NSWindow.willEnterFullScreenNotification, object: window)
+            #expect(window.frame == normal, "AppKit must begin entry with the person's normal frame")
+            #expect(window.styleMask.contains(.fullSizeContentView))
+            center.post(name: NSWindow.didEnterFullScreenNotification, object: window)
+            #expect(!window.styleMask.contains(.fullSizeContentView))
+        }
+
         @Test func theAttachedWindowReceivesTheFullScreenChanges() {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
                                   styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
@@ -19,16 +35,18 @@ extension SplitViewFoldTests {
             let center = NotificationCenter()
             let anchor = FullScreenTitlebarFix.Anchor(center: center)
             window.contentView!.addSubview(anchor)
-            center.post(name: NSWindow.willEnterFullScreenNotification, object: other)
+            center.post(name: NSWindow.didEnterFullScreenNotification, object: other)
             #expect(window.styleMask.contains(.fullSizeContentView))
             for _ in 0..<3 {
                 center.post(name: NSWindow.willEnterFullScreenNotification, object: window)
+                #expect(window.styleMask.contains(.fullSizeContentView))
+                center.post(name: NSWindow.didEnterFullScreenNotification, object: window)
                 #expect(!window.styleMask.contains(.fullSizeContentView))
                 center.post(name: NSWindow.willExitFullScreenNotification, object: window)
                 #expect(window.styleMask.contains(.fullSizeContentView))
             }
             anchor.removeFromSuperview()
-            center.post(name: NSWindow.willEnterFullScreenNotification, object: window)
+            center.post(name: NSWindow.didEnterFullScreenNotification, object: window)
             #expect(window.styleMask.contains(.fullSizeContentView), "A detached anchor must stop changing its old window")
         }
     }
@@ -88,6 +106,7 @@ extension SplitViewFoldTests {
                 #expect(window.styleMask.contains(.fullSizeContentView))
                 #expect(window.frame.size == normalSize)
             } else {
+                center.post(name: NSWindow.didEnterFullScreenNotification, object: window)
                 center.post(name: NSWindow.willExitFullScreenNotification, object: window)
                 window.delegate?.windowDidFailToExitFullScreen?(window)
                 #expect(!window.styleMask.contains(.fullSizeContentView))
