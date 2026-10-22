@@ -32,7 +32,7 @@ extension SplitViewFoldTests {
                 #expect(window.toolbar == nil)
                 window.delegate?.windowDidFailToExitFullScreen?(window)
                 #expect(toolbar.isVisible)
-                center.post(name: NSWindow.didExitFullScreenNotification, object: window)
+                window.delegate?.windowDidExitFullScreen?(Notification(name: NSWindow.didExitFullScreenNotification, object: window))
                 #expect(window.toolbar == nil)
                 #expect(window.frame == frame)
             }
@@ -49,6 +49,12 @@ extension SplitViewFoldTests {
             var removeMenuHiding = false
             var entryFailures = 0
             var exitFailures = 0
+            var exits = 0
+            var exitFrame: NSRect?
+            func windowDidExitFullScreen(_ notification: Notification) {
+                exits += 1
+                if let exitFrame, let window = notification.object as? NSWindow { window.setFrame(exitFrame, display: false) }
+            }
             func windowDidFailToEnterFullScreen(_ window: NSWindow) { entryFailures += 1 }
             func windowDidFailToExitFullScreen(_ window: NSWindow) { exitFailures += 1 }
             func windowShouldClose(_ window: NSWindow) -> Bool { false }
@@ -87,6 +93,32 @@ extension SplitViewFoldTests {
             #expect(window.delegate?.windowShouldClose?(window) == false)
             anchor.removeFromSuperview()
             #expect(window.delegate === original)
+        }
+
+        /// #373: macOS 26 can restore the scene's unconstrained default size before announcing completed exit.
+        @Test func completedExitRestoresTheActualFrameAfterTheOriginalDelegate() throws {
+            let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 1000, height: 650),
+                                  styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            defer { window.close() }
+            let original = WindowDelegate()
+            window.delegate = original
+            let anchor = FullScreenTitlebarFix.Anchor(center: NotificationCenter())
+            try #require(window.contentView).addSubview(anchor)
+            let normal = window.frame
+            _ = window.delegate?.window?(window, willUseFullScreenPresentationOptions: [.fullScreen, .autoHideMenuBar])
+            window.setFrame(NSRect(x: 0, y: 0, width: 1240, height: 810), display: false)
+            original.exitFrame = NSRect(x: 0, y: 0, width: 1100, height: 700)
+            window.delegate?.windowDidExitFullScreen?(Notification(name: NSWindow.didExitFullScreenNotification, object: window))
+            #expect(original.exits == 1)
+            #expect(window.frame == normal)
+            #expect(window.toolbar == nil)
+            // A completed transition cannot apply a saved frame to a later, unrelated notification.
+            window.setFrame(NSRect(x: 0, y: 0, width: 1150, height: 720), display: false)
+            let later = window.frame
+            original.exitFrame = nil
+            window.delegate?.windowDidExitFullScreen?(Notification(name: NSWindow.didExitFullScreenNotification, object: window))
+            #expect(window.frame == later)
         }
 
         @Test(arguments: [false, true], [false, true])

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Use AppKit's detached full-screen toolbar for the revealed window controls (#373). Normal windows have no toolbar and keep
-/// their custom bands (decision 0057). This component does not change the content mode or correct the window frame.
+/// their custom bands (decision 0057). Restore the actual normal frame after AppKit completes exit; keep the content mode unchanged.
 struct FullScreenTitlebarFix: NSViewRepresentable {
     func makeNSView(context: Context) -> Anchor { Anchor() }
     func updateNSView(_ view: Anchor, context: Context) {}
@@ -15,6 +15,7 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
         private var originalToolbar: NSToolbar?
         private var originalToolbarVisible = false
         private var windowDelegate: WindowDelegate?
+        private var normalFrame: NSRect?
         init(center: NotificationCenter = .default) { self.center = center; super.init(frame: .zero) }
         required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
         override func viewDidMoveToWindow() {
@@ -25,37 +26,26 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
             observedWindow = window
             windowDelegate = delegate
             window.delegate = delegate
-            trace("attached")
-            if ProcessInfo.processInfo.environment["UNAGI_FULLSCREEN_TRACE"] != nil {
-                for name in [NSWindow.willEnterFullScreenNotification, NSWindow.didEnterFullScreenNotification, NSWindow.didResizeNotification, NSWindow.willExitFullScreenNotification, NSWindow.didExitFullScreenNotification] {
-                    let event = name.rawValue, stack = name == NSWindow.didResizeNotification
-                    observers.append(center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
-                        MainActor.assumeIsolated { self?.trace(event, stack: stack) }
-                    })
-                }
-            }
-            for name in [NSWindow.willExitFullScreenNotification, NSWindow.didExitFullScreenNotification] {
+            for name in [NSWindow.willExitFullScreenNotification] {
                 observers.append(center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
                     MainActor.assumeIsolated { self?.showToolbar(false) }
                 })
             }
             if window.styleMask.contains(.fullScreen) { showToolbar(true) }
         }
-        func trace(_ event: String, stack: Bool = false) {
-            guard let path = ProcessInfo.processInfo.environment["UNAGI_FULLSCREEN_TRACE"], let window = observedWindow else { return }
-            let line = "\(ProcessInfo.processInfo.systemUptime) \(event) frame=\(window.frame) min=\(window.minSize) contentMin=\(window.contentMinSize) content=\(window.contentView?.frame ?? .zero) layout=\(window.contentLayoutRect) style=\(window.styleMask.rawValue) toolbar=\(window.toolbar != nil) delegate=\(String(describing: windowDelegate?.original))\n" + (stack ? Thread.callStackSymbols.joined(separator: "\n") + "\n" : "")
-            let url = URL(fileURLWithPath: path)
-            if !FileManager.default.fileExists(atPath: path) { FileManager.default.createFile(atPath: path, contents: nil) }
-            do {
-                let file = try FileHandle(forWritingTo: url)
-                defer { try? file.close() }
-                try file.seekToEnd()
-                try file.write(contentsOf: Data(line.utf8))
-            } catch { print("Full-screen trace failed: \(error)") }
+        func prepareForFullScreen() {
+            if let window = observedWindow, normalFrame == nil, !window.styleMask.contains(.fullScreen) { normalFrame = window.frame }
+            showToolbar(true)
+        }
+        func finishFullScreen() {
+            showToolbar(false)
+            defer { normalFrame = nil }
+            guard let window = observedWindow, let normalFrame, window.frame != normalFrame else { return }
+            // macOS 26 can restore the scene's unconstrained default, then fit it to the screen before didExit.
+            window.setFrame(normalFrame, display: true)
         }
         func showToolbar(_ visible: Bool) {
             guard let window = observedWindow else { return }
-            trace("toolbar before \(visible)")
             if visible {
                 if window.toolbar !== toolbar {
                     originalToolbar = window.toolbar
@@ -70,7 +60,6 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
                 }
                 originalToolbar = nil
             }
-            trace("toolbar after \(visible)")
         }
         func stopObserving() {
             for observer in observers { center.removeObserver(observer) }
@@ -79,6 +68,7 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
             if let window = observedWindow, window.delegate === windowDelegate { window.delegate = windowDelegate?.original }
             observedWindow = nil
             windowDelegate = nil
+            normalFrame = nil
         }
     }
 
@@ -99,13 +89,17 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
         }
         func window(_ window: NSWindow, willUseFullScreenPresentationOptions proposedOptions: NSApplication.PresentationOptions) -> NSApplication.PresentationOptions {
             let options = original?.window?(window, willUseFullScreenPresentationOptions: proposedOptions) ?? proposedOptions
-            anchor?.showToolbar(options.contains(.fullScreen))
+            if options.contains(.fullScreen) { anchor?.prepareForFullScreen() } else { anchor?.showToolbar(false) }
             guard options.contains([.fullScreen, .autoHideMenuBar]) else { return options }
             return options.union(.autoHideToolbar)
         }
+        func windowDidExitFullScreen(_ notification: Notification) {
+            original?.windowDidExitFullScreen?(notification)
+            anchor?.finishFullScreen()
+        }
         func windowDidFailToEnterFullScreen(_ window: NSWindow) {
             original?.windowDidFailToEnterFullScreen?(window)
-            anchor?.showToolbar(false)
+            anchor?.finishFullScreen()
         }
         func windowDidFailToExitFullScreen(_ window: NSWindow) {
             original?.windowDidFailToExitFullScreen?(window)

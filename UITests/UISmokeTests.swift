@@ -17,9 +17,6 @@ import Carbon
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
             app = XCUIApplication(url: url)
             app.launchArguments = ["--data-directory", directory.path, "--seed-demo"]
-            if name.contains("testLaunchSelectionAndReadingKeys") {
-                app.launchEnvironment["UNAGI_FULLSCREEN_TRACE"] = directory.appending(path: "fullscreen-trace.log").path
-            }
             app.launch()
             let launchedState = app.state
             inputSource = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
@@ -38,9 +35,6 @@ import Carbon
         try await MainActor.run {
             if let inputSource { XCTAssertEqual(TISSelectInputSource(inputSource), noErr) }
             app?.terminate()
-            if let directory, let trace = try? String(contentsOf: directory.appending(path: "fullscreen-trace.log"), encoding: .utf8) {
-                print("NATIVE FULLSCREEN TRACE\n" + trace)
-            }
             if let directory { try FileManager.default.removeItem(at: directory) }
         }
     }
