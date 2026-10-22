@@ -65,7 +65,7 @@ extension SplitViewFoldTests {
             h.window.titlebarAccessoryViewControllers.contains { $0.view is NSHostingView<SidebarTitlebarControls.Buttons> }
         }
         private func state(_ h: Harness) -> String {
-            "[note hidden \(String(describing: editor(in: h)?.isHiddenOrHasHiddenAncestor)), note collapsed \(String(describing: editor(in: h).flatMap { splitItem(holding: $0)?.item.isCollapsed })), frame \(h.window.frame), list viewport \(String(describing: table(in: h)?.enclosingScrollView?.bounds)), list focused \(h.window.firstResponder === table(in: h)), note focused \(h.window.firstResponder === editor(in: h)), sidebar buttons \(sidebarButtonsMounted(h)), list x \(x(table(in: h)).map { "\($0)" } ?? "none"), article x \(x(article(in: h)).map { "\($0)" } ?? "none"), note x \(x(editor(in: h)).map { "\($0)" } ?? "none")]"
+            "[note hidden \(String(describing: editor(in: h)?.isHiddenOrHasHiddenAncestor)), note collapsed \(String(describing: editor(in: h).flatMap { SplitViewItemLookup(holding: $0)?.item.isCollapsed })), frame \(h.window.frame), list viewport \(String(describing: table(in: h)?.enclosingScrollView?.bounds)), list focused \(h.window.firstResponder === table(in: h)), note focused \(h.window.firstResponder === editor(in: h)), sidebar buttons \(sidebarButtonsMounted(h)), list x \(x(table(in: h)).map { "\($0)" } ?? "none"), article x \(x(article(in: h)).map { "\($0)" } ?? "none"), note x \(x(editor(in: h)).map { "\($0)" } ?? "none")]"
         }
         private func settle(_ h: Harness, line: Int = #line, until ready: () -> Bool) async throws {
             for _ in 0..<250 {
@@ -316,15 +316,7 @@ extension SplitViewFoldTests {
             try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
             let list = try #require(table(in: h))
             try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
-            var view: NSView? = list.superview
-            var item: NSSplitViewItem?
-            while let current = view, item == nil {
-                if let split = current as? NSSplitView, let controller = split.delegate as? NSSplitViewController {
-                    item = controller.splitViewItems.first { list.isDescendant(of: $0.viewController.view) }
-                }
-                view = current.superview
-            }
-            let column = try #require(item)
+            let column = try #require(SplitViewItemLookup(holding: list)?.item)
             column.canCollapse = true
             column.isCollapsed = true                                                          // what a restored window state does
             // Back and usable: the width it had before the system folded it is not known, so it comes back at least at its smallest width.
@@ -366,16 +358,8 @@ extension SplitViewFoldTests {
                 try await settle(h) { ReaderKeyboardCommands.originalPage(in: h.host) != nil }
             }
             let noteEditor = try #require(editor(in: h))
-            var view: NSView? = noteEditor.superview
-            var found: (NSSplitViewController, Int)?
-            while let current = view, found == nil {
-                if let split = current as? NSSplitView, let controller = split.delegate as? NSSplitViewController,
-                   let index = controller.splitViewItems.firstIndex(where: { noteEditor.isDescendant(of: $0.viewController.view) }) {
-                    found = (controller, index)
-                }
-                view = current.superview
-            }
-            let (controller, index) = try #require(found)
+            let found = try #require(SplitViewItemLookup(holding: noteEditor))
+            let (controller, index) = (found.controller, found.index)
             #expect(index > 0)
             // What the person's drag does: the divider before the note moves to the window's right edge, in steps.
             for step in 1...10 {
@@ -412,20 +396,7 @@ extension SplitViewFoldTests {
             }
         }
 
-        /// The split view item that holds `view`, found the way `ListColumnCollapse` and `NoteColumnHold` find it.
-        private func splitItem(holding view: NSView) -> (item: NSSplitViewItem, controller: NSSplitViewController)? {
-            var current: NSView? = view.superview
-            while let candidate = current {
-                if let split = candidate as? NSSplitView, let controller = split.delegate as? NSSplitViewController,
-                   let item = controller.splitViewItems.first(where: { view.isDescendant(of: $0.viewController.view) }) {
-                    return (item, controller)
-                }
-                current = candidate.superview
-            }
-            return nil
-        }
-
-        /// What the two probes assume about the system's split view. They reach into it from the list's and the note's views, so a macOS
+        /// What the two probes assume about the system's split view, checked through the probes' own `SplitViewItemLookup`. They reach into it from the list's and the note's views, so a macOS
         /// update can break them; this test names the assumption that broke (#371, #370). The fold itself is SwiftUI's width, not
         /// `isCollapsed`: the system must not collapse the item, or the window grows when the list returns.
         @Test func theSplitViewStillHasTheShapeTheProbesAssume() async throws {
@@ -435,14 +406,14 @@ extension SplitViewFoldTests {
             let list = try #require(table(in: h))
             let listScroll = try #require(list.enclosingScrollView)
             try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
-            let found = try #require(splitItem(holding: list), "assumption 1: an NSSplitViewController is above the list")
+            let found = try #require(SplitViewItemLookup(holding: list), "assumption 1: an NSSplitViewController is above the list")
             #expect(found.controller.splitViewItems.count >= 3, "assumption 2: sidebar, list and article are separate items, \(found.controller.splitViewItems.count) found")
             #expect(!found.item.canCollapse, "assumption 3: the list's item cannot be collapsed by the person (the system's default; the probe keeps it so)")
             try press("n", in: h)
             try await settle(h) { noteVisible(h) && listScroll.bounds.width < 1 }
             #expect(!found.item.isCollapsed, "assumption 4: the list folds by its width; the system's item stays expanded \(state(h))")
             let note = try #require(editor(in: h))
-            let noteItem = try #require(splitItem(holding: note), "assumption 5: the note's panel is in a split view item too")
+            let noteItem = try #require(SplitViewItemLookup(holding: note), "assumption 5: the note's panel is in a split view item too")
             #expect(!noteItem.item.canCollapse, "assumption 6: the probe turns off collapsing of the note's item")
             try press("n", in: h)
             try await settle(h) { !noteVisible(h) && listScroll.bounds.width >= NotePanelWidth.listMinimum - 1 }
