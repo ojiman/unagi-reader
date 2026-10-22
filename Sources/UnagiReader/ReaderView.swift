@@ -19,8 +19,8 @@ struct ReaderView: View {
     @State private var startingPanelWidth = NotePanelWidth.load()
     /// The window's width, for the most the note panel may take. It is read only by `NoteInspectorColumn`, so a window resize does not redraw the reader.
     @State private var windowSpace = WindowSpace()
-    /// True for one turn after the person dragged the panel shut, so that it is shown again (see `noteOpenBinding`).
-    @State private var panelReopening = false
+    /// Resends the requested inspector state after a late system report (see `noteOpenBinding`).
+    @State private var panelResynchronizing = false
     @State private var saveError: String?
     /// How 「記事をノートに送る」 reaches the note's editor (specification 3.3).
     @State private var noteLink: NoteEditorLink
@@ -158,7 +158,7 @@ struct ReaderView: View {
 
     // The reader's modifiers are split into stages, in their original order: one long chain made the CI compiler give up (#132).
     private var splitView: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
+        NavigationSplitView(columnVisibility: .constant(columnVisibility)) {
             sidebar.navigationSplitViewColumnWidth(min: 185, ideal: 215, max: 280)
         } content: {
             articleList.id(scope).background(AppPalette.surfaceColor)
@@ -579,12 +579,12 @@ struct ReaderView: View {
 
     private var noteOpen: Bool { workspace.noteOpen }
     private var noteOpenBinding: Binding<Bool> {
-        // The panel is closed only by the note button, ⌥⌘I, the ✕ or `Esc` (`toggleNote`). Its edge cannot be dragged shut (`NoteColumnHold`); if
-        // the system still reports `false` here, the note stays open and the panel is shown again on the next turn: ignoring the report left the
-        // panel gone while the app still counted it as open, and the person could lose the panel with no way back that they would find.
-        Binding(get: { noteOpen && !panelReopening }, set: { open in
-            if open { workspace.noteOpen = true }
-            else if noteOpen { panelReopening = true; Task { @MainActor in panelReopening = false } }
+        // System reports can arrive after a newer command. Keep the person's intent and resend it on the next turn;
+        // ignoring a report alone can leave the native panel in the wrong state (#370, #371).
+        Binding(get: { panelResynchronizing ? !noteOpen : noteOpen }, set: { open in
+            guard open != noteOpen, !panelResynchronizing else { return }
+            panelResynchronizing = true
+            Task { @MainActor in panelResynchronizing = false }
         })
     }
     /// The note button, `n` and `⌥⌘I`: open the note with the keyboard in its editor (decision 0064), or close it.

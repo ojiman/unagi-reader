@@ -65,7 +65,7 @@ extension SplitViewFoldTests {
             h.window.titlebarAccessoryViewControllers.contains { $0.view is NSHostingView<SidebarTitlebarControls.Buttons> }
         }
         private func state(_ h: Harness) -> String {
-            "[frame \(h.window.frame), list viewport \(String(describing: table(in: h)?.enclosingScrollView?.bounds)), list focused \(h.window.firstResponder === table(in: h)), note focused \(h.window.firstResponder === editor(in: h)), sidebar buttons \(sidebarButtonsMounted(h)), list x \(x(table(in: h)).map { "\($0)" } ?? "none"), article x \(x(article(in: h)).map { "\($0)" } ?? "none"), note x \(x(editor(in: h)).map { "\($0)" } ?? "none")]"
+            "[note hidden \(String(describing: editor(in: h)?.isHiddenOrHasHiddenAncestor)), note collapsed \(String(describing: editor(in: h).flatMap { splitItem(holding: $0)?.item.isCollapsed })), frame \(h.window.frame), list viewport \(String(describing: table(in: h)?.enclosingScrollView?.bounds)), list focused \(h.window.firstResponder === table(in: h)), note focused \(h.window.firstResponder === editor(in: h)), sidebar buttons \(sidebarButtonsMounted(h)), list x \(x(table(in: h)).map { "\($0)" } ?? "none"), article x \(x(article(in: h)).map { "\($0)" } ?? "none"), note x \(x(editor(in: h)).map { "\($0)" } ?? "none")]"
         }
         private func settle(_ h: Harness, line: Int = #line, until ready: () -> Bool) async throws {
             for _ in 0..<250 {
@@ -389,6 +389,29 @@ extension SplitViewFoldTests {
             #expect(width >= NotePanelWidth.range.lowerBound - 40, "the note is \(width) pt wide")
         }
 
+        /// Issue #371: closing an arriving note keeps the latest request and returns the list.
+        @Test(arguments: [1_240.0, 1_600.0])
+        func closingAnArrivingNoteReturnsTheList(width: Double) async throws {
+            let h = try harness(width: width)
+            defer { finish(h) }
+            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
+            let list = try #require(table(in: h))
+            list.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+            try await settle(h) { article(in: h) != nil }
+            let frame = h.window.frame
+            let listWidth = try #require(list.enclosingScrollView).bounds.width
+            for _ in 0..<5 {
+                try press("n", in: h)
+                try await settle(h) { noteVisible(h) }
+                try press("n", in: h)
+                try await settle(h) {
+                    !noteVisible(h) && sidebarButtonsMounted(h)
+                        && abs((list.enclosingScrollView?.bounds.width ?? 0) - listWidth) < 1
+                }
+                #expect(h.window.frame == frame)
+            }
+        }
+
         /// The split view item that holds `view`, found the way `ListColumnCollapse` and `NoteColumnHold` find it.
         private func splitItem(holding view: NSView) -> (item: NSSplitViewItem, controller: NSSplitViewController)? {
             var current: NSView? = view.superview
@@ -421,7 +444,6 @@ extension SplitViewFoldTests {
             let note = try #require(editor(in: h))
             let noteItem = try #require(splitItem(holding: note), "assumption 5: the note's panel is in a split view item too")
             #expect(!noteItem.item.canCollapse, "assumption 6: the probe turns off collapsing of the note's item")
-            try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))                 // let the move finish, as the tests above do
             try press("n", in: h)
             try await settle(h) { !noteVisible(h) && listScroll.bounds.width >= NotePanelWidth.listMinimum - 1 }
             #expect(!found.item.isCollapsed)
