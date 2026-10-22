@@ -158,7 +158,7 @@ struct ReaderView: View {
 
     // The reader's modifiers are split into stages, in their original order: one long chain made the CI compiler give up (#132).
     private var splitView: some View {
-        NavigationSplitView(columnVisibility: .constant(columnVisibility)) {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar.navigationSplitViewColumnWidth(min: 185, ideal: 215, max: 280)
         } content: {
             articleList.id(scope).background(AppPalette.surfaceColor)
