@@ -108,10 +108,13 @@ import Carbon
         waitForValue(body, containing: "毎日届く情報")
         // NSArgumentDomain applies this setting only to the synthetic app; do not change the person's menu-bar preference.
         app.terminate()
-        app.launchArguments = ["--data-directory", directory.path, "--seed-demo", "-AppleMenuBarVisibleInFullscreen", "YES"]
+        app.launchArguments = ["-AppleMenuBarVisibleInFullscreen", "YES", "--data-directory", directory.path, "--seed-demo"]
         app.launch()
         app.activate()
-        XCTAssertTrue(table.waitForExistence(timeout: 15))
+        let configuredTableAppeared = table.waitForExistence(timeout: 15)
+        let nativeState = NSRunningApplication.runningApplications(withBundleIdentifier: "xyz.ojima.UnagiReader.Synthetic.UISmoke")
+            .map { "pid=\($0.processIdentifier), active=\($0.isActive), hidden=\($0.isHidden), finished=\($0.isFinishedLaunching)" }
+        XCTAssertTrue(configuredTableAppeared, "Configured launch: \(nativeState)\n\(app.windows.debugDescription)")
         table.tableRows.element(boundBy: 1).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         waitForValue(body, containing: "毎日届く情報")
         try checkFullScreenControls(alwaysVisibleMenu: true, resize: true)
