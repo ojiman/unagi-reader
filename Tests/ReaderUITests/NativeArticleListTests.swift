@@ -6,6 +6,18 @@ import ReaderCore
 
 // Checks PRD-11 (specification 7).
 @Suite(EnglishLanguage()) @MainActor struct NativeArticleListTests {
+    @Test func theTableFitsTheViewportAfterAZeroWidthFold() {
+        let scroll = NativeArticleList.ScrollView(frame: NSRect(x: 0, y: 0, width: 400, height: 500))
+        let table = NativeArticleList.Table(frame: scroll.bounds)
+        NativeArticleList.configure(table)
+        scroll.documentView = table
+        for width in [400.0, 0.0, 280.0, 400.0, 0.0, 280.0] {
+            scroll.setFrameSize(NSSize(width: width, height: 500))
+            scroll.tile()
+            if width > 0 { #expect(table.frame.width <= scroll.contentSize.width + 1, "table \(table.frame.width), viewport \(scroll.contentSize.width)") }
+        }
+    }
+
     @Test func selectedFolderListReceivesKeyboardFocusAfterMount() {
         var selection: UUID?
         let parent = NativeArticleList(ids: [], article: { _ in nil }, feedTitle: { _ in "" }, selection: Binding(get: { selection }, set: { selection = $0 }), initialTop: nil, focus: true, shortcutsEnabled: true, onTop: { _ in }, onKey: { _ in })

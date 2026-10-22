@@ -1,4 +1,5 @@
 import XCTest
+import AppKit
 import Carbon
 
 @MainActor final class UISmokeTests: XCTestCase {
@@ -31,6 +32,53 @@ import Carbon
             if let inputSource { XCTAssertEqual(TISSelectInputSource(inputSource), noErr) }
             app?.terminate()
             if let directory { try FileManager.default.removeItem(at: directory) }
+        }
+    }
+
+    // Issue #371: exercise the packaged hidden-title-bar window at the width that exposed #222.
+    private func checkNarrowWindowLayout(width: CGFloat) {
+        selectFirst()
+        let window = app.windows.firstMatch
+        let frame = window.frame
+        if abs(frame.width - width) >= 4 {
+            let edge = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(CGVector(dx: 1, dy: 1))
+            let target = window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: width + 1, dy: frame.height + 1))
+            edge.click(forDuration: 0.1, thenDragTo: target)
+        }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in abs(window.frame.width - width) < 4 }, object: nil)], timeout: 5), .completed, "window after drag: \(window.frame), before: \(frame)")
+        let table = app.tables["Article List"]
+        let listViewport = app.scrollViews.containing(.table, identifier: "Article List").firstMatch
+        let articleViewport = app.scrollViews.containing(.textView, identifier: "Article Body").firstMatch
+        let divider = table.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5)).withOffset(CGVector(dx: 1, dy: 0))
+        // CI's 1,024 pt desktop also needs room for the note and the article beside the list.
+        let listWidth: CGFloat = width < 1170 ? 280 : 400
+        let listRight = table.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: listWidth + 1, dy: 0))
+        divider.click(forDuration: 0.1, thenDragTo: listRight)
+        XCTAssertEqual(listViewport.frame.width, listWidth, accuracy: 3)
+        let start = window.frame
+        for _ in 0..<2 {
+            window.typeKey("n", modifierFlags: [])
+            let editor = app.textViews["Note"]
+            XCTAssertTrue(editor.waitForExistence(timeout: 5))
+            app.buttons["Show Article List"].click()
+            XCTAssertTrue(app.buttons["Hide Article List"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.tables["Article List"].tableRows.firstMatch.isHittable)
+            XCTAssertEqual(listViewport.frame.width, listWidth, accuracy: 3)
+            XCTAssertGreaterThanOrEqual(articleViewport.frame.minX, listViewport.frame.maxX - 1)
+            XCTAssertLessThanOrEqual(articleViewport.frame.maxX, window.frame.maxX + 1)
+            XCTAssertEqual(window.frame.width, start.width, accuracy: 1)
+            app.buttons["Hide Article List"].click()
+            XCTAssertTrue(app.buttons["Show Article List"].waitForExistence(timeout: 5))
+            editor.click()
+            window.typeKey(.escape, modifierFlags: [])
+            XCTAssertTrue(editor.waitForNonExistence(timeout: 5))
+            XCTAssertTrue(app.tables["Article List"].tableRows.firstMatch.isHittable)
+            XCTAssertEqual(listViewport.frame.width, listWidth, accuracy: 3)
+            XCTAssertGreaterThanOrEqual(articleViewport.frame.minX, listViewport.frame.maxX - 1)
+            XCTAssertLessThanOrEqual(articleViewport.frame.maxX, window.frame.maxX + 1)
+            XCTAssertEqual(window.frame.width, start.width, accuracy: 1)
+            XCTAssertEqual(window.frame.minX, start.minX, accuracy: 1)
+            XCTAssertEqual(app.state, .runningForeground)
         }
     }
 
@@ -69,6 +117,9 @@ import Carbon
 
     // Checks PRD-04: layout changes keep the note, and committed typing survives a restart.
     func testNoteLayoutKeepsEditing() {
+        let available = NSScreen.main?.visibleFrame.width ?? 1170
+        let widths = Set([min(CGFloat(1170), available), min(CGFloat(1240), available)]).sorted()
+        for width in widths { checkNarrowWindowLayout(width: width) }
         selectFirst()
         app.windows.firstMatch.typeKey("n", modifierFlags: [])
         let editor = app.textViews["Note"]

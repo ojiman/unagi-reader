@@ -19,7 +19,7 @@ extension SplitViewFoldTests {
             let window: NSWindow
             let directory: URL
         }
-        private func harness(noteOpen: Bool = false, listShown: Bool = false) throws -> Harness {
+        private func harness(noteOpen: Bool = false, listShown: Bool = false, width: Double = 1240) throws -> Harness {
             let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let store = try inMemoryReaderStore()
@@ -33,27 +33,30 @@ extension SplitViewFoldTests {
                 initialNoteOpen: noteOpen, initialListShown: listShown,
                 notePasteboard: NSPasteboard(name: .init("unagi-reader-test-\(UUID())")))
             let host = NSHostingView(rootView: reader)
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1240, height: 800), styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 800), styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false; window.toolbar = NSToolbar(identifier: "synthetic-note-beside")
             window.contentView = host
             window.orderFront(nil)
+            #expect(window.frame.size == NSSize(width: width, height: 800), "the hosted fixture must keep its requested dimensions")
             return Harness(store: store, host: host, window: window, directory: directory)
         }
         private func finish(_ h: Harness) { h.window.close(); try? FileManager.default.removeItem(at: h.directory) }
 
         private func find<T: NSView>(_ type: T.Type, in view: NSView) -> T? {
             if let result = view as? T { return result }
-            return view.subviews.lazy.compactMap { find(type, in: $0) }.first
+            for child in view.subviews { if let result = find(type, in: child) { return result } }
+            return nil
         }
         private func editor(in h: Harness) -> NSTextView? {
             func search(_ view: NSView) -> NSTextView? {
                 if let text = view as? NSTextView, text.string == noteText { return text }
-                return view.subviews.lazy.compactMap { search($0) }.first
+                for child in view.subviews { if let result = search(child) { return result } }
+                return nil
             }
             return search(h.host)
         }
         /// The closed note stays in the view tree, outside the window on the right.
-        private func noteVisible(_ h: Harness) -> Bool { (x(editor(in: h)) ?? 99_999) < 1_240 - 50 }
+        private func noteVisible(_ h: Harness) -> Bool { (x(editor(in: h)) ?? 99_999) < h.window.frame.width - 50 }
         private func table(in h: Harness) -> NativeArticleList.Table? { find(NativeArticleList.Table.self, in: h.host) }
         private func article(in h: Harness) -> ArticleTextView? { find(ArticleTextView.self, in: h.host) }
         private func x(_ view: NSView?) -> CGFloat? { view.map { $0.convert($0.bounds, to: nil).minX } }
@@ -62,7 +65,7 @@ extension SplitViewFoldTests {
             h.window.titlebarAccessoryViewControllers.contains { $0.view is NSHostingView<SidebarTitlebarControls.Buttons> }
         }
         private func state(_ h: Harness) -> String {
-            "[sidebar buttons \(sidebarButtonsMounted(h)), list x \(x(table(in: h)).map { "\($0)" } ?? "none"), article x \(x(article(in: h)).map { "\($0)" } ?? "none"), note x \(x(editor(in: h)).map { "\($0)" } ?? "none")]"
+            "[note hidden \(String(describing: editor(in: h)?.isHiddenOrHasHiddenAncestor)), note collapsed \(String(describing: editor(in: h).flatMap { SplitViewItemLookup(holding: $0)?.item.isCollapsed })), frame \(h.window.frame), list viewport \(String(describing: table(in: h)?.enclosingScrollView?.bounds)), list focused \(h.window.firstResponder === table(in: h)), note focused \(h.window.firstResponder === editor(in: h)), sidebar buttons \(sidebarButtonsMounted(h)), list x \(x(table(in: h)).map { "\($0)" } ?? "none"), article x \(x(article(in: h)).map { "\($0)" } ?? "none"), note x \(x(editor(in: h)).map { "\($0)" } ?? "none")]"
         }
         private func settle(_ h: Harness, line: Int = #line, until ready: () -> Bool) async throws {
             for _ in 0..<250 {
@@ -110,7 +113,7 @@ extension SplitViewFoldTests {
             let articleRight = try #require(right(article(in: h)))
             #expect(try #require(x(editor(in: h))) >= articleRight - 1)
             #expect(article(in: h)?.string.contains("合成記事 1") == true)                       // the same article
-            try await settle(h) { (list.window == nil) || list.convert(list.bounds, to: nil).width < 1 || list.isHiddenOrHasHiddenAncestor }
+            try await settle(h) { (list.window == nil) || (list.enclosingScrollView?.bounds.width ?? list.bounds.width) < 1 || list.isHiddenOrHasHiddenAncestor }
 
             try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))                 // let the move finish, as a person would wait
             try press("n", in: h)
@@ -250,7 +253,7 @@ extension SplitViewFoldTests {
             let note = try #require(editor(in: h))
             h.window.makeFirstResponder(note)
             note.setMarkedText("か", selectedRange: NSRange(location: 1, length: 0), replacementRange: NSRange(location: note.string.count, length: 0))
-            func shown() -> Bool { (x(note) ?? 99_999) < 1_240 - 50 }                         // the composed text changes what `editor(in:)` finds
+            func shown() -> Bool { (x(note) ?? 99_999) < h.window.frame.width - 50 }                         // the composed text changes what `editor(in:)` finds
             try escape(to: note, in: h)
             try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
             #expect(shown())                                                                  // composing: the note stays
@@ -313,15 +316,7 @@ extension SplitViewFoldTests {
             try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
             let list = try #require(table(in: h))
             try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
-            var view: NSView? = list.superview
-            var item: NSSplitViewItem?
-            while let current = view, item == nil {
-                if let split = current as? NSSplitView, let controller = split.delegate as? NSSplitViewController {
-                    item = controller.splitViewItems.first { list.isDescendant(of: $0.viewController.view) }
-                }
-                view = current.superview
-            }
-            let column = try #require(item)
+            let column = try #require(SplitViewItemLookup(holding: list)?.item)
             column.canCollapse = true
             column.isCollapsed = true                                                          // what a restored window state does
             // Back and usable: the width it had before the system folded it is not known, so it comes back at least at its smallest width.
@@ -363,16 +358,8 @@ extension SplitViewFoldTests {
                 try await settle(h) { ReaderKeyboardCommands.originalPage(in: h.host) != nil }
             }
             let noteEditor = try #require(editor(in: h))
-            var view: NSView? = noteEditor.superview
-            var found: (NSSplitViewController, Int)?
-            while let current = view, found == nil {
-                if let split = current as? NSSplitView, let controller = split.delegate as? NSSplitViewController,
-                   let index = controller.splitViewItems.firstIndex(where: { noteEditor.isDescendant(of: $0.viewController.view) }) {
-                    found = (controller, index)
-                }
-                view = current.superview
-            }
-            let (controller, index) = try #require(found)
+            let found = try #require(SplitViewItemLookup(holding: noteEditor))
+            let (controller, index) = (found.controller, found.index)
             #expect(index > 0)
             // What the person's drag does: the divider before the note moves to the window's right edge, in steps.
             for step in 1...10 {
@@ -384,6 +371,161 @@ extension SplitViewFoldTests {
             try await settle(h) { noteVisible(h) && !controller.splitViewItems[index].isCollapsed }
             let width = try #require(editor(in: h)).enclosingScrollView.map { $0.convert($0.bounds, to: nil).width } ?? 0
             #expect(width >= NotePanelWidth.range.lowerBound - 40, "the note is \(width) pt wide")
+        }
+
+        /// Issue #371: closing an arriving note keeps the latest request and returns the list.
+        @Test(arguments: [1_240.0, 1_600.0])
+        func closingAnArrivingNoteReturnsTheList(width: Double) async throws {
+            let h = try harness(width: width)
+            defer { finish(h) }
+            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
+            let list = try #require(table(in: h))
+            list.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+            try await settle(h) { article(in: h) != nil }
+            let frame = h.window.frame
+            let listWidth = try #require(list.enclosingScrollView).bounds.width
+            for _ in 0..<5 {
+                try press("n", in: h)
+                try await settle(h) { noteVisible(h) }
+                try press("n", in: h)
+                try await settle(h) {
+                    !noteVisible(h) && sidebarButtonsMounted(h)
+                        && abs((list.enclosingScrollView?.bounds.width ?? 0) - listWidth) < 1
+                }
+                #expect(h.window.frame == frame)
+            }
+        }
+
+        /// What the two probes assume about the system's split view, checked through the probes' own `SplitViewItemLookup`. They reach into it from the list's and the note's views, so a macOS
+        /// update can break them; this test names the assumption that broke (#371, #370). The fold itself is SwiftUI's width, not
+        /// `isCollapsed`: the system must not collapse the item, or the window grows when the list returns.
+        @Test func theSplitViewStillHasTheShapeTheProbesAssume() async throws {
+            let h = try harness(width: 1_240)
+            defer { finish(h) }
+            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
+            let list = try #require(table(in: h))
+            let listScroll = try #require(list.enclosingScrollView)
+            try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
+            let found = try #require(SplitViewItemLookup(holding: list), "assumption 1: an NSSplitViewController is above the list")
+            #expect(found.controller.splitViewItems.count >= 3, "assumption 2: sidebar, list and article are separate items, \(found.controller.splitViewItems.count) found")
+            #expect(!found.item.canCollapse, "assumption 3: the list's item cannot be collapsed by the person (the system's default; the probe keeps it so)")
+            try press("n", in: h)
+            try await settle(h) { noteVisible(h) && listScroll.bounds.width < 1 }
+            #expect(!found.item.isCollapsed, "assumption 4: the list folds by its width; the system's item stays expanded \(state(h))")
+            let note = try #require(editor(in: h))
+            let noteItem = try #require(SplitViewItemLookup(holding: note), "assumption 5: the note's panel is in a split view item too")
+            #expect(!noteItem.item.canCollapse, "assumption 6: the probe turns off collapsing of the note's item")
+            try press("n", in: h)
+            try await settle(h) { !noteVisible(h) && listScroll.bounds.width >= NotePanelWidth.listMinimum - 1 }
+            #expect(!found.item.isCollapsed)
+        }
+
+        /// Fail-soft: when the list is not inside a system split view (a macOS update that builds the columns differently), the probe finds
+        /// nothing and does nothing. The SwiftUI width still folds the list, and the keyboard stays where it was.
+        @Test func theListStillFoldsWhenNoSplitViewItemCanBeFound() async throws {
+            final class Sensor: NSView {}
+            struct SensorView: NSViewRepresentable {
+                func makeNSView(context: Context) -> Sensor { Sensor() }
+                func updateNSView(_ view: Sensor, context: Context) {}
+            }
+            let space = WindowSpace()
+            func root(collapsed: Bool) -> AnyView {
+                AnyView(SensorView().modifier(ListColumnCollapse(collapsed: collapsed, animated: false, space: space)))
+            }
+            let host = NSHostingView(rootView: root(collapsed: false))
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = host
+            window.orderFront(nil)
+            defer { window.close() }
+            func sensor() -> Sensor? { find(Sensor.self, in: host) }
+            func settleSensor(_ ready: () -> Bool) async throws {
+                for _ in 0..<100 {
+                    host.layoutSubtreeIfNeeded()
+                    if ready() { return }
+                    try await Task.sleep(for: .milliseconds(20))
+                }
+                #expect(ready(), "sensor width \(String(describing: sensor()?.frame.width))")
+            }
+            try await settleSensor { (sensor()?.frame.width ?? 0) > 100 }
+            let responder = window.firstResponder
+            host.rootView = root(collapsed: true)
+            try await settleSensor { (sensor()?.frame.width ?? 99) < 1 }
+            host.rootView = root(collapsed: false)
+            try await settleSensor { (sensor()?.frame.width ?? 0) > 100 }
+            #expect(window.firstResponder === responder)
+        }
+
+        /// Issue #371: in a window narrower than 1,400 pt the list folds and comes back at once; the window's own width never changes.
+        @Test(arguments: [1_170.0, 1_240.0])
+        func theWindowKeepsItsWidthWhileTheListFoldsAndReturns(width: Double) async throws {
+            let h = try harness(width: width)
+            defer { finish(h) }
+            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
+            let list = try #require(table(in: h))
+            list.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+            try await settle(h) { article(in: h)?.string.contains("合成記事 0") == true }
+            try await Task.sleep(for: .seconds(SidebarFold.motionDuration * 2))
+            let initialListWidth = try #require(list.enclosingScrollView).bounds.width
+            let start = h.window.frame
+            var seen: [CGFloat] = []
+            func watch(for seconds: Double) async throws {
+                let end = ContinuousClock.now + .seconds(seconds)
+                while ContinuousClock.now < end {
+                    h.host.layoutSubtreeIfNeeded()
+                    seen.append(h.window.frame.width)
+                    try await Task.sleep(for: .milliseconds(5))
+                }
+            }
+            try press("n", in: h)
+            try await watch(for: 1)
+            #expect(noteVisible(h))
+            try press("n", in: h)
+            try await watch(for: 1)
+            #expect(!noteVisible(h))
+            #expect(h.window.firstResponder === list)
+            // The list is back at a usable width, and it and the article fit in the window.
+            try await settle(h) {
+                guard let listScroll = list.enclosingScrollView, let articleScroll = article(in: h)?.enclosingScrollView else { return false }
+                let listRect = listScroll.convert(listScroll.bounds, to: nil)
+                let articleRect = articleScroll.convert(articleScroll.bounds, to: nil)
+                return listRect.width >= NotePanelWidth.listMinimum - 1 && articleRect.minX >= listRect.maxX - 1 && articleRect.maxX <= width + 1
+            }
+            try await settle(h) { abs((list.enclosingScrollView?.bounds.width ?? 0) - initialListWidth) < 1 }
+            let widest = seen.max() ?? 0, narrowest = seen.min() ?? 0
+            #expect(abs(widest - start.width) < 1 && abs(narrowest - start.width) < 1, "window \(start.width) pt wide, seen \(narrowest)...\(widest)")
+            #expect(abs(h.window.frame.minX - start.minX) < 1)
+        }
+
+        /// Issue #371: wide windows keep their frame and restore the list; motion samples cover the support floor.
+        @Test func theListKeepsItsFrameAndWidthInAWideWindow() async throws {
+            let h = try harness(width: 1600)
+            defer { finish(h) }
+            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
+            let list = try #require(table(in: h))
+            list.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+            try await settle(h) { article(in: h) != nil }
+            try await Task.sleep(for: .seconds(0.6))
+            let scroll = try #require(list.enclosingScrollView)
+            let starting = scroll.bounds.width
+            let frame = h.window.frame
+            for folding in [true, false] {
+                var widths: [CGFloat] = []
+                try press("n", in: h)
+                let end = ContinuousClock.now + .seconds(0.5)
+                while ContinuousClock.now < end {
+                    widths.append(scroll.layer?.presentation()?.bounds.width ?? scroll.bounds.width)
+                    #expect(h.window.frame == frame)
+                    try await Task.sleep(for: .milliseconds(5))
+                }
+                if folding { #expect((widths.max() ?? 0) <= starting + 1) }
+                // CI's macOS 26.6 hosted fold exposes only endpoints (39598530460); motion acceptance starts at macOS 27.
+                if ProcessInfo.processInfo.isOperatingSystemAtLeast(OperatingSystemVersion(majorVersion: 27, minorVersion: 0, patchVersion: 0)) {
+                    #expect(widths.contains { $0 > 1 && $0 < starting - 1 },
+                            "folding \(folding), widths \(widths), window \(h.window.frame), host \(h.host.bounds)")
+                }
+            }
+            try await settle(h) { !noteVisible(h) && abs(scroll.bounds.width - starting) < 1 }
         }
 
         @Test func aNoteOpenAtTheStartHasTheListFolded() async throws {
