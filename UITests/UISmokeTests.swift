@@ -208,9 +208,13 @@ import Carbon
         // window locally: restoring the requested default instead of this frame must fail on either desktop.
         let targetSize = CGSize(width: 1000, height: 650)
         let beforeResize = window.frame
-        let edge = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(CGVector(dx: 1, dy: 1))
-        let target = window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: targetSize.width + 1, dy: targetSize.height + 1))
-        edge.click(forDuration: 0.1, thenDragTo: target)
+        // Keep the resize handles inside the display, including CI's edge-to-edge starting window.
+        let right = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5)).withOffset(CGVector(dx: -1, dy: 0))
+        let rightTarget = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: targetSize.width - 1, dy: 0))
+        right.click(forDuration: 0.1, thenDragTo: rightTarget)
+        let bottom = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1)).withOffset(CGVector(dx: 0, dy: -1))
+        let bottomTarget = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: targetSize.height - 1))
+        bottom.click(forDuration: 0.1, thenDragTo: bottomTarget)
         XCTAssertTrue(waitForCondition { abs(window.frame.width - targetSize.width) < 3 && abs(window.frame.height - targetSize.height) < 3 }, "Resized window: \(window.frame), before: \(beforeResize)")
         let normal = window.frame
         func keepImage(_ name: String, _ screenshot: XCUIScreenshot) {
