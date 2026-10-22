@@ -11,6 +11,8 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
     final class Anchor: NSView {
         private let center: NotificationCenter
         private var observers: [NSObjectProtocol] = []
+        private weak var observedWindow: NSWindow?
+        private var failureDelegate: FailureDelegate?
 
         init(center: NotificationCenter = .default) {
             self.center = center
@@ -22,6 +24,10 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
             super.viewDidMoveToWindow()
             stopObserving()
             guard let window else { return }
+            let delegate = FailureDelegate(original: window.delegate)
+            observedWindow = window
+            failureDelegate = delegate
+            window.delegate = delegate
             observers.append(center.addObserver(forName: NSWindow.willEnterFullScreenNotification, object: window, queue: .main) { [weak window] _ in
                 MainActor.assumeIsolated { if let window { Self.entering(window) } }
             })
@@ -37,6 +43,33 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
         func stopObserving() {
             for observer in observers { center.removeObserver(observer) }
             observers = []
+            if let window = observedWindow, window.delegate === failureDelegate {
+                window.delegate = failureDelegate?.original
+            }
+            observedWindow = nil
+            failureDelegate = nil
+        }
+    }
+
+    /// Failure callbacks have no notification equivalent. Every other delegate message keeps SwiftUI's receiver.
+    final class FailureDelegate: NSObject, NSWindowDelegate {
+        weak var original: (any NSWindowDelegate)?
+        init(original: (any NSWindowDelegate)?) { self.original = original; super.init() }
+
+        nonisolated override func responds(to selector: Selector!) -> Bool {
+            super.responds(to: selector) || (original?.responds(to: selector) ?? false)
+        }
+        nonisolated override func forwardingTarget(for selector: Selector!) -> Any? {
+            if let original, original.responds(to: selector) { return original }
+            return super.forwardingTarget(for: selector)
+        }
+        func windowDidFailToEnterFullScreen(_ window: NSWindow) {
+            original?.windowDidFailToEnterFullScreen?(window)
+            Anchor.leaving(window)
+        }
+        func windowDidFailToExitFullScreen(_ window: NSWindow) {
+            original?.windowDidFailToExitFullScreen?(window)
+            Anchor.entering(window)
         }
     }
 }

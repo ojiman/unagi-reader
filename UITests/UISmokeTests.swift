@@ -83,7 +83,7 @@ import Carbon
     }
 
     // Checks PRD-01: a real click and j/k must select and display the corresponding article.
-    func testLaunchSelectionAndReadingKeys() {
+    func testLaunchSelectionAndReadingKeys() throws {
         let table = app.tables["Article List"]
         XCTAssertEqual(table.tableRows.count, 6)
         // Native cell accessibility clicks can select without giving the table the keyboard.
@@ -96,6 +96,8 @@ import Carbon
         table.typeText("j")
         waitForValue(body, containing: "朝の空気")
         table.typeText("k")
+        waitForValue(body, containing: "毎日届く情報")
+        try checkFullScreenControls()
         waitForValue(body, containing: "毎日届く情報")
     }
 
@@ -184,6 +186,58 @@ import Carbon
         XCTAssertTrue(app.menuItems["Import OPML…"].exists)
         XCTAssertTrue(app.menuItems["Import OPML…"].isEnabled)
         app.windows.firstMatch.typeKey(.escape, modifierFlags: [])
+    }
+
+    // #373: use real input on the packaged window, including the transient green control that has no AX element.
+    private func checkFullScreenControls() throws {
+        let window = app.windows.firstMatch
+        let normal = window.frame
+        let green = app.buttons[XCUIIdentifierFullScreenWindow]
+        XCTAssertTrue(green.exists)
+        let greenX = green.frame.midX - normal.minX
+        func fullScreen() -> Bool { !green.exists && window.frame.height > normal.height + 1 }
+        func normalWindow() -> Bool { green.exists && abs(window.frame.height - normal.height) < 1 }
+        green.click()
+        XCTAssertTrue(waitForCondition(fullScreen))
+        let top = window.coordinate(withNormalizedOffset: .zero)
+        for y: CGFloat in [100, 0, 1] { top.withOffset(CGVector(dx: greenX, dy: y)).hover() }
+        XCTAssertTrue(waitForCondition { self.greenPoint(x: greenX, in: window) != nil })
+        let point = try XCTUnwrap(greenPoint(x: greenX, in: window))
+        top.withOffset(point).click()
+        XCTAssertTrue(waitForCondition(normalWindow), "The revealed green control must leave full screen")
+        XCTAssertEqual(window.frame.width, normal.width, accuracy: 1)
+        green.click()
+        XCTAssertTrue(waitForCondition(fullScreen))
+        let menu = app.menuBars.menuBarItems["View"]
+        for y: CGFloat in [0, 1] { top.withOffset(CGVector(dx: menu.frame.midX, dy: y)).hover() }
+        menu.click()
+        let exit = app.menuItems["Exit Full Screen"]
+        XCTAssertTrue(exit.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForCondition { exit.isHittable })
+        exit.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        XCTAssertTrue(waitForCondition(normalWindow), "The View menu must leave full screen")
+        XCTAssertEqual(window.frame.width, normal.width, accuracy: 1)
+    }
+
+    private func greenPoint(x: CGFloat, in window: XCUIElement) -> CGVector? {
+        guard let image = NSBitmapImageRep(data: XCUIScreen.main.screenshot().pngRepresentation) else { return nil }
+        let scale = CGFloat(image.pixelsWide) / window.frame.width
+        let centerX = Int(x * scale), radius = Int(7 * scale)
+        var rows: [Int] = []
+        for row in 0..<min(image.pixelsHigh, Int(100 * scale)) {
+            let count = (max(0, centerX - radius)...min(image.pixelsWide - 1, centerX + radius)).filter { column in
+                guard let colour = image.colorAt(x: column, y: row)?.usingColorSpace(.deviceRGB) else { return false }
+                return colour.greenComponent > 0.5 && colour.greenComponent > colour.redComponent * 1.25 && colour.greenComponent > colour.blueComponent * 1.3
+            }.count
+            if count >= 3 { rows.append(row) }
+        }
+        guard rows.count >= 6, let first = rows.first, let last = rows.last else { return nil }
+        return CGVector(dx: x, dy: CGFloat(first + last) / (2 * scale))
+    }
+
+    private func waitForCondition(_ ready: @escaping () -> Bool) -> Bool {
+        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in ready() }, object: nil)
+        return XCTWaiter.wait(for: [expectation], timeout: 5) == .completed
     }
 
     private func selectFirst() {

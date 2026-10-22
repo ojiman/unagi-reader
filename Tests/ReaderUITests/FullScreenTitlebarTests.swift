@@ -33,6 +33,44 @@ extension SplitViewFoldTests {
         }
     }
 
+    @Suite(.serialized) @MainActor struct FullScreenFailureTests {
+        @MainActor private final class WindowDelegate: NSObject, NSWindowDelegate {
+            var entryFailures = 0
+            var exitFailures = 0
+            func windowDidFailToEnterFullScreen(_ window: NSWindow) { entryFailures += 1 }
+            func windowDidFailToExitFullScreen(_ window: NSWindow) { exitFailures += 1 }
+            func windowShouldClose(_ sender: NSWindow) -> Bool { false }
+        }
+
+        @Test(arguments: [true, false])
+        func aFailedTransitionRestoresThePreviousContentMode(entering: Bool) throws {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
+                                  styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            defer { window.close() }
+            let original = WindowDelegate()
+            window.delegate = original
+            let center = NotificationCenter()
+            let anchor = FullScreenTitlebarFix.Anchor(center: center)
+            try #require(window.contentView).addSubview(anchor)
+            center.post(name: NSWindow.willEnterFullScreenNotification, object: window)
+            if entering {
+                window.delegate?.windowDidFailToEnterFullScreen?(window)
+                #expect(window.styleMask.contains(.fullSizeContentView))
+            } else {
+                center.post(name: NSWindow.willExitFullScreenNotification, object: window)
+                window.delegate?.windowDidFailToExitFullScreen?(window)
+                #expect(!window.styleMask.contains(.fullSizeContentView))
+            }
+            #expect(original.entryFailures == (entering ? 1 : 0))
+            #expect(original.exitFailures == (entering ? 0 : 1))
+            // A window delegate's optional method and its return value still reach the original receiver.
+            #expect(window.delegate?.windowShouldClose?(window) == false)
+            anchor.removeFromSuperview()
+            #expect(window.delegate === original)
+        }
+    }
+
     @Suite(.serialized) @MainActor struct FullScreenListTopTests {
         /// The first article stays at the same height below the band and the heading, whether the title bar lies under the content
         /// (a normal window) or not (full screen). In full screen it went up under the heading (#373).
