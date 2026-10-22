@@ -196,16 +196,24 @@ import Carbon
         XCTAssertTrue(green.exists)
         let greenX = green.frame.midX - normal.minX
         func fullScreen() -> Bool { !green.exists && window.frame.height > normal.height + 1 }
-        func normalWindow() -> Bool { green.exists && abs(window.frame.height - normal.height) < 1 }
+        var fullScreenFrame = CGRect.zero
+        func normalWindow() -> Bool { green.exists && window.frame.height < fullScreenFrame.height - 1 }
+        func checkRestoredSize() {
+            print("Full-screen frames: before=\(normal), full=\(fullScreenFrame), after=\(window.frame), green=\(green.exists)")
+            XCTAssertEqual(window.frame.height, normal.height, accuracy: 1, "The window must regain its old height")
+            XCTAssertEqual(window.frame.width, normal.width, accuracy: 1, "The window must regain its old width")
+        }
         green.click()
         XCTAssertTrue(waitForCondition(fullScreen))
+        fullScreenFrame = window.frame
+        print("Full-screen frames: before=\(normal), full=\(fullScreenFrame)")
         let top = window.coordinate(withNormalizedOffset: .zero)
         for y: CGFloat in [100, 0, 1] { top.withOffset(CGVector(dx: greenX, dy: y)).hover() }
         XCTAssertTrue(waitForCondition { self.greenPoint(x: greenX, in: window) != nil })
         let point = try XCTUnwrap(greenPoint(x: greenX, in: window))
         top.withOffset(point).click()
         XCTAssertTrue(waitForCondition(normalWindow), "The revealed green control must leave full screen")
-        XCTAssertEqual(window.frame.width, normal.width, accuracy: 1)
+        checkRestoredSize()
         green.click()
         XCTAssertTrue(waitForCondition(fullScreen))
         let menu = app.menuBars.menuBarItems["View"]
@@ -216,7 +224,7 @@ import Carbon
         XCTAssertTrue(waitForCondition { exit.isHittable })
         exit.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         XCTAssertTrue(waitForCondition(normalWindow), "The View menu must leave full screen")
-        XCTAssertEqual(window.frame.width, normal.width, accuracy: 1)
+        checkRestoredSize()
     }
 
     private func greenPoint(x: CGFloat, in window: XCUIElement) -> CGVector? {
