@@ -4,26 +4,35 @@ import ReaderCore
 import Testing
 @testable import UnagiReader
 
-/// Full screen (#373). A hosted test cannot reveal the menu bar and click the green button; the packaged app run is in the PR.
-@Suite(EnglishLanguage()) @MainActor struct FullScreenTitlebarTests {
-    /// With content under the title bar, the green button that came down with the menu bar sent its click to the content, and the
-    /// window could not leave full screen. The content leaves the title bar in full screen and goes back under it before the window
-    /// returns to its frame.
-    /// The steps are called directly: a posted full-screen notification reaches AppKit too, and the hosted key tests that ran beside
-    /// it failed.
-    @Test func theContentLeavesTheTitleBarOnlyInFullScreen() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
-                              styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        defer { window.close() }
-        FullScreenTitlebarFix.Anchor.entering(window)
-        #expect(!window.styleMask.contains(.fullSizeContentView))
-        FullScreenTitlebarFix.Anchor.leaving(window)
-        #expect(window.styleMask.contains(.fullSizeContentView))
-    }
-}
-
 extension SplitViewFoldTests {
+    /// A private notification center tests the wiring without sending synthetic full-screen notices to AppKit.
+    /// Real green-button clicks still need the packaged app (#373).
+    @Suite(.serialized) @MainActor struct FullScreenTitlebarTests {
+        @Test func theAttachedWindowReceivesTheFullScreenChanges() {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
+                                  styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+            let other = NSWindow(contentRect: window.contentView!.bounds,
+                                 styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            other.isReleasedWhenClosed = false
+            defer { window.close(); other.close() }
+            let center = NotificationCenter()
+            let anchor = FullScreenTitlebarFix.Anchor(center: center)
+            window.contentView!.addSubview(anchor)
+            center.post(name: NSWindow.willEnterFullScreenNotification, object: other)
+            #expect(window.styleMask.contains(.fullSizeContentView))
+            for _ in 0..<3 {
+                center.post(name: NSWindow.willEnterFullScreenNotification, object: window)
+                #expect(!window.styleMask.contains(.fullSizeContentView))
+                center.post(name: NSWindow.willExitFullScreenNotification, object: window)
+                #expect(window.styleMask.contains(.fullSizeContentView))
+            }
+            anchor.removeFromSuperview()
+            center.post(name: NSWindow.willEnterFullScreenNotification, object: window)
+            #expect(window.styleMask.contains(.fullSizeContentView), "A detached anchor must stop changing its old window")
+        }
+    }
+
     @Suite(.serialized) @MainActor struct FullScreenListTopTests {
         /// The first article stays at the same height below the band and the heading, whether the title bar lies under the content
         /// (a normal window) or not (full screen). In full screen it went up under the heading (#373).

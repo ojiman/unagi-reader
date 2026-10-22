@@ -9,13 +9,19 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
     static func dismantleNSView(_ view: Anchor, coordinator: ()) { view.stopObserving() }
 
     final class Anchor: NSView {
+        private let center: NotificationCenter
         private var observers: [NSObjectProtocol] = []
+
+        init(center: NotificationCenter = .default) {
+            self.center = center
+            super.init(frame: .zero)
+        }
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             stopObserving()
             guard let window else { return }
-            let center = NotificationCenter.default
             observers.append(center.addObserver(forName: NSWindow.willEnterFullScreenNotification, object: window, queue: .main) { [weak window] _ in
                 MainActor.assumeIsolated { if let window { Self.entering(window) } }
             })
@@ -29,7 +35,7 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
         static func entering(_ window: NSWindow) { window.styleMask.remove(.fullSizeContentView) }
         static func leaving(_ window: NSWindow) { window.styleMask.insert(.fullSizeContentView) }
         func stopObserving() {
-            for observer in observers { NotificationCenter.default.removeObserver(observer) }
+            for observer in observers { center.removeObserver(observer) }
             observers = []
         }
     }
