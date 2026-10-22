@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// In full screen the window's content does not run under the title bar. With full-size content, the title bar that comes down
-/// with the menu bar drew the window buttons, but their clicks went to the content below them, and the green button could not
-/// leave full screen (#373). The normal window keeps its hidden title bar (decision 0057).
+/// Use AppKit's detached full-screen toolbar for the revealed window controls (#373). Normal windows have no toolbar and keep
+/// their custom bands (decision 0057). This component does not change the content mode or correct the window frame.
 struct FullScreenTitlebarFix: NSViewRepresentable {
     func makeNSView(context: Context) -> Anchor { Anchor() }
     func updateNSView(_ view: Anchor, context: Context) {}
@@ -12,15 +11,12 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
         private let center: NotificationCenter
         private var observers: [NSObjectProtocol] = []
         private weak var observedWindow: NSWindow?
+        private let toolbar = NSToolbar(identifier: "FullScreenControls")
+        private var originalToolbar: NSToolbar?
+        private var originalToolbarVisible = false
         private var windowDelegate: WindowDelegate?
-        private var normalSize: NSSize?
-
-        init(center: NotificationCenter = .default) {
-            self.center = center
-            super.init(frame: .zero)
-        }
+        init(center: NotificationCenter = .default) { self.center = center; super.init(frame: .zero) }
         required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             stopObserving()
@@ -29,48 +25,40 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
             observedWindow = window
             windowDelegate = delegate
             window.delegate = delegate
-            observers.append(center.addObserver(forName: NSWindow.willEnterFullScreenNotification, object: window, queue: .main) { [weak self, weak window] _ in
-                MainActor.assumeIsolated {
-                    guard let self, let window else { return }
-                    if self.normalSize == nil { self.normalSize = window.frame.size }
-                }
-            })
-            // Changing a normal window's content mode changes its frame; let AppKit enter first.
-            observers.append(center.addObserver(forName: NSWindow.didEnterFullScreenNotification, object: window, queue: .main) { [weak window] _ in
-                MainActor.assumeIsolated { if let window { Self.entering(window) } }
-            })
-            // Put the content mode back before AppKit restores the normal frame.
-            observers.append(center.addObserver(forName: NSWindow.willExitFullScreenNotification, object: window, queue: .main) { [weak window] _ in
-                MainActor.assumeIsolated { if let window { Self.leaving(window) } }
-            })
-            // A window restored in full screen is already there.
-            if window.styleMask.contains(.fullScreen) { Self.entering(window) }
+            for name in [NSWindow.willExitFullScreenNotification, NSWindow.didExitFullScreenNotification] {
+                observers.append(center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.showToolbar(false) }
+                })
+            }
+            if window.styleMask.contains(.fullScreen) { showToolbar(true) }
         }
-        static func entering(_ window: NSWindow) { window.styleMask.remove(.fullSizeContentView) }
-        static func leaving(_ window: NSWindow) { window.styleMask.insert(.fullSizeContentView) }
-        func restoreNormalSize(_ window: NSWindow) {
-            guard let size = normalSize else { return }
-            normalSize = nil
-            guard window.frame.size != size else { return }
-            // Small displays can return at a different size. Preserve the actual size and AppKit's restored top-left.
-            var frame = window.frame
-            frame.origin.y += frame.height - size.height
-            frame.size = size
-            window.setFrame(frame, display: true)
+        func showToolbar(_ visible: Bool) {
+            guard let window = observedWindow else { return }
+            if visible {
+                if window.toolbar !== toolbar {
+                    originalToolbar = window.toolbar
+                    originalToolbarVisible = window.toolbar?.isVisible ?? false
+                    window.toolbar = toolbar
+                }
+                toolbar.isVisible = true
+            } else {
+                if window.toolbar === toolbar {
+                    window.toolbar = originalToolbar
+                    originalToolbar?.isVisible = originalToolbarVisible
+                }
+                originalToolbar = nil
+            }
         }
         func stopObserving() {
             for observer in observers { center.removeObserver(observer) }
             observers = []
-            if let window = observedWindow, window.delegate === windowDelegate {
-                window.delegate = windowDelegate?.original
-            }
+            showToolbar(false)
+            if let window = observedWindow, window.delegate === windowDelegate { window.delegate = windowDelegate?.original }
             observedWindow = nil
             windowDelegate = nil
-            normalSize = nil
         }
     }
 
-    /// Run the existing exit handler before correcting its restored frame; forward other delegate messages unchanged.
     final class WindowDelegate: NSObject, NSWindowDelegate {
         weak var original: (any NSWindowDelegate)?
         private weak var anchor: Anchor?
@@ -79,7 +67,6 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
             self.anchor = anchor
             super.init()
         }
-
         nonisolated override func responds(to selector: Selector!) -> Bool {
             super.responds(to: selector) || (original?.responds(to: selector) ?? false)
         }
@@ -87,18 +74,19 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
             if let original, original.responds(to: selector) { return original }
             return super.forwardingTarget(for: selector)
         }
-        func windowDidExitFullScreen(_ notification: Notification) {
-            original?.windowDidExitFullScreen?(notification)
-            if let window = notification.object as? NSWindow { anchor?.restoreNormalSize(window) }
+        func window(_ window: NSWindow, willUseFullScreenPresentationOptions proposedOptions: NSApplication.PresentationOptions) -> NSApplication.PresentationOptions {
+            let options = original?.window?(window, willUseFullScreenPresentationOptions: proposedOptions) ?? proposedOptions
+            anchor?.showToolbar(options.contains(.fullScreen))
+            guard options.contains([.fullScreen, .autoHideMenuBar]) else { return options }
+            return options.union(.autoHideToolbar)
         }
         func windowDidFailToEnterFullScreen(_ window: NSWindow) {
             original?.windowDidFailToEnterFullScreen?(window)
-            Anchor.leaving(window)
-            anchor?.restoreNormalSize(window)
+            anchor?.showToolbar(false)
         }
         func windowDidFailToExitFullScreen(_ window: NSWindow) {
             original?.windowDidFailToExitFullScreen?(window)
-            Anchor.entering(window)
+            anchor?.showToolbar(true)
         }
     }
 }

@@ -191,6 +191,14 @@ import Carbon
     // #373: use real input on the packaged window, including the transient green control that has no AX element.
     private func checkFullScreenControls() throws {
         let window = app.windows.firstMatch
+        // The CI desktop initially clamps the requested 1240 × 810 pt size. Also exercise a smaller, person-resized
+        // window locally: restoring the requested default instead of this frame must fail on either desktop.
+        let targetSize = CGSize(width: 1000, height: 650)
+        let beforeResize = window.frame
+        let edge = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(CGVector(dx: 1, dy: 1))
+        let target = window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: targetSize.width + 1, dy: targetSize.height + 1))
+        edge.click(forDuration: 0.1, thenDragTo: target)
+        XCTAssertTrue(waitForCondition { abs(window.frame.width - targetSize.width) < 3 && abs(window.frame.height - targetSize.height) < 3 }, "Resized window: \(window.frame), before: \(beforeResize)")
         let normal = window.frame
         func keepImage(_ name: String, _ screenshot: XCUIScreenshot) {
             let attachment = XCTAttachment(screenshot: screenshot)
@@ -245,17 +253,19 @@ import Carbon
     private func greenPoint(x: CGFloat, in window: XCUIElement) -> CGVector? {
         guard let image = NSBitmapImageRep(data: XCUIScreen.main.screenshot().pngRepresentation) else { return nil }
         let scale = CGFloat(image.pixelsWide) / window.frame.width
-        let centerX = Int(x * scale), radius = Int(7 * scale)
-        var rows: [Int] = []
+        let centerX = Int(x * scale), radius = Int(20 * scale)
+        var points: [(x: Int, y: Int)] = []
         for row in 0..<min(image.pixelsHigh, Int(100 * scale)) {
-            let count = (max(0, centerX - radius)...min(image.pixelsWide - 1, centerX + radius)).filter { column in
+            let columns = (max(0, centerX - radius)...min(image.pixelsWide - 1, centerX + radius)).filter { column in
                 guard let colour = image.colorAt(x: column, y: row)?.usingColorSpace(.deviceRGB) else { return false }
                 return colour.greenComponent > 0.5 && colour.greenComponent > colour.redComponent * 1.25 && colour.greenComponent > colour.blueComponent * 1.3
-            }.count
-            if count >= 3 { rows.append(row) }
+            }
+            if columns.count >= 3 { points.append(contentsOf: columns.map { ($0, row) }) }
         }
-        guard rows.count >= 6, let first = rows.first, let last = rows.last else { return nil }
-        return CGVector(dx: x, dy: CGFloat(first + last) / (2 * scale))
+        guard let minX = points.map(\.x).min(), let maxX = points.map(\.x).max(),
+              let minY = points.map(\.y).min(), let maxY = points.map(\.y).max(), maxY - minY >= 6 else { return nil }
+        // Detached native controls can move horizontally: click the observed green circle, not its normal-window x.
+        return CGVector(dx: CGFloat(minX + maxX) / (2 * scale), dy: CGFloat(minY + maxY) / (2 * scale))
     }
 
     private func waitForCondition(_ ready: @escaping () -> Bool) -> Bool {

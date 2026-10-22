@@ -18,7 +18,7 @@ struct NativeArticleList: NSViewRepresentable {
     var initialTopOffset: Double = 0
     var onTopOffset: ((UUID, Double) -> Void)? = nil
     /// Room above the first row: the band and the title block (`ListHeader`), from the top of the column. It does not depend on the
-    /// window's title bar, which is under the content in a normal window and not in full screen (#373).
+    /// window's title bar or detached full-screen controls (#373).
     var headerInset: CGFloat = 0
 
     /// The list is drawn on the same surface as the article and the note.

@@ -5,140 +5,110 @@ import Testing
 @testable import UnagiReader
 
 extension SplitViewFoldTests {
-    /// A private notification center tests the wiring without sending synthetic full-screen notices to AppKit.
-    /// Real green-button clicks still need the packaged app (#373).
+    /// Private notifications exercise attachment without sending fake full-screen events to AppKit.
     @Suite(.serialized) @MainActor struct FullScreenTitlebarTests {
-        @Test func entryLeavesTheNormalFrameAloneUntilTheSystemHasEntered() throws {
-            let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 1024, height: 674),
+        @Test func theFullScreenToolbarDoesNotChangeTheNormalFrame() throws {
+            let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 1000, height: 650),
                                   styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
             defer { window.close() }
             let center = NotificationCenter()
             let anchor = FullScreenTitlebarFix.Anchor(center: center)
+            let frame = window.frame
             try #require(window.contentView).addSubview(anchor)
-            let normal = window.frame
-            center.post(name: NSWindow.willEnterFullScreenNotification, object: window)
-            #expect(window.frame == normal, "AppKit must begin entry with the person's normal frame")
-            #expect(window.styleMask.contains(.fullSizeContentView))
-            center.post(name: NSWindow.didEnterFullScreenNotification, object: window)
-            #expect(!window.styleMask.contains(.fullSizeContentView))
-        }
-
-        @Test func theAttachedWindowReceivesTheFullScreenChanges() {
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
-                                  styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
-            let other = NSWindow(contentRect: window.contentView!.bounds,
-                                 styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
-            window.isReleasedWhenClosed = false
-            other.isReleasedWhenClosed = false
-            defer { window.close(); other.close() }
-            let center = NotificationCenter()
-            let anchor = FullScreenTitlebarFix.Anchor(center: center)
-            window.contentView!.addSubview(anchor)
-            center.post(name: NSWindow.didEnterFullScreenNotification, object: other)
-            #expect(window.styleMask.contains(.fullSizeContentView))
+            #expect(window.toolbar == nil)
+            #expect(window.frame == frame)
             for _ in 0..<3 {
-                center.post(name: NSWindow.willEnterFullScreenNotification, object: window)
+                let options: NSApplication.PresentationOptions = [.fullScreen, .autoHideMenuBar, .autoHideDock]
+                _ = window.delegate?.window?(window, willUseFullScreenPresentationOptions: options)
+                let toolbar = try #require(window.toolbar)
+                #expect(toolbar.isVisible)
+                #expect(window.frame == frame, "Preparing native full-screen controls must preserve the normal frame")
                 #expect(window.styleMask.contains(.fullSizeContentView))
-                center.post(name: NSWindow.didEnterFullScreenNotification, object: window)
-                #expect(!window.styleMask.contains(.fullSizeContentView))
+                window.delegate?.windowDidFailToEnterFullScreen?(window)
+                #expect(window.toolbar == nil)
+                _ = window.delegate?.window?(window, willUseFullScreenPresentationOptions: options)
                 center.post(name: NSWindow.willExitFullScreenNotification, object: window)
-                #expect(window.styleMask.contains(.fullSizeContentView))
+                #expect(window.toolbar == nil)
+                window.delegate?.windowDidFailToExitFullScreen?(window)
+                #expect(toolbar.isVisible)
+                center.post(name: NSWindow.didExitFullScreenNotification, object: window)
+                #expect(window.toolbar == nil)
+                #expect(window.frame == frame)
             }
             anchor.removeFromSuperview()
-            center.post(name: NSWindow.didEnterFullScreenNotification, object: window)
-            #expect(window.styleMask.contains(.fullSizeContentView), "A detached anchor must stop changing its old window")
+            #expect(window.toolbar == nil)
+            _ = window.delegate?.window?(window, willUseFullScreenPresentationOptions: [.fullScreen, .autoHideMenuBar])
+            #expect(window.toolbar == nil)
         }
     }
 
-    @Suite(.serialized) @MainActor struct FullScreenFrameTests {
+    @Suite(.serialized) @MainActor struct FullScreenPresentationTests {
         @MainActor private final class WindowDelegate: NSObject, NSWindowDelegate {
-            var exitFrame: NSRect?
-            var exits = 0
-            func windowDidExitFullScreen(_ notification: Notification) {
-                exits += 1
-                if let window = notification.object as? NSWindow, let exitFrame {
-                    window.setFrame(exitFrame, display: false)
-                }
-            }
-        }
-        @Test func eachExitRestoresTheActualNormalSize() throws {
-            let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 1024, height: 674),
-                                  styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
-            window.isReleasedWhenClosed = false
-            defer { window.close() }
-            let original = WindowDelegate()
-            window.delegate = original
-            let center = NotificationCenter()
-            let anchor = FullScreenTitlebarFix.Anchor(center: center)
-            try #require(window.contentView).addSubview(anchor)
-            for size in [NSSize(width: 1024, height: 674), NSSize(width: 1000, height: 650)] {
-                window.setFrame(NSRect(origin: NSPoint(x: 100, y: 100), size: size), display: false)
-                center.post(name: NSWindow.willEnterFullScreenNotification, object: window)
-                center.post(name: NSWindow.willExitFullScreenNotification, object: window)
-                // Reproduce a different normal size after the full-screen transition on a small desktop (#373).
-                window.setFrame(NSRect(x: 150, y: 200, width: 1240, height: 810), display: false)
-                original.exitFrame = window.frame
-                let nativeTop = window.frame.maxY
-                center.post(name: NSWindow.didExitFullScreenNotification, object: window)
-                window.delegate?.windowDidExitFullScreen?(Notification(name: NSWindow.didExitFullScreenNotification, object: window))
-                #expect(window.frame.size == size)
-                #expect(window.frame.minX == 150)
-                #expect(window.frame.maxY == nativeTop, "Keep AppKit's restored top-left position")
-            }
-            #expect(original.exits == 2, "Forward each exit once before restoring the size")
-            original.exitFrame = nil
-            let restored = window.frame
-            center.post(name: NSWindow.didExitFullScreenNotification, object: window)
-            window.delegate?.windowDidExitFullScreen?(Notification(name: NSWindow.didExitFullScreenNotification, object: window))
-            #expect(window.frame == restored, "An extra exit notification must not reuse an old size")
-        }
-    }
-
-    @Suite(.serialized) @MainActor struct FullScreenFailureTests {
-        @MainActor private final class WindowDelegate: NSObject, NSWindowDelegate {
+            var calls = 0
+            var removeMenuHiding = false
             var entryFailures = 0
             var exitFailures = 0
             func windowDidFailToEnterFullScreen(_ window: NSWindow) { entryFailures += 1 }
             func windowDidFailToExitFullScreen(_ window: NSWindow) { exitFailures += 1 }
-            func windowShouldClose(_ sender: NSWindow) -> Bool { false }
+            func windowShouldClose(_ window: NSWindow) -> Bool { false }
+            func window(_ window: NSWindow, willUseFullScreenPresentationOptions options: NSApplication.PresentationOptions) -> NSApplication.PresentationOptions {
+                calls += 1
+                var result = options.union(.disableHideApplication)
+                if removeMenuHiding { result.remove(.autoHideMenuBar) }
+                return result
+            }
         }
 
-        @Test(arguments: [true, false])
-        func aFailedTransitionRestoresThePreviousContentMode(entering: Bool) throws {
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
-                                  styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+        @Test func nativePresentationPreservesTheOriginalOptionsAndNormalFrame() throws {
+            let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 1000, height: 650),
+                                  styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
             defer { window.close() }
             let original = WindowDelegate()
             window.delegate = original
-            let center = NotificationCenter()
-            let anchor = FullScreenTitlebarFix.Anchor(center: center)
+            let anchor = FullScreenTitlebarFix.Anchor(center: NotificationCenter())
             try #require(window.contentView).addSubview(anchor)
-            let normalSize = window.frame.size
-            center.post(name: NSWindow.willEnterFullScreenNotification, object: window)
-            if entering {
-                window.setFrame(NSRect(x: 0, y: 0, width: 1240, height: 810), display: false)
-                window.delegate?.windowDidFailToEnterFullScreen?(window)
-                #expect(window.styleMask.contains(.fullSizeContentView))
-                #expect(window.frame.size == normalSize)
-            } else {
-                center.post(name: NSWindow.didEnterFullScreenNotification, object: window)
-                center.post(name: NSWindow.willExitFullScreenNotification, object: window)
-                window.delegate?.windowDidFailToExitFullScreen?(window)
-                #expect(!window.styleMask.contains(.fullSizeContentView))
-                center.post(name: NSWindow.willExitFullScreenNotification, object: window)
-                window.setFrame(NSRect(x: 0, y: 0, width: 1240, height: 810), display: false)
-                center.post(name: NSWindow.didExitFullScreenNotification, object: window)
-                window.delegate?.windowDidExitFullScreen?(Notification(name: NSWindow.didExitFullScreenNotification, object: window))
-                #expect(window.frame.size == normalSize, "A failed exit must keep the original size for the next attempt")
-            }
-            #expect(original.entryFailures == (entering ? 1 : 0))
-            #expect(original.exitFailures == (entering ? 0 : 1))
-            // A window delegate's optional method and its return value still reach the original receiver.
+            let frame = window.frame
+            let proposed: NSApplication.PresentationOptions = [.fullScreen, .autoHideMenuBar, .autoHideDock]
+            let options = window.delegate?.window?(window, willUseFullScreenPresentationOptions: proposed)
+            #expect(options == proposed.union([.autoHideToolbar, .disableHideApplication]))
+            #expect(original.calls == 1)
+            #expect(window.frame == frame)
+            #expect(window.styleMask.contains(.fullSizeContentView))
+            // Respect the existing delegate and an always-visible menu bar; autoHideToolbar would be invalid without hiding it.
+            original.removeMenuHiding = true
+            let visibleMenu = window.delegate?.window?(window, willUseFullScreenPresentationOptions: proposed)
+            #expect(visibleMenu == proposed.subtracting(.autoHideMenuBar).union(.disableHideApplication))
+            window.delegate?.windowDidFailToEnterFullScreen?(window)
+            window.delegate?.windowDidFailToExitFullScreen?(window)
+            #expect(original.entryFailures == 1)
+            #expect(original.exitFailures == 1)
             #expect(window.delegate?.windowShouldClose?(window) == false)
             anchor.removeFromSuperview()
             #expect(window.delegate === original)
+        }
+
+        @Test(arguments: [false, true], [false, true])
+        func detachPreservesTheExistingToolbarAndItsVisibility(visible: Bool, replaced: Bool) throws {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1000, height: 650),
+                                  styleMask: [.titled, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            defer { window.close() }
+            let original = NSToolbar(identifier: "ExistingControls")
+            window.toolbar = original
+            original.isVisible = visible
+            let anchor = FullScreenTitlebarFix.Anchor(center: NotificationCenter())
+            try #require(window.contentView).addSubview(anchor)
+            #expect(window.toolbar === original)
+            #expect(original.isVisible == visible)
+            _ = window.delegate?.window?(window, willUseFullScreenPresentationOptions: [.fullScreen, .autoHideMenuBar])
+            #expect(window.toolbar !== original)
+            let newer = NSToolbar(identifier: "NewerControls")
+            if replaced { window.toolbar = newer; newer.isVisible = false }
+            anchor.removeFromSuperview()
+            #expect(window.toolbar === (replaced ? newer : original))
+            #expect(window.toolbar?.isVisible == (replaced ? false : visible))
         }
     }
 
