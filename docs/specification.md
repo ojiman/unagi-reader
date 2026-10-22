@@ -153,6 +153,7 @@ normal                original page (v)     note beside article   note with the 
 
 - One style: monochrome symbols of one size and one hit area; colour only for a state (a filled Star, a filled translate). No links and no accent-coloured symbols in a band.
 - Dragging an empty part of a band moves the window; a double-click does what the system setting says.
+- In full screen the bands stay at the top of the screen and the columns keep their places. When the pointer reveals the menu bar, the system's title bar comes down with it, over the top of the columns, with the window buttons, add subscription and refresh. This temporary bar uses the system appearance, also in Sepia. The green button, the system's full-screen shortcut and 「表示」 (View) ▸ 「フルスクリーンを終了」 (Exit Full Screen) leave full screen, and the window returns at its old size. If the displays change, the restored window stays accessible on a current screen.
 - Every band control also has a menu bar command; the keys stay as they are (3.1.5).
 
 **Headings**
