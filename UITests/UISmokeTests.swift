@@ -17,9 +17,6 @@ import Carbon
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
             app = XCUIApplication(url: url)
             app.launchArguments = ["--data-directory", directory.path, "--seed-demo"]
-            if name.contains("testLaunchSelectionAndReadingKeys") {
-                app.launchArguments += ["-AppleMenuBarVisibleInFullscreen", "NO"]
-            }
             app.launch()
             let launchedState = app.state
             inputSource = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
