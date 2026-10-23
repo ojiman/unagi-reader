@@ -197,6 +197,8 @@ normal                original page (v)     note beside article   note with the 
 - Opening an article shows the feed's body (or the RSS summary) as it is; it never fetches the original page or swaps the text (RSS first, decision 0033). For more, `v` (in the app) or `b` (the browser).
 - The app never takes text from the original page (decision 0056): no full-text fetch, and no line under the article that says how much text there is.
 - Links and quotes of the feed's text are kept. A link opens in the default browser. Quotes look different from the text. A saved body without layout data is shown as plain text.
+- The feed's HTML is shown as the feed gives it, with no handling per site (decision 0066). Images appear where the feed puts them; an image in a link opens the link; the representative image is not shown a second time when the body holds it. A late, failed or offline image never moves the text being read. [not built #406]
+- Headings, lists (with bullets or numbers), code (monospaced), emphasis and simple tables keep their look; sizes follow the article text size. [not built #407]
 - The next article comes in from below, the previous from above, short and quick (following the list order). The text area does not change height when loading ends.
 - An article becomes read when its body or RSS summary is actually shown in the article area. Scrolling the list or fetching the body does not mark it read. Receiving or showing it again does not change the first read time.
 
