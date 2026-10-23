@@ -89,6 +89,49 @@ import Carbon
             XCTAssertEqual(window.frame.minX, start.minX, accuracy: 1)
             XCTAssertEqual(app.state, .runningForeground)
         }
+        if abs(width - 1170) < 4 {
+            // #381: after the no-drag baseline, try a newer choice in both directions.
+            for targetWidth: CGFloat in [340, 460] {
+                // Cache the normal-layout coordinates before folding; do not wait for restoration before dragging.
+                let from = window.coordinate(withNormalizedOffset: .zero).withOffset(
+                    CGVector(dx: listViewport.frame.minX - start.minX + listWidth + splitter.frame.width / 2,
+                             dy: start.height / 2))
+                let to = from.withOffset(CGVector(dx: targetWidth - listWidth, dy: 0))
+                window.typeKey("n", modifierFlags: [])
+                let editor = app.textViews["Note"]
+                XCTAssertTrue(editor.waitForExistence(timeout: 5))
+                let closedAt = ProcessInfo.processInfo.systemUptime
+                window.typeKey(.escape, modifierFlags: [])
+                let dragRequestedAfter = ProcessInfo.processInfo.systemUptime - closedAt
+                from.click(forDuration: 0.05, thenDragTo: to)
+                let elapsed = ProcessInfo.processInfo.systemUptime - closedAt
+                print("#381 window=\(width), target=\(targetWidth), close-to-drag-request=\(dragRequestedAfter)s, close-to-drag-complete=\(elapsed)s, actual=\(listViewport.frame.width)")
+                XCTAssertTrue(editor.waitForNonExistence(timeout: 5))
+                XCTAssertEqual(listViewport.frame.width, targetWidth, accuracy: 3)
+                // Observe beyond the restoration task's two-second limit, rather than accepting one matching frame.
+                let overridden = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                    abs(listViewport.frame.width - targetWidth) > 3
+                }, object: nil)
+                overridden.isInverted = true
+                XCTAssertEqual(XCTWaiter.wait(for: [overridden], timeout: 2.2), .completed,
+                               "A newer divider choice must not be restored to the old width")
+                XCTAssertEqual(window.frame.width, start.width, accuracy: 1)
+                // A later fold must remember the new choice too.
+                window.typeKey("n", modifierFlags: [])
+                XCTAssertTrue(editor.waitForExistence(timeout: 5))
+                window.typeKey(.escape, modifierFlags: [])
+                XCTAssertTrue(editor.waitForNonExistence(timeout: 5))
+                XCTAssertEqual(listViewport.frame.width, targetWidth, accuracy: 3)
+                // Reset the baseline for the other direction.
+                let currentDivider = app.splitters.allElementsBoundByIndex.first {
+                    abs($0.frame.minX - listViewport.frame.maxX) < 1
+                }
+                XCTAssertNotNil(currentDivider)
+                currentDivider?.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                    .click(forDuration: 0.1, thenDragTo: listRight)
+                XCTAssertEqual(listViewport.frame.width, listWidth, accuracy: 3)
+            }
+        }
     }
 
     // Checks PRD-01: a real click and j/k must select and display the corresponding article.
