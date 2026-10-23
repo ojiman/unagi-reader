@@ -26,6 +26,8 @@ There is no backend, no account and no AI proxy. The app has no AI of its own ([
 
 ## 3. Store
 
+Before any directory, store, cache or refresh initialization, `AppDataDirectory` requires an explicit path for the synthetic bundle ID (`xyz.ojima.UnagiReader.Synthetic`) and its dotted child IDs. It refuses the normal library and descendants, resolving symlinks and comparing paths without case. Other bundle IDs keep the normal default/explicit-directory behavior.
+
 `ReaderStore.schema` has six models: `Feed`, `Article`, `ContentSnapshot`, `FeedMembership`, `ReaderSettings`, `Note`.
 
 - An article's identity, first-received and first-read times, Star and memberships are kept apart from its body (`ContentSnapshot`, which expires). `FeedMembership` joins one article to several subscriptions, so counts are not doubled.
