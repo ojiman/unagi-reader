@@ -50,6 +50,24 @@ import ReaderCore
         #expect(tops.count == 2 && tops[1] >= tops[0] + 80)
     }
 
+    /// An image paragraph in a quote is indented with the quoted text, clear of the quote's bar (review of #413).
+    @Test func anImageOnlyQuoteParagraphKeepsItsIndent() throws {
+        let view = ArticleTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        let html = "<blockquote><p><img src='https://img.example/photo.png' width='120' height='80'></p><p>Quoted text</p></blockquote>"
+        let xml = "<rss xmlns:c='http://purl.org/rss/1.0/modules/content/'><channel><title>合成</title><item><guid>a</guid><link>https://img.example/a</link><c:encoded><![CDATA[\(html)]]></c:encoded></item></channel></rss>"
+        let blocks = try #require(try FeedParser.parse(Data(xml.utf8), sourceURL: URL(string: "https://img.example/rss")!).entries.first?.bodyParagraphs)
+        #expect(blocks.map(\.quoteDepth) == [1, 1])
+        view.install(title: "合成", publisher: "合成購読", date: "", paragraphs: blocks.map(\.text), unavailable: nil, bodyParagraphs: blocks)
+        let index = try #require(cells(view).first?.index)
+        let style = try #require(view.textStorage?.attribute(.paragraphStyle, at: index, effectiveRange: nil) as? NSParagraphStyle)
+        #expect(style.headIndent == 20 && style.firstLineHeadIndent == 20)
+        let manager = try #require(view.layoutManager), container = try #require(view.textContainer)
+        let x = manager.boundingRect(forGlyphRange: manager.glyphRange(forCharacterRange: NSRange(location: index, length: 1), actualCharacterRange: nil), in: container).minX
+        let text = (view.string as NSString).range(of: "Quoted text").location
+        let textX = manager.boundingRect(forGlyphRange: manager.glyphRange(forCharacterRange: NSRange(location: text, length: 1), actualCharacterRange: nil), in: container).minX
+        #expect(x == 20 && x == textX)
+    }
+
     @Test func aWideImageFitsTheColumn() throws {
         let view = ArticleTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         let paragraph = BodyParagraph(text: "本文", images: [BodyImage(location: 0, url: "https://img.example/wide.jpg", width: 2000, height: 1000)])

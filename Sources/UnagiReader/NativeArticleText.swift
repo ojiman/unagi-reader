@@ -78,7 +78,8 @@ import ReaderCore
                 let depth = CGFloat(min(block.quoteDepth, 3)) * 20
                 let style = NSMutableParagraphStyle(); style.lineSpacing = 8 * scale; style.paragraphSpacing = 22 * scale
                 style.headIndent = depth; style.firstLineHeadIndent = depth
-                document.addAttributes([.paragraphStyle: style, .foregroundColor: NSColor.secondaryLabelColor], range: range)
+                // With its newline: a paragraph of images only has no text, and its images take the style from it.
+                document.addAttributes([.paragraphStyle: style, .foregroundColor: NSColor.secondaryLabelColor], range: NSRange(location: range.location, length: range.length + 1))
                 indent = depth
             }
             for link in block.links {
