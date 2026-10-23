@@ -26,7 +26,9 @@ Instructions for coding agents (Claude Code, Codex) and the person who reviews t
 test_log=$(mktemp /private/tmp/unagi-reader-tests.XXXXXX)
 swift test --scratch-path /private/tmp/unagi-reader-dogfooding-build > "$test_log" 2>&1 &&
     bash scripts/check-test-log.sh "$test_log"                            # local tests; read "$test_log" for the output
-swift test --scratch-path /private/tmp/unagi-reader-ci-build --force-resolved-versions --disable-keychain --disable-netrc   # CI flags (CI separates the timed filter test)
+local_log=$(mktemp /private/tmp/unagi-reader-local-tests.XXXXXX)
+swift test --scratch-path /private/tmp/unagi-reader-dogfooding-build --filter "$(bash scripts/ci-gate.sh local-tests)" --xunit-output "$local_log.xml" > "$local_log" 2>&1 &&
+    bash scripts/check-test-log.sh "$local_log" "$local_log-swift-testing.xml" # CI-excluded tests; scope in architecture 5
 bash scripts/build-app.sh release                                        # ad hoc signed .build/Unagi Reader.app (debug is the default)
 bash scripts/fetch-ci-app.sh <PR number>                                  # a PR's CI-built app, without the quarantine attribute (needs gh)
 bash scripts/make-synthetic-copy.sh                                      # copies the built app with a synthetic bundle ID; prints the launch command
@@ -39,10 +41,9 @@ bash scripts/test-check-docs.sh
 ```
 
 - **For a manual synthetic run, use the command printed by `make-synthetic-copy.sh`.** It takes the built app (or an app path as its first argument), makes a temporary copy with its own bundle ID and a new data directory, and does not launch it. An optional second argument names a new data directory; the real library and its symlink aliases are refused. The printed command needs `open -n`: without it, `open` can reuse a running Unagi Reader and drop `--args`. Before touching anything, check that the process has the temporary `--data-directory` (`pgrep -fl UnagiReader`) and that the window shows the synthetic subscriptions.
-- **Real-app UI smoke tests:** build Release, then run `bash scripts/run-ui-smoke.sh`. The synthetic-copy helper supplies a separate app; the runner gives it the ID `xyz.ojima.UnagiReader.Synthetic.UISmoke`, local networking and the CI floor macOS 26.6. Each test uses a fresh temporary library. Run one suite at a time on a free, logged-in desktop; Xcode may request UI testing permission. Tests send real keys, select ASCII input and restore the previous input source. The printed result directory (`CI_RESULTS` in CI) holds logs, `.xcresult`, summary and duration. All five tests must pass, none skipped. In CI the job `ui-smoke` runs them on every push to `main` and on manual runs, not for pull requests, and it is not part of `check`. Before merging a change to the screens, run the workflow by hand on its branch (`gh workflow run ci.yml --ref <branch>`; `-f configuration=debug` drives a Debug build). Japanese input, motion feel, VoiceOver, Reduce Motion and macOS 27.0 need the owner (#145).
+- **Verification scope:** choose checks by the change using [architecture 5](docs/architecture.md#5-build-and-ci). The full Swift command above includes local-only tests; it is not a requirement for every small change. For real-app smoke, build Release and run `scripts/run-ui-smoke.sh` locally on macOS 27. Synthetic launch instructions above still apply.
 - **Opt-in store checks** (not in CI during the beta): `bash scripts/prepare-v1-store-fixture.sh <new dir>`, then `UNAGI_READER_V1_FIXTURE_DIR=<dir> swift test …`. The other fixtures are in architecture 3.
-- **CI** (macOS 26 / Xcode 26.6 / Swift 6.3.3) has three jobs. `regression` runs the tests for any change to code. It runs the 10,000-article filter timing test in three separate processes after the other tests; each must keep the 50 ms limit and finish with the expected test result. `release` (optimized build, ad hoc signature, packaged app) runs on a PR only when it changes `Package.swift`, `Package.resolved`, `ThirdPartyNotices.md`, `scripts/build-app.sh`, `Assets/*` or `.github/workflows/*`, and always on `main` and manual runs. `check` is the one required status: it runs the documents check, skips the macOS jobs for a PR of only `docs/**` or Markdown, and otherwise passes only when every due job passed (`scripts/ci-gate.sh`). A PR run usually has no packaged app; run the workflow by hand or build locally. `ui-smoke` (above) runs after `release` on `main` and manual runs, with that job's app. **CodeQL** (`codeql.yml`) is not a required status: a PR gets Python and Actions only; Swift (about 20 minutes) runs on `main`, weekly and by hand.
-- **The local Mac** (macOS 27 / Swift 6.4) is the only place the support floor macOS 27.0 is exercised ([decision 0007](docs/decisions/0007-support-floor-macos-27.md)). Do not use APIs that need the macOS 27 SDK.
+- **CI and version floors:** [architecture 5](docs/architecture.md#5-build-and-ci) defines the jobs, what they prove, SDK limits and local product verification. [README Security](README.md#security) describes the separate security scans.
 
 ## How work is tracked
 
@@ -66,7 +67,7 @@ Several writers may work at once ([decision 0062](docs/decisions/0062-several-wr
 
 ## Starting or resuming
 
-A new thread has no memory of the last one. Rebuild the state from Git and GitHub, not from a summary: the branch, HEAD, uncommitted changes, open PRs, the latest `ui-smoke` result on `main` (`gh run list --workflow ci.yml --branch main`), the relevant part of the specification. Say what is done, what is not, and the next step before changing anything. Reuse an earlier PASS only for the same commit and environment.
+A new thread has no memory of the last one. Rebuild the state from Git and GitHub, not from a summary: the branch, HEAD, uncommitted changes, open PRs, the latest CI result on `main` (`gh run list --workflow ci.yml --branch main`) and relevant local verification, the relevant part of the specification. Say what is done, what is not, and the next step before changing anything. Reuse an earlier PASS only for the same commit and environment.
 
 ## Boundaries
 
@@ -90,13 +91,7 @@ Always:
 5. A save or change the person asked for is never reported as done when it was not (`try?` that drops a failure; text lost because its target is gone). Cancellation, a stale async answer and an action with nothing to act on are legitimate no-ops; keep them distinct.
 6. **A document PR removes what it replaces.** When you add a rule, delete the old wording in the same PR; do not repeat a rule that has a home (vision, specification, architecture, this file) — link to it. A PR that only adds text says why.
 
-By risk:
-
-| Change | Also needed |
-|---|---|
-| Store or model, concurrency, external writes, retention or deletion | All tests; the release build when UI or packaging changes; a synthetic app run for UI; an independent review of a fixed commit by someone other than the writer (docs/review-checklist.md); the environment of each result |
-| UI polish, labels, small behavior | Tests for the changed logic; `git diff --check`; a synthetic run only when a test cannot show it |
-| Documents only | `git diff --check` and `python3 scripts/check_docs.py` |
+Verification by risk is defined in [architecture 5](docs/architecture.md#5-build-and-ci).
 
 Evidence stays small: a verification record only for a risky change or a PASS that 1.0 relies on, at most one per PR, the result in the first three lines. No raw logs or probe code in the repository. A low-risk review is one pass.
 

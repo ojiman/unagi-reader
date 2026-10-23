@@ -483,7 +483,7 @@ The app has **no AI of its own** ([decision 0049](decisions/0049-one-note-and-no
 
 **Platform and policy**
 
-- macOS 27.0 or later (the support floor). CI builds for 26.6 ([decision 0007](decisions/0007-support-floor-macos-27.md)).
+- macOS 27.0 or later (the support floor). CI builds for 26.6 ([decision 0065](decisions/0065-ci-and-local-verification.md)).
 - The source is Apache-2.0. LICENSE and the third-party licenses, copyright notices and NOTICE are shipped. Feeds, articles, trademarks and service terms are not under the app's license.
 - Only code, the specification and synthetic samples and tests are published; never the person's subscriptions, history, articles, note or credentials. Check the diff and the history before publishing.
 - Publishing the source is a separate decision after product acceptance. The App Store and a signed release are not conditions of V1. Approving a policy is not permission to publish or distribute.

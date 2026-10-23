@@ -9,12 +9,6 @@ on:
     branches: [main]
     paths-ignore: ['docs/**', '**.md']
   workflow_dispatch:
-    inputs:
-      configuration:
-        description: The app build the UI smoke tests drive (debug builds its own; release uses the release job's app)
-        type: choice
-        options: [release, debug]
-        default: release
 
 permissions:
   contents: read
@@ -68,7 +62,7 @@ jobs:
     name: regression
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    # No macOS 27 runner exists yet: this verifies the build floor (26.6), not the support floor (27.0). See docs/decisions/0007.
+    # No macOS 27 runner exists yet: this verifies the build floor (26.6), not the support floor (27.0). See docs/architecture.md#5-build-and-ci.
     runs-on: macos-26
     timeout-minutes: 20
     env:
@@ -95,23 +89,12 @@ jobs:
           # The log can lose the end lines of fast tests (#186), so Swift Testing also writes its own xUnit record
           # (tests-swift-testing.xml), which the next step checks.
           status=0
-          { time swift test --scratch-path "$RUNNER_TEMP/unagi-reader-ci-build" --force-resolved-versions --disable-keychain --disable-netrc --skip 'ArticleFilterStoreTests/tenThousandArticlesAreNarrowedQuickly' --xunit-output "$CI_RESULTS/tests.xml"; } > "$CI_RESULTS/tests.log" 2>&1 || status=$?
+          { time swift test --scratch-path "$RUNNER_TEMP/unagi-reader-ci-build" --force-resolved-versions --disable-keychain --disable-netrc --skip "$(bash scripts/ci-gate.sh local-tests)" --xunit-output "$CI_RESULTS/tests.xml"; } > "$CI_RESULTS/tests.log" 2>&1 || status=$?
           cat "$CI_RESULTS/tests.log"
           exit "$status"
       # A test process can end early with exit code 0 and no summary line; `swift test` then looks like a pass.
       - name: Check that the test run finished
         run: bash scripts/check-test-log.sh "$CI_RESULTS/tests.log" "$CI_RESULTS/tests-swift-testing.xml"
-      - name: Measure the cached filter without competing tests
-        run: |
-          # Every sample must pass the same 50 ms limit. These are independent runs, not retries.
-          for sample in 1 2 3; do
-            status=0
-            swift test --scratch-path "$RUNNER_TEMP/unagi-reader-ci-build" --skip-build --disable-keychain --disable-netrc --filter 'ArticleFilterStoreTests/tenThousandArticlesAreNarrowedQuickly' --xunit-output "$CI_RESULTS/filter-$sample.xml" > "$CI_RESULTS/filter-$sample.log" 2>&1 || status=$?
-            cat "$CI_RESULTS/filter-$sample.log"
-            test "$status" -eq 0
-            bash scripts/check-test-log.sh "$CI_RESULTS/filter-$sample.log" "$CI_RESULTS/filter-$sample-swift-testing.xml"
-            grep -q '^✔ Test tenThousandArticlesAreNarrowedQuickly() passed after ' "$CI_RESULTS/filter-$sample.log"
-          done
       - name: Save logs and artifacts
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -164,50 +147,6 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: unagi-reader-release-${{ github.event.pull_request.head.sha || github.sha }}
-          path: ${{ env.CI_RESULTS }}/
-          if-no-files-found: warn
-          retention-days: 7
-
-  # Real-app XCUITest smoke tests (#158). Not for pull requests and not part of `check`: a failure marks only this job.
-  # A person or agent can run the workflow by hand on a branch before merging a change to the screens.
-  ui-smoke:
-    name: ui-smoke
-    needs: release
-    if: github.event_name != 'pull_request' && needs.release.result == 'success'
-    runs-on: macos-26
-    timeout-minutes: 20
-    permissions:
-      actions: read
-      contents: read
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
-      CI_RESULTS: ${{ github.workspace }}/ci-results
-      CONFIGURATION: ${{ inputs.configuration || 'release' }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-      - name: Get the app
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p "$CI_RESULTS"
-          if [ "$CONFIGURATION" = debug ]; then
-            { time bash scripts/build-app.sh; } > "$CI_RESULTS/ui-smoke-app-build.log" 2>&1 || { cat "$CI_RESULTS/ui-smoke-app-build.log"; exit 1; }
-          else
-            # The release job's packaged app: no second Release build.
-            gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "unagi-reader-release-$GITHUB_SHA" --dir "$RUNNER_TEMP/release"
-            mkdir -p .build
-            ditto -x -k "$RUNNER_TEMP/release/UnagiReader-adhoc.zip" .build
-          fi
-          echo "configuration: $CONFIGURATION" | tee "$CI_RESULTS/ui-smoke-configuration.txt"
-      - name: Run real-app UI smoke tests
-        run: bash scripts/run-ui-smoke.sh
-      - name: Save logs and artifacts
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: unagi-reader-ui-smoke-${{ github.sha }}-${{ github.run_attempt }}
           path: ${{ env.CI_RESULTS }}/
           if-no-files-found: warn
           retention-days: 7

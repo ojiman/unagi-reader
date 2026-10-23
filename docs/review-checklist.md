@@ -20,7 +20,7 @@ For reading a fixed commit and finding the gap between what a change **claims** 
 
 ## 3. Does the result depend on the environment?
 
-- Local (macOS 27 / Swift 6.4, the only place the support floor 27.0 is exercised) and CI (macOS 26.6 / Swift 6.3.3, the build floor) can differ. Does this change touch a place where they did? See "Known gotchas" in [AGENTS.md](../AGENTS.md#known-gotchas).
+- Judge CI and local evidence by their roles in [architecture 5](architecture.md#5-build-and-ci). Were the checks appropriate to the change, and were unverified product behaviors kept explicit? See also the known gotchas in [AGENTS.md](../AGENTS.md#known-gotchas).
 - Does it grow `ReaderView`'s modifier chain, call `NSButton.performClick` in a hosted test, or add a hosted test that folds columns outside `SplitViewFoldTests`? Those are in the same list.
 
 ## 4. Scope, decisions and the documents

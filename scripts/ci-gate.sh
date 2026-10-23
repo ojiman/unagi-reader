@@ -7,6 +7,7 @@
 #                                     so an empty or failed file list never skips the tests.
 #   ci-gate.sh packaging              Read changed file paths from stdin. Print `true` when any path can change how the
 #                                     app is built or packaged (see the case list below), otherwise `false`.
+#   ci-gate.sh local-tests             Print the --skip / --filter expression for local-only geometry/timing assertions.
 #   ci-gate.sh verdict CHANGES CODE PACKAGING EVENT REGRESSION RELEASE
 #                                     CHANGES = result of the `changes` job, CODE and PACKAGING = its outputs,
 #                                     EVENT = the GitHub event name, REGRESSION and RELEASE = results of the two macOS jobs.
@@ -37,6 +38,53 @@ case "${1:-}" in
     done
     echo "$found"
     ;;
+  local-tests)
+    # SwiftPM --skip / --filter patterns. Keep the tests; only macOS 27 runs these assertions.
+    local_tests=(
+      'ReaderCoreTests\.ArticleFilterStoreTests/tenThousandArticlesAreNarrowedQuickly' # 50 ms budget on the supported Mac.
+      'ReaderCoreTests\.ImportFeedLookupTests/aFeedIsAddedQuicklyToALargeLibrary' # 1.5 s import budget.
+      'ReaderCoreTests\.NoteLineStyleTests/aSixtyThousandLineNoteIsScannedQuickly' # 0.5 s scan budget.
+      'ReaderCoreTests\.FirstRefreshPerformanceTests/firstRefreshAfterOPMLImport' # Opt-in refresh delay/RSS measurement.
+      'ReaderCoreTests\.ExpiredRefreshPerformanceTests/' # Opt-in expired-content replay measurement.
+      'ReaderCoreTests\.DeadlineTests/(aFastOperationReturnsAtOnceNotAtTheDeadline|anOperationThatIgnoresCancellationStillReleasesTheCallerAtTheDeadline)' # Elapsed-time bounds; timeout/cancellation outcome tests stay in CI.
+      'ReaderUITests\.ArticleBandTests/' # Hosted control positions.
+      'ReaderUITests\.ArticleTextSizeViewTests/(resizingAndBodySizeChangesKeepThePublisherAtTheTop|aLongTitleAtTheLargestStepFitsTheNarrowArticle|changingTheSizeKeepsTheParagraphAtTheTop)' # Text bounds and scroll positions; font-value rules stay in CI.
+      'ReaderUITests\.ListHeaderTests/' # Native text/pixel bounds.
+      'ReaderUITests\.SidebarSectionHeaderTests/' # Hover pixels and positions.
+      'ReaderUITests\.SidebarTitlebarTests/' # Native titlebar accessory geometry.
+      'ReaderUITests\.SidebarRowTests/' # Hover pixels.
+      'ReaderUITests\.FeedDragTests/aFolderRowShowsItIsTheTargetOnlyWhileADragIsOverIt' # Drop-target pixels.
+      'ReaderUITests\.SplitViewFoldTests/ReaderLayoutTests/originalPageFoldsTheSidebarAndClosingBringsItBack' # Close-button/page bounds and restored list coordinates.
+      'ReaderUITests\.SplitViewFoldTests/ReaderLayoutTests/closingThePageInTheMiddleOfTheFoldStillBringsTheSidebarBack' # List coordinates/width during an interrupted native fold.
+      'ReaderUITests\.SplitViewFoldTests/SidebarButtonsTests/' # Mounted reader/fold control layout.
+      'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/nOpensTheNoteBesideTheArticleAndFoldsTheSidebarAndTheList' # Column positions and restored list width.
+      'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/aWideSavedNoteLeavesTheArticleItsWidthInANarrowWindow' # Minimum article width in a narrow window.
+      'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/aWideSavedNoteLeavesTheListAndTheArticleTheirWidthsInThreeColumns' # Three-column widths and bounds.
+      'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/theNoteHasACrossAtItsTopLeft' # Close-button coordinates.
+      'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/theLayoutButtonShowsTheListBesideTheArticleAndTheNote' # Three-column positions.
+      'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/aListFoldedByTheSystemComesBackWhileTheNoteIsClosed' # Native restored column width and position.
+      'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/theNoteControlsSitInTheNoteBand' # Note control coordinates.
+      'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/draggingTheNoteEdgeToTheRightNeverFoldsTheNote' # Native divider drag and minimum panel width.
+      'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/closingAnArrivingNoteReturnsTheList' # Animated width restoration (#371).
+      'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/theSplitViewStillHasTheShapeTheProbesAssume' # Native split-view structure and folded/restored widths.
+      'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/theListStillFoldsWhenNoSplitViewItemCanBeFound' # Hosted fallback view widths.
+      'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/theWindowKeepsItsWidthWhileTheListFoldsAndReturns' # Window/column geometry sampled during motion.
+      'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/theListKeepsItsFrameAndWidthInAWideWindow' # Presentation-layer width samples.
+      'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/aNoteOpenAtTheStartHasTheListFolded' # Initial panel coordinates and width.
+      'ReaderUITests\.SplitViewFoldTests/NoteReaderTests/theNotePanelOpensAtItsDefaultWidthNotAtWhateverIsLeft' # Mounted editor width.
+      'ReaderUITests\.SplitViewFoldTests/SidebarBandTests/' # Heading/selection pixels.
+      'ReaderUITests\.SplitViewFoldTests/FullScreenListTopTests/' # Native titlebar/list geometry.
+      'ReaderUITests\.SplitViewFoldTests/FullScreenPresentationTests/completedExit' # Screen-constrained frame restoration.
+      'ReaderUITests\.SplitViewFoldTests/MarkdownCopyTests/aCopyShowsACheckMarkForAMoment' # Tight real-time feedback interval (#388).
+      'ReaderUITests\.ListFilterTests/theFieldIsTheSystemSearchFieldOverTheList' # Native search-field bounds.
+      'ReaderUITests\.NoteTextEditorTests/aLargeNoteKeepsItsTextAndStaysQuick' # One-second editing budget.
+      'ReaderUITests\.NoteInsertionTests/anInsertionIsShownWhereTheTextWent' # Native scroll-to-insertion geometry.
+      'ReaderUITests\.NoteInsertionTests/forANoteThatOpensItIsShownAfterTheNoteHasComeIn' # Scroll after panel animation.
+      'ReaderUITests\.NativeArticleTextTests/(pageMotion|fixedHero|paragraphPosition|viewportResize|headerOnlyViewport)' # Native layer/viewport geometry.
+      'ReaderUITests\.NativeArticleListTests/(theTableFits|articleTextUsesSpace|aLongSourceName|rowsHaveRoom|backgroundInsertion|remountRestores|newArticles|manyNewArticles|whenTheReaderHasScrolled|reduceMotionFades|onlyInsertions|theTopOfTheList)' # Native row/scroll/animation geometry.
+    )
+    printf '%s\n' "${local_tests[@]}" | paste -sd '|' -
+    ;;
   verdict)
     changes=${2:?changes result}; code=${3:?code output}; packaging=${4:?packaging output}
     event=${5:?event name}; regression=${6:?regression result}; release=${7:?release result}
@@ -51,6 +99,6 @@ case "${1:-}" in
     echo "check: regression passed, release $release"
     ;;
   *)
-    echo "usage: ci-gate.sh classify | packaging | verdict CHANGES CODE PACKAGING EVENT REGRESSION RELEASE" >&2; exit 2
+    echo "usage: ci-gate.sh classify | packaging | local-tests | verdict CHANGES CODE PACKAGING EVENT REGRESSION RELEASE" >&2; exit 2
     ;;
 esac

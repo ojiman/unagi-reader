@@ -48,7 +48,7 @@ The app is ad hoc signed, not notarized. macOS blocks a copy that carries a quar
 ## Status
 
 - Final product acceptance on a real Mac is not complete.
-- CI covers only the build floor (macOS 26.6). The support floor (macOS 27.0) is exercised only on the maintainer's machine. Input methods, VoiceOver, Reduce Motion and long-running use are not yet verified. See the [verification records](docs/verification/).
+- [Build, CI and local verification](docs/architecture.md#5-build-and-ci) defines what is checked and what remains unverified.
 - Settings has separate app-language and article-translation choices. The UI is available in English, Japanese, Simplified Chinese, Traditional Chinese, Korean, Spanish and Brazilian Portuguese ([specification 3.7](docs/specification.md#37-settings)).
 
 Simplified Chinese, Traditional Chinese, Korean, Spanish and Brazilian Portuguese were prepared with AI and have not been reviewed by a person. To report a translation error, [open an issue](https://github.com/ojiman/unagi-reader/issues/new) with the language, screen, current wording and suggested wording.
@@ -67,12 +67,7 @@ Simplified Chinese, Traditional Chinese, Korean, Spanish and Brazilian Portugues
 
 ## Development
 
-```sh
-swift test --scratch-path /private/tmp/unagi-reader-dogfooding-build
-git diff --check
-```
-
-Tests use only synthetic RSS/HTML and temporary databases. The project is developed with two AI coding agents, Claude Code and Codex, each on its own issue and pull request under the owner's review; [AGENTS.md](AGENTS.md) describes the workflow and the checks.
+Commands are in [AGENTS.md](AGENTS.md#commands); choose checks using [architecture 5](docs/architecture.md#5-build-and-ci). Tests use synthetic RSS/HTML and temporary databases. Claude Code and Codex work on separate issues and PRs under the owner's review.
 
 ## Security
 
