@@ -139,12 +139,13 @@ Choose checks by the change, rather than running every command for every PR:
 |---|---|
 | Documents | `git diff --check` and the documents check. |
 | CI or support scripts | Their control-flow/selection tests and the affected CI command; CI checks its own build environment. |
+| Any PR changing `Sources/UnagiReader/**` | Before merging, run the CI-excluded tests on local macOS 27 with the filtered command in [AGENTS.md](../AGENTS.md#commands), alone with no other build or test running. Record the commit, environment and result in the PR. |
 | Small UI or behavior change | Related logic tests. Before merging a screen change, check the changed operations in a synthetic packaged app on macOS 27 when hosted tests cannot show them. |
 | Store/model, concurrency, external writes, retention or deletion | All Swift tests and an independent review of a fixed commit; also a Release build and a synthetic run when UI or packaging changes. |
 | Performance | Measure the affected scenario on the local Mac, alone with no other build or test running. Specification 2.1 budgets stay unchanged. |
 
 The full Swift command in [AGENTS.md](../AGENTS.md#commands) still runs every test, including local-only cases and the filter timing assertion. It is available for broad changes and release verification; it is not mandatory for each small change. Check that every started test ended with `scripts/check-test-log.sh`; exit code zero alone is insufficient.
 
-The real-app XCUITest suite remains in `UITests/UISmoke.xcodeproj`, driven locally by `scripts/run-ui-smoke.sh` after a Release build. Use only synthetic bundle IDs and explicit temporary libraries. Run one suite at a time on a free, logged-in desktop. All five cases must pass with no skips to call the full smoke suite a pass. A failed/partial run stays failed/partial; separately record any targeted operation that was actually verified. Startup/restoration problems remain tracked in #392, not hidden with retries or wider tolerances.
+The real-app XCUITest suite remains in `UITests/UISmoke.xcodeproj`, driven locally by `scripts/run-ui-smoke.sh` after a Release build. Use only synthetic bundle IDs and explicit temporary libraries. Run one suite at a time on a free, logged-in desktop. All five cases must pass with no skips to call the full smoke suite a pass. A failed/partial run stays failed/partial; separately record any targeted operation that was actually verified. Do not hide failures with retries or wider tolerances.
 
-Japanese input, VoiceOver, Reduce Motion, motion feel and long use still need the owner's check (#145). Moving tests out of CI does not turn unverified behavior into PASS. After #396, assess #388–#391 on macOS 27 and propose closure of 26-only findings to the owner; their repair is not a prerequisite for this CI change.
+Japanese input, VoiceOver, Reduce Motion, motion feel and long use still need the owner's check. Moving tests out of CI does not turn unverified behavior into PASS.

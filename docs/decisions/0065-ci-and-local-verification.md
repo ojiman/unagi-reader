@@ -14,6 +14,7 @@ The reading loop benefits from useful regressions and shorter feedback, not repe
 ## Decision
 
 - Keep build floor 26.6, support floor 27.0 and the existing SDK restriction. CI checks compilation, logic regressions, documents and packaging/signature. It does not run the real-app UI smoke suite, native geometry/pixel assertions or real-time performance budgets.
+- When GitHub provides macOS 27 runners, raise the build floor and CI to 27 in a separate PR.
 - Product layout, feel and performance evidence comes from local macOS 27. Retain the excluded tests and the full local command. Select routine local checks by the change's risk; do not require all tests and all packaged checks for every small change.
 - A 26-only rendering or timing failure is not evidence of a supported-product defect. A build, storage, recovery or logic failure is not dismissed on the basis of its OS, and a red test is not automatically excluded.
 - Keep `check` as the required gate. The owner reviews and merges. Screen changes still need relevant local verification; failed or unverified checks are reported as such.

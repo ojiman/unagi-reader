@@ -58,6 +58,29 @@ expect_value "note selection routing stays in CI" false "$(local_only 'ReaderUIT
 expect_value "synthetic clock logic stays in CI" false "$(local_only 'ReaderUITests.ReaderPerformanceTests/theHeartbeatSubtractsItsExpectedTwentyMilliseconds()')"
 expect_value "Sepia restoration logic stays in CI" false "$(local_only 'ReaderUITests.SplitViewFoldTests/FullScreenSepiaTests/changingTheDetachedWindowRestoresThePreviousWindow()')"
 
+# Mixed hosted suites must keep save, focus and command regressions in CI.
+while IFS= read -r test; do
+  expect_value "hosted logic stays in CI: $test" false "$(local_only "ReaderUITests.$test")"
+done <<'TESTS'
+SplitViewFoldTests/NoteBesideArticleTests/openingTheNoteGivesTheKeyboardToTheEditor()
+SplitViewFoldTests/NoteBesideArticleTests/escapeFromTheEditorClosesTheNoteButNotWhileComposing()
+SplitViewFoldTests/NoteBesideArticleTests/escapeFromTheArticleClosesTheNote()
+SplitViewFoldTests/NoteBesideArticleTests/escapeInTheNoteGivesTheKeyboardToTheOriginalPage()
+SplitViewFoldTests/NoteBesideArticleTests/jAndKMoveTheArticleWithTheNoteOpen()
+SplitViewFoldTests/NoteBesideArticleTests/theHostedEditorCanSaveAQueuedEditAfterHarnessCleanup()
+SplitViewFoldTests/NoteReaderTests/theSameNoteOpensFromTheStarScreen()
+SplitViewFoldTests/NoteReaderTests/theNoteIsAbsentWhileClosedAndBesideTheListAndTheReaderWhenOpen()
+SplitViewFoldTests/NotePanelTests/theChevronsMoveBetweenTheNotesArticlesAndStopAtTheEnds()
+SplitViewFoldTests/NotePanelTests/theNotePanelHasNoSummaryButtonAndNoActionBar()
+SplitViewFoldTests/NotePanelTests/theListAndTheChevronsAgreeOnTheShownArticle()
+SplitViewFoldTests/MarkdownCopyTests/theCopyButtonExistsAndAnEmptyNoteCannotBeCopied()
+ArticleTextSizeViewTests/bodyTitleAndDateScaleWhileThePublisherStaysAHeading()
+ReaderSelectionRenderingTests/selectingCachedTextDoesNotRenderAnUnavailableBodyFirst()
+TESTS
+expect_value "note panel width is local" true "$(local_only 'ReaderUITests.SplitViewFoldTests/NoteReaderTests/theNotePanelOpensAtItsDefaultWidthNotAtWhateverIsLeft()')"
+expect_value "page close geometry is local" true "$(local_only 'ReaderUITests.SplitViewFoldTests/ReaderLayoutTests/originalPageFoldsTheSidebarAndClosingBringsItBack()')"
+expect_value "page fold geometry is local" true "$(local_only 'ReaderUITests.SplitViewFoldTests/ReaderLayoutTests/closingThePageInTheMiddleOfTheFoldStillBringsTheSidebarBack()')"
+
 v() { bash "$gate" verdict "$@"; }
 # docs only: both macOS jobs skipped
 expect_status "docs only, jobs skipped"             0 v success false false pull_request skipped skipped

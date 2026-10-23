@@ -26,6 +26,9 @@ Instructions for coding agents (Claude Code, Codex) and the person who reviews t
 test_log=$(mktemp /private/tmp/unagi-reader-tests.XXXXXX)
 swift test --scratch-path /private/tmp/unagi-reader-dogfooding-build > "$test_log" 2>&1 &&
     bash scripts/check-test-log.sh "$test_log"                            # local tests; read "$test_log" for the output
+local_log=$(mktemp /private/tmp/unagi-reader-local-tests.XXXXXX)
+swift test --scratch-path /private/tmp/unagi-reader-dogfooding-build --filter "$(bash scripts/ci-gate.sh local-tests)" --xunit-output "$local_log.xml" > "$local_log" 2>&1 &&
+    bash scripts/check-test-log.sh "$local_log" "$local_log-swift-testing.xml" # CI-excluded tests; scope in architecture 5
 bash scripts/build-app.sh release                                        # ad hoc signed .build/Unagi Reader.app (debug is the default)
 bash scripts/fetch-ci-app.sh <PR number>                                  # a PR's CI-built app, without the quarantine attribute (needs gh)
 bash scripts/make-synthetic-copy.sh                                      # copies the built app with a synthetic bundle ID; prints the launch command
