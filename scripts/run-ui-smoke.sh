@@ -18,9 +18,9 @@ trap cleanup EXIT
 copy_output=$(bash scripts/make-synthetic-copy.sh "$source_app" "$run/data")
 app=$(printf '%s\n' "$copy_output" | sed -n 's/^Ready: \(.*\) (synthetic bundle identifier, ad hoc signed)$/\1/p')
 [ -n "$app" ] && [ "$(plutil -extract CFBundleIdentifier raw -o - "$app/Contents/Info.plist")" = xyz.ojima.UnagiReader.Synthetic ]
-# Separate from manual synthetic runs too. Only this temporary copy runs on the CI build floor.
+# Separate from manual synthetic runs too. This temporary copy runs on the product support floor.
 plutil -replace CFBundleIdentifier -string "$smoke_domain" "$app/Contents/Info.plist"
-plutil -replace LSMinimumSystemVersion -string 26.6 "$app/Contents/Info.plist"
+plutil -replace LSMinimumSystemVersion -string 27.0 "$app/Contents/Info.plist"
 plutil -insert NSAppTransportSecurity -json '{"NSAllowsLocalNetworking":true}' "$app/Contents/Info.plist"
 codesign --force --sign - "$app"
 codesign --verify --deep --strict "$app"

@@ -34,6 +34,27 @@ expect_value "packaging: notices"            true  "$(packaging $'ThirdPartyNoti
 expect_value "packaging: plain source"       false "$(packaging $'Sources/UnagiReader/ReaderView.swift\nTests/a.swift\n')"
 expect_value "packaging: empty list"         false "$(packaging '')"
 
+# Local-only selection must not remove storage, editing or routing regressions.
+local_tests=$(bash "$gate" local-tests)
+expect_value "local-only list is nonempty" true "$([ -n "$local_tests" ] && echo true || echo false)"
+local_only() { [[ "$1" =~ $local_tests ]] && echo true || echo false; }
+expect_value "filter budget is local" true "$(local_only 'ReaderCoreTests.ArticleFilterStoreTests/tenThousandArticlesAreNarrowedQuickly()')"
+expect_value "large import budget is local" true "$(local_only 'ReaderCoreTests.ImportFeedLookupTests/aFeedIsAddedQuicklyToALargeLibrary()')"
+expect_value "line scan budget is local" true "$(local_only 'ReaderCoreTests.NoteLineStyleTests/aSixtyThousandLineNoteIsScannedQuickly()')"
+expect_value "deadline elapsed-time bound is local" true "$(local_only 'ReaderCoreTests.DeadlineTests/anOperationThatIgnoresCancellationStillReleasesTheCallerAtTheDeadline()')"
+expect_value "deadline semantics stay in CI" false "$(local_only 'ReaderCoreTests.DeadlineTests/cancellingTheCallerCancelsTheOperation()')"
+expect_value "fold geometry is local" true "$(local_only 'ReaderUITests.SplitViewFoldTests/NoteBesideArticleTests/closingAnArrivingNoteReturnsTheList(width:)')"
+expect_value "pixel heading is local" true "$(local_only 'ReaderUITests.ListHeaderTests/aLongTitleStaysInsideTheColumn()')"
+expect_value "copy clock is local" true "$(local_only 'ReaderUITests.SplitViewFoldTests/MarkdownCopyTests/aCopyShowsACheckMarkForAMoment()')"
+expect_value "large-note timing is local" true "$(local_only 'ReaderUITests.NoteTextEditorTests/aLargeNoteKeepsItsTextAndStaysQuick()')"
+expect_value "store tests stay in CI" false "$(local_only 'ReaderCoreTests.NoteStoreTests/aFailedSaveKeepsTheNote()')"
+expect_value "filter logic stays in CI" false "$(local_only 'ReaderCoreTests.ArticleFilterStoreTests/theFilterMatchesTheSummary()')"
+expect_value "editor recovery stays in CI" false "$(local_only 'ReaderUITests.NoteTextEditorTests/aFailedSaveKeepsTheTypedTextInTheView()')"
+expect_value "copy recovery stays in CI" false "$(local_only 'ReaderUITests.SplitViewFoldTests/MarkdownCopyTests/aFailedSaveCopiesTheVisibleNote(initial:)')"
+expect_value "shortcut routing stays in CI" false "$(local_only 'ReaderUITests.OriginalKeyboardTests/nativeCommandsIgnoreModifiedInput()')"
+expect_value "synthetic clock logic stays in CI" false "$(local_only 'ReaderUITests.ReaderPerformanceTests/theHeartbeatSubtractsItsExpectedTwentyMilliseconds()')"
+expect_value "Sepia restoration logic stays in CI" false "$(local_only 'ReaderUITests.SplitViewFoldTests/FullScreenSepiaTests/changingTheDetachedWindowRestoresThePreviousWindow()')"
+
 v() { bash "$gate" verdict "$@"; }
 # docs only: both macOS jobs skipped
 expect_status "docs only, jobs skipped"             0 v success false false pull_request skipped skipped

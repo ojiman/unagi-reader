@@ -18,7 +18,6 @@ A decision record says who decided what, when and why. It is not where the curre
 | [0003](0003-beta-data-compatibility.md) | No data compatibility between betas; guaranteed from 1.0 | valid |
 | [0005](0005-v1-product-decisions-2026-10-04.md) | V1 product decisions: retention, source publication | valid in part (hand-off: 0049; display-language setting: 0060) |
 | [0006](0006-original-page-and-sidebar-behavior.md) | Article selection and the sidebar while the original page is open | valid |
-| [0007](0007-support-floor-macos-27.md) | Support floor macOS 27.0; the build floor stays 26.6 | valid |
 | [0019](0019-v1-simplification-notes.md) | V1 simplification: notes replace themes | valid in part (points 2, 3, 5, 6, 8 replaced by 0049) |
 | [0023](0023-rename-to-unagi-reader.md) | Rename to Unagi Reader | valid |
 | [0024](0024-remove-the-old-name-from-code-and-scratch.md) | Remove the old name from code and scratch paths | valid |
@@ -59,7 +58,8 @@ A decision record says who decided what, when and why. It is not where the curre
 | [0062](0062-several-writers-under-review.md) | Several writers at once, each on its own issue, under the owner's review | valid |
 | [0063](0063-export-opml.md) | Export the subscriptions as an OPML file | valid (approved when its PR is merged) |
 | [0064](0064-opening-the-note-gives-it-the-keyboard.md) | Opening the note gives it the keyboard | valid (built) |
+| [0065](0065-ci-and-local-verification.md) | CI guards main; product behavior is verified locally | valid |
 
 ## Removed from the working tree
 
-Wholly replaced records are in Git history only: 0004, 0008, 0010, 0011, 0013, 0014, 0016, 0018 (first prune, 2026-10); 0009, 0012, 0015, 0017, 0020, 0021, 0022, 0035, 0042 (replaced by 0049) and 0045 (a proposal that 0049 made moot) (second prune, 2026-10-14); 0002 (replaced by 0062, 2026-10-18). Their numbers are not reused.
+Wholly replaced records are in Git history only: 0004, 0008, 0010, 0011, 0013, 0014, 0016, 0018 (first prune, 2026-10); 0009, 0012, 0015, 0017, 0020, 0021, 0022, 0035, 0042 (replaced by 0049) and 0045 (a proposal that 0049 made moot) (second prune, 2026-10-14); 0002 (replaced by 0062, 2026-10-18). 0007 was replaced by 0065 (2026-10-23). Their numbers are not reused.

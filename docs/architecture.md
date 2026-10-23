@@ -121,8 +121,30 @@ The package build plugin compiles the catalog with Xcode's `xcstringstool`, incl
 
 ## 5. Build and CI
 
-The toolchains, the CI jobs and when each one runs are in [AGENTS.md](../AGENTS.md#commands). The build and test contracts:
+[Decision 0065](decisions/0065-ci-and-local-verification.md) separates the merge gate from product verification. The build floor stays macOS 26.6 (Xcode 26.6 / Swift 6.3.3); the support floor is macOS 27.0. Do not use APIs that require the macOS 27 SDK. Record the actual OS and toolchain with each result; a run on 27.0.1 does not establish behavior on 27.0.
 
-- CI builds on macOS 26.6 (the build floor); the support floor macOS 27.0 is checked only on the local Mac ([decision 0007](decisions/0007-support-floor-macos-27.md)). Do not use APIs that need the macOS 27 SDK.
-- Real-app UI smoke tests use a separate XCUITest target in `UITests/UISmoke.xcodeproj`, driven by `scripts/run-ui-smoke.sh`. The job `ui-smoke` runs them on pushes to `main` and manual runs with the `release` job's app, not for pull requests and outside `check`; a failed, partial or skipped suite fails that job only. The app itself stays a Swift package.
-- `release` makes an ad hoc signed app and checks the signature after a ZIP round trip. There is no Developer ID signing, notarization or automatic release.
+### CI: build and logic regressions
+
+- `regression` builds the app and runs ReaderCore tests and UI logic tests. Storage, recovery, cancellation, editing and command routing stay covered. Native layout, pixels, scrolling, animation and real-time performance assertions run only locally. The single exclusion list, with a reason per entry, is `scripts/ci-gate.sh local-tests`; a readiness wait alone does not make a logic test local-only. Tests are retained, not deleted.
+- `release` builds the optimized app, packages it and checks its ad hoc signature after a ZIP round trip. It runs on every main push and manual run, and on PRs that change packaging or the workflow. There is no Developer ID signing, notarization or automatic release.
+- `check` remains the one required status. It checks documents and support scripts and requires every due regression/release job to pass. Documentation-only PRs skip the macOS jobs. CodeQL stays separate from this gate.
+- CI runs neither the real-app UI smoke suite nor the three filter timing samples. CI success does not establish product layout, feel, accessibility or performance on macOS 27.
+- Classify a failure by what it checks. Do not chase macOS 26-only rendering, window geometry or timing as a supported-product defect. Do not dismiss a build, storage, recovery or logic failure merely because it appeared on 26, and do not automatically exclude a failing test.
+
+### Local macOS 27: changed behavior and product evidence
+
+Choose checks by the change, rather than running every command for every PR:
+
+| Change | Local verification |
+|---|---|
+| Documents | `git diff --check` and the documents check. |
+| CI or support scripts | Their control-flow/selection tests and the affected CI command; CI checks its own build environment. |
+| Small UI or behavior change | Related logic tests. Before merging a screen change, check the changed operations in a synthetic packaged app on macOS 27 when hosted tests cannot show them. |
+| Store/model, concurrency, external writes, retention or deletion | All Swift tests and an independent review of a fixed commit; also a Release build and a synthetic run when UI or packaging changes. |
+| Performance | Measure the affected scenario on the local Mac, alone with no other build or test running. Specification 2.1 budgets stay unchanged. |
+
+The full Swift command in [AGENTS.md](../AGENTS.md#commands) still runs every test, including local-only cases and the filter timing assertion. It is available for broad changes and release verification; it is not mandatory for each small change. Check that every started test ended with `scripts/check-test-log.sh`; exit code zero alone is insufficient.
+
+The real-app XCUITest suite remains in `UITests/UISmoke.xcodeproj`, driven locally by `scripts/run-ui-smoke.sh` after a Release build. Use only synthetic bundle IDs and explicit temporary libraries. Run one suite at a time on a free, logged-in desktop. All five cases must pass with no skips to call the full smoke suite a pass. A failed/partial run stays failed/partial; separately record any targeted operation that was actually verified. Startup/restoration problems remain tracked in #392, not hidden with retries or wider tolerances.
+
+Japanese input, VoiceOver, Reduce Motion, motion feel and long use still need the owner's check (#145). Moving tests out of CI does not turn unverified behavior into PASS. After #396, assess #388–#391 on macOS 27 and propose closure of 26-only findings to the owner; their repair is not a prerequisite for this CI change.
