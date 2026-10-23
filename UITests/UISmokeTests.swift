@@ -16,7 +16,8 @@ import Carbon
             directory = FileManager.default.temporaryDirectory.appending(path: "unagi-ui-smoke-" + UUID().uuidString)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
             app = XCUIApplication(url: url)
-            app.launchArguments = ["--data-directory", directory.path, "--seed-demo"]
+            // Process-local settings exercise real restoration and Sepia without changing the person's preferences.
+            app.launchArguments = ["--data-directory", directory.path, "--seed-demo", "-NSQuitAlwaysKeepsWindows", "YES", "-appearance", "sepia"]
             app.launch()
             let launchedState = app.state
             inputSource = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
@@ -53,10 +54,14 @@ import Carbon
         let table = app.tables["Article List"]
         let listViewport = app.scrollViews.containing(.table, identifier: "Article List").firstMatch
         let articleViewport = app.scrollViews.containing(.textView, identifier: "Article Body").firstMatch
-        let divider = table.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5)).withOffset(CGVector(dx: 1, dy: 0))
+        // The table ends before a visible scrollbar. Drag the actual split-view divider, not the table's edge.
+        guard let splitter = app.splitters.allElementsBoundByIndex.first(where: { abs($0.frame.minX - listViewport.frame.maxX) < 1 }) else {
+            XCTFail("The list must have a divider at its viewport edge"); return
+        }
+        let divider = splitter.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         // CI's 1,024 pt desktop also needs room for the note and the article beside the list.
         let listWidth: CGFloat = width < 1170 ? 280 : 400
-        let listRight = table.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: listWidth + 1, dy: 0))
+        let listRight = listViewport.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: listWidth + splitter.frame.width / 2, dy: 0))
         divider.click(forDuration: 0.1, thenDragTo: listRight)
         XCTAssertEqual(listViewport.frame.width, listWidth, accuracy: 3)
         let start = window.frame
@@ -88,6 +93,7 @@ import Carbon
 
     // Checks PRD-01: a real click and j/k must select and display the corresponding article.
     func testLaunchSelectionAndReadingKeys() throws {
+        useNormalWindow()
         let table = app.tables["Article List"]
         XCTAssertEqual(table.tableRows.count, 6)
         try checkListFilterControl()
@@ -107,15 +113,37 @@ import Carbon
         waitForValue(body, containing: "毎日届く情報")
         try checkFullScreenControls(alwaysVisibleMenu: false, resize: true)
         waitForValue(body, containing: "毎日届く情報")
+        // #392: preserve a real full-screen scene across a normal quit, including Sepia before any theme change.
+        let window = app.windows.firstMatch
+        let normal = window.frame
+        let green = app.buttons[XCUIIdentifierFullScreenWindow]
+        let greenX = green.frame.midX - normal.minX
+        green.click()
+        XCTAssertTrue(waitForCondition { window.frame.height > normal.height + 1 })
+        window.typeKey("q", modifierFlags: .command)
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
         // NSArgumentDomain applies this setting only to the synthetic app; do not change the person's menu-bar preference.
-        app.terminate()
-        app.launchArguments = ["-AppleMenuBarVisibleInFullscreen", "YES", "--data-directory", directory.path, "--seed-demo"]
+        app.launchArguments += ["-AppleMenuBarVisibleInFullscreen", "YES"]
         app.launch()
         app.activate()
         let configuredTableAppeared = table.waitForExistence(timeout: 15)
         let nativeState = NSRunningApplication.runningApplications(withBundleIdentifier: "xyz.ojima.UnagiReader.Synthetic.UISmoke")
             .map { "pid=\($0.processIdentifier), active=\($0.isActive), hidden=\($0.isHidden), finished=\($0.isFinishedLaunching)" }
         XCTAssertTrue(configuredTableAppeared, "Configured launch: \(nativeState)\n\(app.windows.debugDescription)")
+        let menu = app.menuBars.menuBarItems["View"]
+        menu.click()
+        XCTAssertTrue(app.menuItems["Exit Full Screen"].waitForExistence(timeout: 5), "The synthetic app must really restore full screen")
+        app.typeKey(.escape, modifierFlags: [])
+        let top = window.coordinate(withNormalizedOffset: .zero)
+        for y: CGFloat in [100, 0, 1] { top.withOffset(CGVector(dx: greenX, dy: y - window.frame.minY)).hover() }
+        XCTAssertTrue(waitForCondition { self.greenPoint(x: greenX, in: window) != nil })
+        let image = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        image.name = "Restored full-screen Sepia controls, before any theme change"
+        image.lifetime = .keepAlways
+        add(image)
+        useNormalWindow()
+        XCTAssertEqual(window.frame.width, normal.width, accuracy: 1)
+        XCTAssertEqual(window.frame.height, normal.height, accuracy: 1)
         table.tableRows.element(boundBy: 1).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         waitForValue(body, containing: "毎日届く情報")
         try checkFullScreenControls(alwaysVisibleMenu: true, resize: true)
@@ -124,6 +152,7 @@ import Carbon
 
     // Checks PRD-04 and decision 0050: the panel's own close button and Esc close the note.
     func testNoteCloseButtonAndEscape() {
+        useNormalWindow()
         selectFirst()
         app.windows.firstMatch.typeKey("n", modifierFlags: [])
         let editor = app.textViews["Note"]
@@ -140,6 +169,7 @@ import Carbon
 
     // Checks PRD-04: layout changes keep the note, and committed typing survives a restart.
     func testNoteLayoutKeepsEditing() {
+        useNormalWindow()
         let available = NSScreen.main?.visibleFrame.width ?? 1170
         let widths = Set([min(CGFloat(1170), available), min(CGFloat(1240), available)]).sorted()
         for width in widths { checkNarrowWindowLayout(width: width) }
@@ -168,6 +198,7 @@ import Carbon
 
     // Checks PRD-14 and PRD-03: normal URL input fetches a loopback feed; v/Esc opens/closes its local page.
     func testLocalFeedAndOriginalPage() throws {
+        useNormalWindow()
         try addLocalFeed()
         selectFirst()
         let body = app.textViews["Article Body"]
@@ -185,6 +216,7 @@ import Carbon
     // (decision 0043): the person types without clicking it. Several renames, from an unselected and a selected row, because the
     // focus was lost only sometimes (#265).
     func testRenameAndOPMLMenu() {
+        useNormalWindow()
         var current = "開発ノート"
         for round in 1...4 {
             let row = app.outlines.staticTexts[current]
@@ -207,6 +239,27 @@ import Carbon
         XCTAssertTrue(app.menuItems["Import OPML…"].exists)
         XCTAssertTrue(app.menuItems["Import OPML…"].isEnabled)
         app.windows.firstMatch.typeKey(.escape, modifierFlags: [])
+    }
+
+    // #392: a fresh library does not reset the OS scene's full-screen state.
+    private func useNormalWindow() {
+        let window = app.windows.firstMatch
+        let menu = app.menuBars.menuBarItems["View"]
+        let top = window.coordinate(withNormalizedOffset: .zero)
+        for y: CGFloat in [0, 1] { top.withOffset(CGVector(dx: menu.frame.midX - window.frame.minX, dy: y - window.frame.minY)).hover() }
+        menu.click()
+        let exit = app.menuItems["Exit Full Screen"]
+        if exit.exists {
+            print("Leaving restored full-screen fixture: \(app.windows.firstMatch.frame)")
+            // The restored-start menu click did not consistently leave full screen.
+            // Dismiss it, then use the same native shortcut checked by the full-screen scenarios.
+            app.typeKey(.escape, modifierFlags: [])
+            window.typeKey("f", modifierFlags: .function)
+        } else {
+            app.typeKey(.escape, modifierFlags: [])
+        }
+        XCTAssertTrue(app.buttons[XCUIIdentifierFullScreenWindow].waitForExistence(timeout: 5), "The smoke fixture must have normal window controls")
+        XCTAssertTrue(app.buttons["Add Subscription"].waitForExistence(timeout: 5))
     }
 
     // #373: use real input on the packaged window, including the transient green control that has no AX element.
