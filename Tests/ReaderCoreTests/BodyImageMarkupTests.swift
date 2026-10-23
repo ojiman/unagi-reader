@@ -37,6 +37,33 @@ struct BodyImageMarkupTests {
         #expect(paragraphs[0].images == [BodyImage(location: ("前🙂" as NSString).length, url: "https://synthetic.example/a.png", width: 40, height: 20)])
     }
 
+    /// A comic or photo entry: the body has images and no text (review of #413).
+    @Test func aBodyOfImagesOnlyKeepsThemInAParagraphWithoutText() throws {
+        let paragraphs = try #require(ArticleMarkup.parse("<p><img src='https://synthetic.example/comic.png'></p><p><a href='/next'><img src='/b.png'></a></p>", base: Self.base))
+        #expect(paragraphs == [BodyParagraph(text: "", images: [BodyImage(location: 0, url: "https://synthetic.example/comic.png", block: true),
+                                                                 BodyImage(location: 0, url: "https://synthetic.example/b.png", link: "https://synthetic.example/next", block: true)])])
+    }
+
+    @MainActor @Test func aBodyOfImagesOnlyIsSavedShownAndExpired() throws {
+        let library = try TestLibrary(); defer { library.cleanup() }
+        let store = try ReaderStore(url: library.url)
+        let at = Date(timeIntervalSince1970: 1_000_000)
+        let xml = "<rss xmlns:c='http://purl.org/rss/1.0/modules/content/'><channel><title>合成</title><item><guid>a</guid><link>https://synthetic.example/comic/1</link><description>第1話</description><c:encoded><![CDATA[<p><img src='https://synthetic.example/comic.png'></p>]]></c:encoded></item></channel></rss>"
+        try store.importFeed(try FeedParser.parse(Data(xml.utf8), sourceURL: Self.base), receivedAt: at)
+        let article = try #require(store.articles.first)
+        let content = try #require(try store.content(articleID: article.id, at: at))
+        #expect(content.paragraphs == [""] && content.coverage == .feedProvided)
+        #expect(content.bodyParagraphs.first?.images?.map(\.url) == ["https://synthetic.example/comic.png"])
+        // Nothing to translate but the title.
+        #expect(TranslationPlan(title: "題", content: content, target: "en").items.map(\.index) == [TranslationPlan.titleIndex])
+        try store.markDisplayed(articleID: article.id, at: at)
+        #expect(store.article(id: article.id)?.isRead == true)
+        // Retention counts it as a body and removes it.
+        #expect(try store.previewDeletion(days: 7, at: at.addingTimeInterval(86_400 * 8)).bodyCount == 1)
+        try store.deleteContent(articleIDs: [article.id], at: at)
+        #expect(try store.content(articleID: article.id, at: at) == nil)
+    }
+
     @Test func onlyWebImagesAreKept() throws {
         let html = "<p>本文<img src='javascript:alert(1)'><img src='data:image/png;base64,AAAA'><img><img src='file:///private/tmp/x.png'><img src='https://ok.example/x.png' width='wide'></p>"
         let paragraphs = try #require(ArticleMarkup.parse(html, base: Self.base))

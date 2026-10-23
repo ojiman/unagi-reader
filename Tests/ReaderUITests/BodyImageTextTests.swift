@@ -73,4 +73,32 @@ import ReaderCore
         view.show(nil, for: "https://img.example/never.jpg")
         #expect(view.readingPosition().anchor == before.anchor)
     }
+
+    /// A failed image gives its reserved box back, and the text being read stays (review of #413).
+    @Test func aFailedImageLeavesNoGapAndTheTextStays() throws {
+        let view = ArticleTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        let scroll = NSScrollView(frame: view.frame); scroll.documentView = view
+        let texts = (0..<60).map { "合成段落\($0)。" + String(repeating: "日本語の本文です。", count: 12) }
+        let url = "https://img.example/failed.png"
+        let blocks = texts.enumerated().map { index, text in
+            BodyParagraph(text: text, images: index == 2 ? [BodyImage(location: 0, url: url, width: 600, height: 400, block: true)] : nil)
+        }
+        view.install(title: "合成", publisher: "合成購読", date: "", paragraphs: texts, unavailable: nil, bodyParagraphs: blocks)
+        let cell = try #require(cells(view).first?.cell)
+        #expect(cell.cellSize().height > 100)
+        view.restore(anchor: "paragraph-30", offset: 12)
+        let before = view.readingPosition()
+        view.show(nil, for: url)
+        #expect(cell.cellSize().height <= 1)
+        let after = view.readingPosition()
+        #expect(after.anchor == before.anchor && abs(after.offset - before.offset) < 1)
+    }
+
+    @Test func aBodyOfImagesOnlyIsDrawn() throws {
+        let view = ArticleTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        let block = BodyParagraph(text: "", images: [BodyImage(location: 0, url: "https://img.example/comic.png", width: 300, height: 200, block: true)])
+        view.install(title: "第1話", publisher: "合成購読", date: "", paragraphs: [""], unavailable: nil, bodyParagraphs: [block])
+        #expect(cells(view).map(\.cell.url) == ["https://img.example/comic.png"])
+        #expect(view.plainText([NSRange(location: 0, length: (view.string as NSString).length)]) == "合成購読\n第1話\n\n\n")
+    }
 }

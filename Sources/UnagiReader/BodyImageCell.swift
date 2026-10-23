@@ -28,6 +28,12 @@ final class BodyImageCell: NSTextAttachmentCell {
         defer { size = fitted }
         return fitted != size
     }
+    /// The image did not come (failed, offline): the box reserved for it goes, so no gap is left. True when its size changed.
+    func fail() -> Bool {
+        picture = nil; natural = nil
+        defer { size = NSSize(width: 1, height: 1) }
+        return size != NSSize(width: 1, height: 1)
+    }
     /// The arrived image; true when its size changed.
     func arrive(_ image: NSImage, column: CGFloat) -> Bool {
         picture = image

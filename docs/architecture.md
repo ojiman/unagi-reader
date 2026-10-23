@@ -21,7 +21,7 @@ There is no backend, no account and no AI proxy. The app has no AI of its own ([
 
 - Every URL is checked for its scheme; redirects are checked before they are followed.
 - The feed parser and `OPMLParser` refuse XML entity declarations (`<!ENTITY`). `OPMLParser` reads at most 5 MB, 2,000 outlines and 64 levels.
-- Feed HTML is never run; `ArticleMarkup` turns RSS HTML and Atom XHTML into paragraphs, UTF-16 link ranges (HTTP(S) only), quote depth and images (`BodyImage`: HTTP(S) address, UTF-16 offset, the feed's width and height, its link; an image of a block without text opens the next paragraph or closes the last). A link is checked again when it is clicked. `BodyParagraph.images` is nil without images, so such bodies are saved as before.
+- Feed HTML is never run; `ArticleMarkup` turns RSS HTML and Atom XHTML into paragraphs, UTF-16 link ranges (HTTP(S) only), quote depth and images (`BodyImage`: HTTP(S) address, UTF-16 offset, the feed's width and height, its link; an image of a block without text opens the next paragraph or closes the last; a body of images only is one paragraph without text, saved and shown like any body and counted by retention). A link is checked again when it is clicked. `BodyParagraph.images` is nil without images, so such bodies are saved as before.
 - The app never fetches an article's page for its text ([decision 0056](decisions/0056-the-feed-text-only.md)). Bodies extracted by earlier versions stay in the store with the coverage `extracted` and are shown like any body.
 
 ## 3. Store
@@ -114,7 +114,7 @@ Before any directory, store, cache or refresh initialization, `AppDataDirectory`
 - Limits: response 4 MiB, 20,000,000 pixels before decoding, longest side 1,200 px after scaling; disk cache 64 MiB; success kept 7 days, failure 10 minutes; 4 fetches at a time.
 - Each result is checked for the ID, the URL and cancellation. A late image never changes a row height, the selection or the reading position: image frames are fixed, and hosted views in the text have a fixed frame.
 - Image choice: enclosure, media, then images in the body. `hatena:imageurl` (checked by namespace) and HTML `entry-image` come first; images in `cite`, favicons, bookmark counters and images marked small are skipped.
-- Images in the body are `NSTextAttachment`s with a `BodyImageCell` in the article's `NSTextView`, loaded through the same `ReaderImageLoader`. A cell's size is fixed until its image arrives (the feed's size fitted to the column, or nothing); when an arrival changes it, `ArticleTextView.show` lays the text out again and restores the reading position. Copy and selection go through `plainText`, which leaves out the attachment characters.
+- Images in the body are `NSTextAttachment`s with a `BodyImageCell` in the article's `NSTextView`, loaded through the same `ReaderImageLoader`. A cell's size is fixed until its image arrives (the feed's size fitted to the column, or nothing); when an arrival or a failure changes it (a failed image gives its box back), `ArticleTextView.show` lays the text out again and restores the reading position. Copy and selection go through `plainText`, which leaves out the attachment characters.
 
 ### 4.6 UI language
 

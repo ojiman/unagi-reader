@@ -295,7 +295,7 @@ import SwiftData
             let snapshot = models.bodiesFetched.contains(id) ? models.bodies[id]
                 : try target.fetch(FetchDescriptor<ContentSnapshot>(predicate: #Predicate { $0.articleID == id })).first
             if available, let snapshot {
-                if !entry.body.isEmpty && snapshot.coverageRaw != ContentCoverage.extracted.rawValue {
+                if (!entry.body.isEmpty || BodyParagraph.hasImages(entry.bodyParagraphs)) && snapshot.coverageRaw != ContentCoverage.extracted.rawValue {
                     let textChanged = snapshot.text != entry.body
                     if textChanged { snapshot.text = entry.body }
                     update(snapshot, \.coverageRaw, entry.coverage.rawValue)
@@ -305,7 +305,7 @@ import SwiftData
                         snapshot.bodyFormatData = BodyParagraph.encode(entry.bodyParagraphs)
                     }
                 }
-            } else if available && !entry.body.isEmpty {
+            } else if available && (!entry.body.isEmpty || BodyParagraph.hasImages(entry.bodyParagraphs)) {
                 let snapshot = ContentSnapshot(articleID: id, text: entry.body, coverage: entry.coverage, bodyParagraphs: entry.bodyParagraphs)
                 target.insert(snapshot)
                 if models.bodiesFetched.contains(id) { models.bodies[id] = snapshot }
@@ -393,7 +393,13 @@ import SwiftData
         let savedBody = snapshot?.text ?? ""
         let body = savedBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : savedBody
         let summary = article.summary.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !body.isEmpty || !summary.isEmpty else { return nil }
+        // A body of images only is shown as the feed gives it, like a body with text.
+        let images = body.isEmpty ? BodyParagraph.decode(snapshot?.bodyFormatData, matching: savedBody).flatMap { BodyParagraph.hasImages($0) ? $0 : nil } : nil
+        guard !body.isEmpty || images != nil || !summary.isEmpty else { return nil }
+        if let images {
+            return ArticleContent(articleID: articleID, text: "", summary: summary, coverage: ContentCoverage(rawValue: snapshot?.coverageRaw ?? "") ?? .unavailable,
+                                  originalURL: article.originalURL.flatMap { ArticleURL.validated($0) }, bodyParagraphs: images)
+        }
         return ArticleContent(articleID: articleID, text: body.isEmpty ? summary : body, summary: summary,
                               coverage: body.isEmpty ? .summaryOnly : ContentCoverage(rawValue: snapshot?.coverageRaw ?? "") ?? .unavailable,
                               originalURL: article.originalURL.flatMap { ArticleURL.validated($0) },
