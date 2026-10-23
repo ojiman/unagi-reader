@@ -72,6 +72,8 @@ public struct BodyParagraph: Sendable, Codable, Equatable {
     static func encode(_ paragraphs: [BodyParagraph]?) -> Data? { paragraphs.flatMap { try? JSONEncoder().encode($0) } }
     /// The saved paragraphs as values, whatever the order of their JSON keys; nil for no format or an unreadable one.
     static func values(_ data: Data?) -> [BodyParagraph]? { data.flatMap { try? JSONDecoder().decode([BodyParagraph].self, from: $0) } }
+    /// Whether a body has images: one without text is still a body (a comic, a photo).
+    static func hasImages(_ paragraphs: [BodyParagraph]?) -> Bool { paragraphs?.contains { $0.images != nil } == true }
 }
 
 // Convert HTML into native text metadata. No HTML renderer or resource loading is used.
@@ -137,7 +139,9 @@ enum ArticleMarkup {
             text = ""; links = []; images = []; styles = []
         }
         func finish() {
-            guard !pending.isEmpty, let last = paragraphs.last else { return }
+            guard !pending.isEmpty else { return }
+            // A body of images only (a comic, a photo) is one paragraph without text.
+            guard let last = paragraphs.last else { paragraphs = [BodyParagraph(text: "", quoteDepth: quoteDepth, images: pending)]; pending = []; return }
             let end = (last.text as NSString).length
             paragraphs[paragraphs.count - 1] = last.with(images: (last.images ?? []) + pending.map { $0.at(end) })
             pending = []

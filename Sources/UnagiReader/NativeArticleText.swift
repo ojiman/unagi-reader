@@ -182,14 +182,15 @@ import ReaderCore
             })
         }
     }
-    /// An image arrived (nil: it failed). When its size changes, the text is laid out again and the paragraph being read stays where it was.
+    /// An image arrived, or failed (nil): a failed one gives back the box reserved for it. When a size changes, the text is laid out again
+    /// and the paragraph being read stays where it was.
     func show(_ image: NSImage?, for url: String) {
-        guard let image, let storage = textStorage else { return }
+        guard let storage = textStorage else { return }
         let column = textContainer?.containerSize.width ?? 0
         var changed: [NSRange] = []
         storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, range, _ in
             guard let cell = (value as? NSTextAttachment)?.attachmentCell as? BodyImageCell, cell.url == url else { return }
-            if cell.arrive(image, column: column) { changed.append(range) }
+            if image.map({ cell.arrive($0, column: column) }) ?? cell.fail() { changed.append(range) }
             else { layoutManager?.invalidateDisplay(forCharacterRange: range) }
         }
         guard !changed.isEmpty, let manager = layoutManager else { return }

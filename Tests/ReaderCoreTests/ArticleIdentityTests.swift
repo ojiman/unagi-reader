@@ -95,6 +95,51 @@ import Testing
         #expect(own != articleID && reopened.article(id: own)?.isRead == false && reopened.article(id: own)?.title == "Post - Origin")
     }
 
+    /// An article saved by an earlier version has the link alone as its identity. Opening the library gives it the new identity while
+    /// its subscription's address is known, so unsubscribing before the first refresh and subscribing again still finds it (review of #411).
+    @Test func anEarlierArticleIsFoundAgainWhenResubscribedBeforeAnyRefresh() throws {
+        let library = try TestLibrary(); defer { library.cleanup() }
+        let oldID = try {
+            let store = try ReaderStore(url: library.url)
+            try store.importFeed(original, receivedAt: received)
+            let article = try #require(store.articles.first)
+            try store.markDisplayed(articleID: article.id, at: received)
+            try store.setStar(articleID: article.id, isStarred: true, at: received)
+            let context = ModelContext(store.container)
+            let saved = try #require(try context.fetch(FetchDescriptor<Article>()).first)
+            saved.identityKey = "https://origin.example/post"                                   // as earlier versions saved it
+            try context.save()
+            return article.id
+        }()
+        let reopened = try ReaderStore(url: library.url)
+        #expect(reopened.article(id: oldID)?.identityKey == "https://origin.example/rss https://origin.example/post")
+        try reopened.unsubscribe(try #require(reopened.feeds.first))
+        let again = try reopened.importFeed(original, receivedAt: received)
+        #expect(reopened.visibleArticleIDs(feedID: again.id, unreadOnly: false, keeping: nil) == [oldID] && reopened.articles.count == 1)
+        #expect(reopened.article(id: oldID)?.isRead == true && reopened.article(id: oldID)?.starredAt == received)
+    }
+
+    /// An earlier entry without a link had its feed's address and source ID as its identity; it gets the new form too.
+    @Test func anEarlierArticleWithoutALinkGetsTheNewIdentity() throws {
+        let library = try TestLibrary(); defer { library.cleanup() }
+        let linkless = ParsedFeed(title: "Origin", sourceURL: URL(string: "https://origin.example/rss")!,
+                                  entries: [ParsedEntry(sourceID: "note-1", title: "Note", url: nil, summary: "s", body: "s", coverage: .feedProvided,
+                                                        publishedAt: received)], skippedEntries: 0)
+        let oldID = try {
+            let store = try ReaderStore(url: library.url)
+            try store.importFeed(linkless, receivedAt: received)
+            let context = ModelContext(store.container)
+            let saved = try #require(try context.fetch(FetchDescriptor<Article>()).first)
+            saved.identityKey = "https://origin.example/rss|note-1"
+            try context.save()
+            return saved.id
+        }()
+        let reopened = try ReaderStore(url: library.url)
+        try reopened.unsubscribe(try #require(reopened.feeds.first))
+        try reopened.importFeed(linkless, receivedAt: received)
+        #expect(reopened.articles.map(\.id) == [oldID])
+    }
+
     /// When the article's own subscription is gone, the subscription that still has it keeps it.
     @Test func aSharedArticleWhoseOwnSubscriptionIsGoneMovesToTheOneThatHasIt() throws {
         let library = try TestLibrary(); defer { library.cleanup() }
