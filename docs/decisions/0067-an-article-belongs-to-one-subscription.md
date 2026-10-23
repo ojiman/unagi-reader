@@ -22,7 +22,7 @@ The owner: these are two things. A social bookmark feed says "this page was intr
 1. **An article is identified by its subscription and its entry**: the subscription's address plus the entry's link, or its source ID when it has no link. The same link in two subscriptions is two articles, each with its own feed's title, summary, image, date and body.
 2. **Read state, Star and note records are not linked** between them. The app has no idea of "the same article" across subscriptions.
 3. **Subscribing again to the same address** finds the articles kept after unsubscribing, with their reading history.
-4. **A library made by an earlier version** is separated when it opens: a shared article stays in its own subscription (or, when that one is gone, in the first that still has it), with its reading history and Star; the other subscriptions get articles of their own at their next refresh, unread.
+4. **A library made by an earlier version** is separated when it opens: a shared article stays in its own subscription (or, when that one is gone, in the first that still has it), with its reading history and Star; the other subscriptions get articles of their own at their next refresh, unread. Every article in a subscription gets the new identity at once, so point 3 holds before any refresh.
 
 ## What this costs
 
