@@ -84,6 +84,8 @@ jobs:
             xcodebuild -version
             swift --version
           } | tee "$CI_RESULTS/environment.txt"
+      - name: Check synthetic startup isolation
+        run: bash scripts/test-synthetic-startup.sh | tee "$CI_RESULTS/synthetic-startup.log"
       - name: Run tests
         run: |
           # The log can lose the end lines of fast tests (#186), so Swift Testing also writes its own xUnit record
