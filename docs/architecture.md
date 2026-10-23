@@ -28,7 +28,7 @@ There is no backend, no account and no AI proxy. The app has no AI of its own ([
 
 `ReaderStore.schema` has six models: `Feed`, `Article`, `ContentSnapshot`, `FeedMembership`, `ReaderSettings`, `Note`.
 
-- An article's identity, first-received and first-read times, Star and memberships are kept apart from its body (`ContentSnapshot`, which expires). `FeedMembership` joins one article to several subscriptions, so counts are not doubled.
+- An article's identity, first-received and first-read times, Star and memberships are kept apart from its body (`ContentSnapshot`, which expires). An article belongs to one subscription (`Article.feedID`, joined by one `FeedMembership` that keeps the entry's source ID). Its identity is the subscription's address and the entry's link, or its source ID without a link (`ReaderStore.identity`, [decision 0067](decisions/0067-an-article-belongs-to-one-subscription.md)). Opening a library from an earlier version keeps each shared article in one subscription (`separateSharedArticles`).
 - `Feed.folder` is a one-level string; there is no folder model, so an empty folder cannot exist.
 - `Article.starredAt` non-nil means starred; starring again uses the current time; there is no history of Star changes.
 - `Note` has `text`, created and updated times. There is exactly one: `ReaderStore.note`. `saveNote(text:at:)` saves the text exactly as typed, with no length limit; with no note it throws `missingNote`. When the store opens, `keepOnlyOneNote(at:)` keeps the most recently edited note (ties: the lower ID), deletes the others, or creates an empty one; a failed save fails the open.

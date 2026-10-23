@@ -4,7 +4,7 @@ import Testing
 
 // Checks PRD-11 (specification 7).
 @MainActor struct FolderTests {
-    @Test func sharedArticleCountsOnce() throws {
+    @Test func anAddressInTwoSubscriptionsCountsInEach() throws {                // decision 0067
         let library = try TestLibrary(); defer { library.cleanup() }
         let store = try ReaderStore(url: library.url)
         for name in ["a", "b"] {
@@ -12,10 +12,10 @@ import Testing
             try store.moveFeed(id: feed.id, toFolder: " 技術 ")
         }
         let article = try #require(store.articles.first)
-        #expect(store.folderArticleIDs(folder: "技術", keeping: nil) == [article.id])
-        #expect(store.folderUnreadCount(folder: "技術") == 1)
+        #expect(Set(store.folderArticleIDs(folder: "技術", keeping: nil)) == Set(store.articles.map(\.id)) && store.articles.count == 2)
+        #expect(store.folderUnreadCount(folder: "技術") == 2)
         try store.markDisplayed(articleID: article.id, at: .now)
-        #expect(store.folderUnreadCount(folder: "技術") == 0)
+        #expect(store.folderUnreadCount(folder: "技術") == 1)
     }
     @Test func movingAndRenamingRetainsSelection() throws {
         let library = try TestLibrary(); defer { library.cleanup() }

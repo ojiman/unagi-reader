@@ -345,7 +345,8 @@ The **note** is the app's **one** plain-text Markdown document ([decision 0049](
 - Right-click a subscription: refresh, rename (in the row itself), move to a folder, unsubscribe (decision 0043).
 - A subscription moved to another folder moves smoothly to its new place, and the folder opens (not with Reduce Motion).
 - Two ways to move to a folder: 「フォルダへ移動…」 in the menu (a small chooser with a field: typing filters the folders; a new name offers 「作って移動」; ↑ ↓, Return, Esc; 「未分類」 too; a folder is made by moving its first subscription into it), and drag and drop in the sidebar.
-- A folder can be renamed (a name that already exists joins the two folders) and shows the articles of all its subscriptions. An article in several subscriptions and its unread state are counted once. No empty folders and no nesting: a folder disappears with its last subscription.
+- A folder can be renamed (a name that already exists joins the two folders) and shows the articles of all its subscriptions. No empty folders and no nesting: a folder disappears with its last subscription.
+- Each subscription's entries are its own articles (decision 0067). A page that two subscriptions carry, such as a social bookmark feed and the page's own site, is two articles, each with its own feed's title, date and text, and each read, starred and counted on its own. Subscribing again to an address finds the articles kept after unsubscribing.
 
 ### 3.6 Translation
 

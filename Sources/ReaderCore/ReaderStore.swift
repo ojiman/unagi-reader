@@ -60,6 +60,7 @@ import SwiftData
         try keepOnlyOneNote(at: now)
         if seedDemo { try seedIfEmpty(now: now) }
         else { try reload() }
+        try separateSharedArticles()
         try purgeExpired(at: now)
         self.saveHook = saveHook
         self.reloadHook = reloadHook
@@ -107,6 +108,23 @@ import SwiftData
         refreshUnreadCounts()
         refreshStarIndex()
         needsReload = false
+    }
+
+    /// Before decision 0067 one article could belong to several subscriptions. It stays in its own subscription (`Article.feedID`, or
+    /// the first remaining one when that subscription is gone), with its reading history and Star; the other subscriptions lose the
+    /// membership and get an article of their own at their next refresh. A failed save fails the open, as `keepOnlyOneNote` does.
+    private func separateSharedArticles() throws {
+        var changed = false
+        for (articleID, group) in Dictionary(grouping: memberships, by: \.articleID) {
+            guard let article = articleIndex[articleID] else { continue }
+            let sorted = group.sorted { $0.key < $1.key }
+            let kept = sorted.first { $0.feedID == article.feedID } ?? sorted[0]
+            if article.feedID != kept.feedID { article.feedID = kept.feedID; changed = true }
+            for membership in sorted where membership !== kept { context.delete(membership); changed = true }
+        }
+        guard changed else { return }
+        do { try context.save() } catch { rollback(); throw error }
+        try reload()
     }
 
     /// Publish only saved changes. Full reloads invalidate the lookup cache, including after a failed save or publication.
@@ -254,11 +272,12 @@ import SwiftData
             return article
         }
         for entry in parsed.entries {
-            let identity = entry.url?.absoluteString ?? (parsed.sourceURL.absoluteString + "|" + entry.sourceID)
+            let identity = Self.identity(feedAddress: parsed.sourceURL.absoluteString, entry: entry)
             let existing = try index.articleID(identity: identity, feedID: feed.id, sourceID: entry.sourceID).map(model)
             let article = existing ?? Article(feedID: feed.id, title: entry.title, summary: entry.summary,
                                               publisher: entry.url?.host ?? "", publishedAt: entry.publishedAt ?? .distantPast, receivedAt: receivedAt)
             if existing == nil { target.insert(article); models.byID[article.id] = article; index.add(article.id) }
+            update(article, \.feedID, feed.id)         // an article kept after unsubscribing, found again by the same address
             let oldIdentity = article.identityKey
             if let url = entry.url {
                 update(article, \.identityKey, identity)
@@ -272,14 +291,11 @@ import SwiftData
                 update(article, \.imageURL, entry.imageURL?.absoluteString ?? article.imageURL)
             } else { try clearContent(of: article, at: receivedAt, in: target, models: models) }
             if let date = entry.publishedAt { update(article, \.publishedAt, date) }
-            // A second feed must not overwrite a saved article with a shorter excerpt.
             let id = article.id
             let snapshot = models.bodiesFetched.contains(id) ? models.bodies[id]
                 : try target.fetch(FetchDescriptor<ContentSnapshot>(predicate: #Predicate { $0.articleID == id })).first
             if available, let snapshot {
-                if !entry.body.isEmpty &&
-                    snapshot.coverageRaw != ContentCoverage.extracted.rawValue &&
-                    (article.feedID == feed.id || entry.body.count > snapshot.text.count) {
+                if !entry.body.isEmpty && snapshot.coverageRaw != ContentCoverage.extracted.rawValue {
                     let textChanged = snapshot.text != entry.body
                     if textChanged { snapshot.text = entry.body }
                     update(snapshot, \.coverageRaw, entry.coverage.rawValue)
@@ -303,6 +319,12 @@ import SwiftData
         return feed
     }
 
+    /// An entry's identity: its subscription's address and its link, or its source ID when it has no link. The same link in two
+    /// subscriptions is two articles (decision 0067).
+    static func identity(feedAddress: String, entry: ParsedEntry) -> String {
+        feedAddress + " " + (entry.url?.absoluteString ?? "|" + entry.sourceID)
+    }
+
     /// Assigns `value` only when it differs from the model's (see `merge`).
     private func update<Model: AnyObject, Value: Equatable>(_ model: Model, _ keyPath: ReferenceWritableKeyPath<Model, Value>, _ value: Value) {
         if model[keyPath: keyPath] != value { model[keyPath: keyPath] = value }
@@ -314,7 +336,7 @@ import SwiftData
         var ids: [UUID] = []
         for (feedID, feed) in parsed {
             for entry in feed.entries {
-                let identity = entry.url?.absoluteString ?? (feed.sourceURL.absoluteString + "|" + entry.sourceID)
+                let identity = Self.identity(feedAddress: feed.sourceURL.absoluteString, entry: entry)
                 if let id = index.articleID(identity: identity, feedID: feedID, sourceID: entry.sourceID), models.byID[id] == nil { ids.append(id) }
             }
         }
