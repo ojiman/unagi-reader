@@ -119,8 +119,10 @@ import ReaderCore
                 style.defaultTabInterval = 150 * scale
             }
             style.firstLineHeadIndent = first; style.headIndent = rest
-            document.addAttribute(.paragraphStyle, value: style, range: range)
-            if block.quoteDepth > 0 { document.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: range) }
+            // With its newline: a paragraph of images only has no text, and its images take the style from it.
+            let paragraph = NSRange(location: range.location, length: range.length + 1)
+            document.addAttribute(.paragraphStyle, value: style, range: paragraph)
+            if block.quoteDepth > 0 { document.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: paragraph) }
         }
         if let level = block.heading {
             let size: CGFloat = [22, 20, 18, 17, 16, 16][min(max(level, 1), 6) - 1]
