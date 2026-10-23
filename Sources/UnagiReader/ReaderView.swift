@@ -164,6 +164,8 @@ struct ReaderView: View {
         } content: {
             articleList.id(scope).background(AppPalette.surfaceColor)
                 .modifier(ListColumnCollapse(collapsed: SidebarFold.listFolded(noteOpen: noteOpen, listShown: workspace.noteListShown), animated: !reduceMotion, space: windowSpace))
+                // The fold clips the column. Include its control band in that clip, above the title-bar safe area (#397).
+                .ignoresSafeArea(.container, edges: .top)
         } detail: {
             originalColumn.frame(minWidth: NotePanelWidth.articleMinimum)
                 .overlay(alignment: .top) { articleBand.ignoresSafeArea(.container, edges: .top) }

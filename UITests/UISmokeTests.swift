@@ -90,6 +90,7 @@ import Carbon
     func testLaunchSelectionAndReadingKeys() throws {
         let table = app.tables["Article List"]
         XCTAssertEqual(table.tableRows.count, 6)
+        try checkListFilterControl()
         // Native cell accessibility clicks can select without giving the table the keyboard.
         table.tableRows.element(boundBy: 1).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         let body = app.textViews["Article Body"]
@@ -251,6 +252,7 @@ import Carbon
         XCTAssertEqual(fullScreenFrame.minY > 0, alwaysVisibleMenu, "The synthetic menu preference must take effect: \(fullScreenFrame)")
         keepImage("Full screen", window.screenshot())
         print("Full-screen frames: before=\(normal), full=\(fullScreenFrame)")
+        try checkListFilterControl()
         let top = window.coordinate(withNormalizedOffset: .zero)
         for y: CGFloat in [100, 0, 1] { top.withOffset(CGVector(dx: greenX, dy: y - window.frame.minY)).hover() }
         XCTAssertTrue(waitForCondition { self.greenPoint(x: greenX, in: window) != nil })
@@ -275,6 +277,30 @@ import Carbon
         window.typeKey("f", modifierFlags: .function)
         XCTAssertTrue(waitForCondition(normalWindow), "The system shortcut must leave full screen")
         checkRestoredSize()
+    }
+
+    // #397: AX can expose a clickable button even while the column clips its SwiftUI symbol.
+    private func checkListFilterControl() throws {
+        let button = app.buttons["Filter Articles"]
+        XCTAssertTrue(button.waitForExistence(timeout: 5))
+        XCTAssertTrue(button.isHittable)
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: button.screenshot().pngRepresentation))
+        let background = try XCTUnwrap(bitmap.colorAt(x: 0, y: 0)?.usingColorSpace(.sRGB))
+        var visiblePixels = 0
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
+                let contrast = abs(color.redComponent - background.redComponent)
+                    + abs(color.greenComponent - background.greenComponent) + abs(color.blueComponent - background.blueComponent)
+                if contrast > 0.15 { visiblePixels += 1 }
+            }
+        }
+        XCTAssertGreaterThan(visiblePixels, 10, "The filter symbol must have visible contrast, not only an AX element")
+        button.click()
+        let field = app.searchFields["Filter Articles"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(field.waitForNonExistence(timeout: 5))
     }
 
     private func greenPoint(x: CGFloat, in window: XCUIElement) -> CGVector? {
