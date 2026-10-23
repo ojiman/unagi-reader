@@ -1,6 +1,6 @@
 # 0066 The article shows the feed's HTML as the feed gives it, in native text
 
-- Status: valid (images built, #406; structure not built: #407)
+- Status: valid (built: #406 images, #407 structure)
 - Date: 2026-10-24
 - Decider: the owner (PdM), in the chat of 2026-10-24, choosing option B of the two the agent described.
 

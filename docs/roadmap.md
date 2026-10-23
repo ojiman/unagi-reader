@@ -13,9 +13,7 @@ Everything that must be done before the beta is an issue in the milestone [Beta]
 
 ## Next
 
-The owner found these with Hatena Bookmark on 2026-10-23; they apply to every feed.
-
-1. [#407](https://github.com/ojiman/unagi-reader/issues/407): the feed's HTML as the feed gives it: headings, lists, code and tables (images were #406) ([decision 0066](decisions/0066-the-feed-html-as-the-feed-gives-it.md)).
+Nothing is scheduled.
 
 ## Candidates
 
