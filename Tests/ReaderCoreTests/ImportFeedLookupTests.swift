@@ -48,12 +48,13 @@ import Testing
         try store.importFeed(feed("https://a.example/rss", [entry("1", url: "https://a.example/x"), entry("1", url: "https://a.example/y")]), receivedAt: received)
         #expect(store.articles.count == 1 && store.memberships.count == 1)
     }
-    @Test func anArticleThatAnotherFeedHasIsSharedNotCopied() throws {
+    @Test func anAddressThatAnotherFeedHasIsAnArticleOfItsOwn() throws {         // decision 0067
         let library = try TestLibrary(); defer { library.cleanup() }
         let store = try ReaderStore(url: library.url)
         try store.importFeed(feed("https://a.example/rss", [entry("1", url: "https://shared.example/p")]), receivedAt: received)
         try store.importFeed(feed("https://b.example/rss", [entry("9", url: "https://shared.example/p")]), receivedAt: received)
-        #expect(store.articles.count == 1 && store.memberships.count == 2 && store.feeds.count == 2)
+        #expect(store.articles.count == 2 && store.memberships.count == 2 && store.feeds.count == 2)
+        #expect(Set(store.articles.map(\.feedID)) == Set(store.feeds.map(\.id)))
     }
 
     /// The first refresh after an OPML import adds feed after feed to a library that grows. One feed of 150 entries on 4,000

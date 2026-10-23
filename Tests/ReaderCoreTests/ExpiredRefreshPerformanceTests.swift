@@ -24,7 +24,7 @@ import Testing
                 let link = URL(string: "https://f\(f).example/a\(e)")!
                 let expired = f.isMultiple(of: 2)
                 let article = Article(feedID: feed.id, title: "A\(e)", summary: expired ? "" : "Summary", publisher: "example", publishedAt: start, receivedAt: expired ? start : at)
-                article.identityKey = link.absoluteString; article.originalURL = link.absoluteString
+                article.identityKey = url.absoluteString + " " + link.absoluteString; article.originalURL = link.absoluteString
                 if expired { article.contentDeletedAt = at; expiredIDs.append(article.id) }
                 context.insert(article)
                 context.insert(FeedMembership(feedID: feed.id, articleID: article.id, sourceID: "\(e)"))
