@@ -158,7 +158,7 @@ normal                original page (v)     note beside article   note with the 
 
 **Headings**
 
-- Feeds, 「購読元」, the list's current scope and the article's publisher use a small 12 pt semibold heading. The top headings sit at the same visual height below the bands. When both lists are at the top, the first sidebar row and first article row's selection backgrounds start at the same height.
+- Feeds, 「購読元」, the list's current scope and the article's source name use a small 12 pt semibold heading. The top headings sit at the same visual height below the bands. When both lists are at the top, the first sidebar row and first article row's selection backgrounds start at the same height.
 
 **Sidebar**
 
@@ -193,7 +193,7 @@ normal                original page (v)     note beside article   note with the 
 
 **Article**
 
-- The publisher scrolls with the article. Its heading keeps the same size and starting position when the article text size changes. The title is 26 pt semibold. The buttons at the top: Star and the external browser (globe). The theme and the text size are in Settings (3.7).
+- Above the title, the article's source name (3.0), the same name its list row shows, as written (the site's address only when its subscription is gone). Below the title, the weekday, date and time of publication in the system's time zone and format, for example 「Friday, Oct 23, 2026 at 19:56」, or 「Publication date unknown」. The source name scrolls with the article and keeps the same size and starting position when the article text size changes. The title is 26 pt semibold. The buttons at the top: Star and the external browser (globe). The theme and the text size are in Settings (3.7).
 - Opening an article shows the feed's body (or the RSS summary) as it is; it never fetches the original page or swaps the text (RSS first, decision 0033). For more, `v` (in the app) or `b` (the browser).
 - The app never takes text from the original page (decision 0056): no full-text fetch, and no line under the article that says how much text there is.
 - Links and quotes of the feed's text are kept. A link opens in the default browser. Quotes look different from the text. A saved body without layout data is shown as plain text.
@@ -348,7 +348,8 @@ The **note** is the app's **one** plain-text Markdown document ([decision 0049](
 - Right-click a subscription: refresh, rename (in the row itself), move to a folder, unsubscribe (decision 0043).
 - A subscription moved to another folder moves smoothly to its new place, and the folder opens (not with Reduce Motion).
 - Two ways to move to a folder: 「フォルダへ移動…」 in the menu (a small chooser with a field: typing filters the folders; a new name offers 「作って移動」; ↑ ↓, Return, Esc; 「未分類」 too; a folder is made by moving its first subscription into it), and drag and drop in the sidebar.
-- A folder can be renamed (a name that already exists joins the two folders) and shows the articles of all its subscriptions. An article in several subscriptions and its unread state are counted once. No empty folders and no nesting: a folder disappears with its last subscription.
+- A folder can be renamed (a name that already exists joins the two folders) and shows the articles of all its subscriptions. No empty folders and no nesting: a folder disappears with its last subscription.
+- Each subscription's entries are its own articles (decision 0067). A page that two subscriptions carry, such as a social bookmark feed and the page's own site, is two articles, each with its own feed's title, date and text, and each read, starred and counted on its own. Subscribing again to an address finds the articles kept after unsubscribing.
 
 ### 3.6 Translation
 
@@ -442,7 +443,7 @@ The settings window (Unagi Reader ▸ 「設定…」, `⌘,`) has the panes bel
 **Text size**
 
 - 「文字サイズ」 is a slider with five steps: 14, 16 (standard), 18, 20 and 22 pt.
-- It sets the article's body. The title (26 pt at standard) and date line scale by the same ratio. The publisher keeps the heading size of the other reading areas (3.1.4).
+- It sets the article's body. The title (26 pt at standard) and date line scale by the same ratio. The source name keeps the heading size of the other reading areas (3.1.4).
 - The list, the sidebar and the note keep their sizes (decision 0028).
 - A change shows at once in the open article; the paragraph at the top of the article stays at the top.
 - Not now: `⌘+` / `⌘−` / `⌘0`, a size for the note or the list.

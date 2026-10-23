@@ -15,9 +15,7 @@ Everything that must be done before the beta is an issue in the milestone [Beta]
 
 The owner found these with Hatena Bookmark on 2026-10-23; they apply to every feed.
 
-1. [#395](https://github.com/ojiman/unagi-reader/issues/395): an article is identified by its subscription and entry, not by its URL alone (the owner, 2026-10-24).
-2. [#394](https://github.com/ojiman/unagi-reader/issues/394): the reading heading names the subscription, and the date shows the time. After #395.
-3. [#406](https://github.com/ojiman/unagi-reader/issues/406), then [#407](https://github.com/ojiman/unagi-reader/issues/407): the feed's HTML as the feed gives it, images first, then headings, lists, code and tables ([decision 0066](decisions/0066-the-feed-html-as-the-feed-gives-it.md)).
+1. [#406](https://github.com/ojiman/unagi-reader/issues/406), then [#407](https://github.com/ojiman/unagi-reader/issues/407): the feed's HTML as the feed gives it, images first, then headings, lists, code and tables ([decision 0066](decisions/0066-the-feed-html-as-the-feed-gives-it.md)).
 
 ## Candidates
 

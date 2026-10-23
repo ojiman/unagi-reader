@@ -3,6 +3,8 @@ import ReaderCore
 
 struct ArticleDetailView: View {
     let article: Article
+    /// The subscription's name, as the article's list row shows it (specification 3.0).
+    let source: String
     let content: ArticleContent?
     let expiry: Date?
     let updateAvailable: Bool
@@ -25,7 +27,7 @@ struct ArticleDetailView: View {
     @AppStorage(ArticleTextSize.key) private var textSize = ArticleTextSize.standard
 
     private var available: Bool { content?.articleID == article.id && (expiry ?? .distantPast) > .now }
-    private var date: String { article.publishedAt == .distantPast ? String(localized: "Publication date unknown", bundle: ReaderLocalization.bundle) : article.publishedAt.formatted(.dateTime.year().month().day()) }
+    private var date: String { ArticleHeading.date(article.publishedAt) }
     private var title: String {
         let value = translated?.title ?? article.title
         return value.isEmpty ? article.displayTitle : value
@@ -39,7 +41,7 @@ struct ArticleDetailView: View {
                     if let error { Text(error) }
                 }.font(.caption).foregroundStyle(.secondary).padding(12)
             }
-            NativeArticleText(articleID: article.id, title: title, publisher: article.displayPublisher.uppercased(), date: date,
+            NativeArticleText(articleID: article.id, title: title, publisher: source, date: date,
                 paragraphs: available ? (translated?.paragraphs.map(\.text) ?? content!.paragraphs) : [],
                 unavailable: available ? nil : (article.contentDeletedAt != nil ? String(localized: "The article body and RSS summary have been deleted.", bundle: ReaderLocalization.bundle) : String(localized: "The article body is unavailable.", bundle: ReaderLocalization.bundle)),
                 initialAnchor: initialAnchor, initialOffset: initialOffset, reduceMotion: reduceMotion || !pageMotion, onScroll: onScroll, onInteraction: onInteraction, onDisplayBegin: onDisplayBegin, onDisplayed: onDisplayed,
