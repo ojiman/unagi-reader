@@ -18,6 +18,9 @@ import ReaderCore
     private var didDisplayBody = false
     private var quoteRanges: [(NSRange, CGFloat)] = []
     var onOpenLink: (URL) -> Bool = { NSWorkspace.shared.open($0) }
+    /// Loads an image of the feed's HTML; nil leaves the images empty (tests).
+    var loadImage: ((URL) async -> NSImage?)?
+    private var imageTasks: [Task<Void, Never>] = []
 
     override init(frame: NSRect) {
         let storage = NSTextStorage()
@@ -62,25 +65,31 @@ import ReaderCore
             document.append(NSAttributedString(string: " \n", attributes: [.font: NSFont.systemFont(ofSize: 1), .foregroundColor: NSColor.clear, .paragraphStyle: style]))
         }
         paragraphRanges = []; paragraphYs = []; bodyRange = nil; quoteRanges = []
+        imageTasks.forEach { $0.cancel() }; imageTasks = []
+        var imageURLs: [String] = []
         let start = document.length
         for (index, paragraph) in paragraphs.enumerated() {
-            let range = NSRange(location: document.length, length: (paragraph as NSString).length)
-            paragraphRanges.append(range)
+            var range = NSRange(location: document.length, length: (paragraph as NSString).length)
             append(paragraph, size: 16)
-            guard let blocks = bodyParagraphs, blocks.indices.contains(index), blocks[index].text == paragraph else { continue }
+            guard let blocks = bodyParagraphs, blocks.indices.contains(index), blocks[index].text == paragraph else { paragraphRanges.append(range); continue }
             let block = blocks[index]
+            var indent: CGFloat?
             if block.quoteDepth > 0 {
-                let indent = CGFloat(min(block.quoteDepth, 3)) * 20
+                let depth = CGFloat(min(block.quoteDepth, 3)) * 20
                 let style = NSMutableParagraphStyle(); style.lineSpacing = 8 * scale; style.paragraphSpacing = 22 * scale
-                style.headIndent = indent; style.firstLineHeadIndent = indent
+                style.headIndent = depth; style.firstLineHeadIndent = depth
                 document.addAttributes([.paragraphStyle: style, .foregroundColor: NSColor.secondaryLabelColor], range: range)
-                quoteRanges.append((range, indent))
+                indent = depth
             }
             for link in block.links {
                 guard link.location >= 0, link.length > 0, link.location <= range.length, link.length <= range.length - link.location,
                       let url = ArticleURL.link(link.url) else { continue }
                 document.addAttributes([.link: url, .foregroundColor: NSColor.linkColor, .underlineStyle: NSUnderlineStyle.single.rawValue], range: NSRange(location: range.location + link.location, length: link.length))
             }
+            range.length += insertImages(block.images ?? [], into: document, paragraph: range, inset: indent ?? 0)
+            imageURLs += (block.images ?? []).map(\.url)
+            paragraphRanges.append(range)
+            if let indent { quoteRanges.append((range, indent)) }
         }
         if !paragraphs.isEmpty { bodyRange = NSRange(location: start, length: document.length - start) }
         if let unavailable { append(unavailable, size: 16, secondary: true) }
@@ -88,6 +97,77 @@ import ReaderCore
         didDisplayBody = false
         layoutDocument()
         needsDisplay = true
+        loadImages(imageURLs)
+    }
+
+    /// Inserts the paragraph's images at their places (decision 0066) and returns the length added. An image whose block had no text
+    /// stands on a line of its own: a line separator keeps it apart from the text without making another paragraph.
+    private func insertImages(_ images: [BodyImage], into document: NSMutableAttributedString, paragraph range: NSRange, inset: CGFloat) -> Int {
+        guard !images.isEmpty else { return 0 }
+        let column = textContainer?.containerSize.width ?? 0
+        let ordered = images.enumerated().sorted { ($0.element.location, $0.offset) < ($1.element.location, $1.offset) }.map(\.element)
+        let attributes = document.attributes(at: range.location, effectiveRange: nil).filter { [.font, .paragraphStyle].contains($0.key) }
+        var pieces: [(Int, NSAttributedString)] = []
+        for (position, image) in ordered.enumerated() {
+            let location = min(max(0, image.location), range.length)
+            let cell = BodyImageCell(url: image.url, width: image.width, height: image.height, inset: inset)
+            cell.fit(to: column)
+            let attachment = NSTextAttachment(); attachment.attachmentCell = cell
+            let piece = NSMutableAttributedString(attachment: attachment)
+            if let link = image.link.flatMap({ ArticleURL.link($0) }) { piece.addAttribute(.link, value: link, range: NSRange(location: 0, length: piece.length)) }
+            let next = ordered.indices.contains(position + 1) ? ordered[position + 1] : nil
+            let prior = position > 0 ? ordered[position - 1] : nil
+            if image.block, range.length > 0, location == 0, !(next?.block == true && next?.location == 0) {
+                piece.append(NSAttributedString(string: "\u{2028}"))
+            }
+            if image.block, range.length > 0, location == range.length, !(prior?.block == true && prior?.location == range.length) {
+                piece.insert(NSAttributedString(string: "\u{2028}"), at: 0)
+            }
+            piece.addAttributes(attributes, range: NSRange(location: 0, length: piece.length))
+            pieces.append((location, piece))
+        }
+        // From the last to the first, so earlier offsets stay right and images at one offset keep their order.
+        for (location, piece) in pieces.reversed() { document.insert(piece, at: range.location + location) }
+        return pieces.reduce(0) { $0 + $1.1.length }
+    }
+    private func loadImages(_ urls: [String]) {
+        guard let loadImage else { return }
+        for value in Set(urls) {
+            guard let url = ArticleURL.validated(value) else { continue }
+            imageTasks.append(Task { [weak self] in
+                let image = await loadImage(url)
+                guard !Task.isCancelled else { return }
+                self?.show(image, for: value)
+            })
+        }
+    }
+    /// An image arrived (nil: it failed). When its size changes, the text is laid out again and the paragraph being read stays where it was.
+    func show(_ image: NSImage?, for url: String) {
+        guard let image, let storage = textStorage else { return }
+        let column = textContainer?.containerSize.width ?? 0
+        var changed: [NSRange] = []
+        storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, range, _ in
+            guard let cell = (value as? NSTextAttachment)?.attachmentCell as? BodyImageCell, cell.url == url else { return }
+            if cell.arrive(image, column: column) { changed.append(range) }
+            else { layoutManager?.invalidateDisplay(forCharacterRange: range) }
+        }
+        guard !changed.isEmpty, let manager = layoutManager else { return }
+        let kept = enclosingScrollView != nil && !paragraphRanges.isEmpty ? readingPosition() : nil
+        for range in changed { manager.invalidateLayout(forCharacterRange: range, actualCharacterRange: nil) }
+        paragraphYs = []
+        if let kept { restore(anchor: kept.anchor, offset: kept.offset) } else { layoutDocument() }
+        needsDisplay = true
+    }
+    /// The text of these ranges as the person reads it: images left out, their line breaks as line breaks.
+    func plainText(_ ranges: [NSRange]) -> String {
+        let source = string as NSString
+        return ranges.filter { $0.length > 0 && NSMaxRange($0) <= source.length }
+            .map { source.substring(with: $0).replacingOccurrences(of: "\u{FFFC}", with: "").replacingOccurrences(of: "\u{2028}", with: "\n") }
+            .joined(separator: "\n")
+    }
+    override func writeSelection(to pboard: NSPasteboard, type: NSPasteboard.PasteboardType) -> Bool {
+        guard type == .string else { return super.writeSelection(to: pboard, type: type) }
+        return pboard.setString(plainText(selectedRanges.map(\.rangeValue)), forType: .string)
     }
 
     override func setFrameSize(_ newSize: NSSize) {
@@ -96,6 +176,9 @@ import ReaderCore
         super.setFrameSize(newSize)
         if widthChanged {
             let width = max(1, min(670, newSize.width - 84))
+            textStorage?.enumerateAttribute(.attachment, in: NSRange(location: 0, length: textStorage?.length ?? 0)) { value, _, _ in
+                ((value as? NSTextAttachment)?.attachmentCell as? BodyImageCell)?.fit(to: width)
+            }
             textContainer?.containerSize = NSSize(width: width, height: .greatestFiniteMagnitude)
             textContainerInset = NSSize(width: max(42, (newSize.width - width) / 2), height: 0)
             paragraphYs = []
@@ -191,11 +274,8 @@ extension ArticleTextView {
     /// Several selected pieces are joined by line breaks.
     static func selectedText(in window: NSWindow?) -> String? {
         guard let view = window?.firstResponder as? ArticleTextView else { return nil }
-        let source = view.string as NSString
-        let pieces = view.selectedRanges.map(\.rangeValue)
-            .filter { $0.length > 0 && NSMaxRange($0) <= source.length }
-            .map { source.substring(with: $0) }
-        return pieces.isEmpty ? nil : pieces.joined(separator: "\n")
+        let text = view.plainText(view.selectedRanges.map(\.rangeValue))
+        return text.isEmpty ? nil : text
     }
 }
 
@@ -278,6 +358,9 @@ struct NativeArticleText: NSViewRepresentable {
         let changed = signature != context.coordinator.signature || bodyParagraphs != context.coordinator.bodyParagraphs
         if changed { text.recordScroll() }
         text.onScroll = onScroll; text.onInteraction = onInteraction; text.onDisplayBegin = onDisplayBegin; text.onDisplayed = onDisplayed
+        text.loadImage = imageLoader.map { loader in
+            { url in (try? await loader.image(url: url, at: .now)).flatMap { $0 }.flatMap { NSImage(data: $0) } }
+        }
         (scroll as? ArticleScrollView)?.onInteraction = onInteraction
         if let imageLoader, let heroURL {
             let image = ArticleImageView(loader: imageLoader, articleID: articleID, url: heroURL, size: CGSize(width: 0, height: 180))
