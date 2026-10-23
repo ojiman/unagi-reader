@@ -112,7 +112,8 @@ import SwiftData
 
     /// Before decision 0067 one article could belong to several subscriptions. It stays in its own subscription (`Article.feedID`, or
     /// the first remaining one when that subscription is gone), with its reading history and Star; the other subscriptions lose the
-    /// membership and get an article of their own at their next refresh. A failed save fails the open, as `keepOnlyOneNote` does.
+    /// membership and get an article of their own at their next refresh. Every article in a subscription gets the new identity. A failed
+    /// save fails the open, as `keepOnlyOneNote` does. An article no subscription has keeps its earlier identity: its address is unknown.
     private func separateSharedArticles() throws {
         var changed = false
         for (articleID, group) in Dictionary(grouping: memberships, by: \.articleID) {
@@ -121,6 +122,11 @@ import SwiftData
             let kept = sorted.first { $0.feedID == article.feedID } ?? sorted[0]
             if article.feedID != kept.feedID { article.feedID = kept.feedID; changed = true }
             for membership in sorted where membership !== kept { context.delete(membership); changed = true }
+            // An earlier identity (the link alone, or the address and source ID) gets the new form while the address is known, so the
+            // article is found again after unsubscribing and subscribing to the same address, refreshed or not.
+            if let address = feedIndex[kept.feedID]?.sourceURL, article.identityKey?.hasPrefix(address + " ") != true {
+                article.identityKey = Self.identity(feedAddress: address, link: article.originalURL, sourceID: kept.sourceID); changed = true
+            }
         }
         guard changed else { return }
         do { try context.save() } catch { rollback(); throw error }
@@ -322,8 +328,9 @@ import SwiftData
     /// An entry's identity: its subscription's address and its link, or its source ID when it has no link. The same link in two
     /// subscriptions is two articles (decision 0067).
     static func identity(feedAddress: String, entry: ParsedEntry) -> String {
-        feedAddress + " " + (entry.url?.absoluteString ?? "|" + entry.sourceID)
+        identity(feedAddress: feedAddress, link: entry.url?.absoluteString, sourceID: entry.sourceID)
     }
+    static func identity(feedAddress: String, link: String?, sourceID: String) -> String { feedAddress + " " + (link ?? "|" + sourceID) }
 
     /// Assigns `value` only when it differs from the model's (see `merge`).
     private func update<Model: AnyObject, Value: Equatable>(_ model: Model, _ keyPath: ReferenceWritableKeyPath<Model, Value>, _ value: Value) {
