@@ -20,6 +20,16 @@ struct BodyStructureMarkupTests {
         #expect(try parse("<ul><li>外<ul><li>内</li></ul></li></ul>").map(\.text) == ["• 外", "◦ 内"])
     }
 
+    /// Feed HTML is input: a start at the edge of the number range must not stop the app (review of #414). The number stays at the
+    /// largest one instead of wrapping to a negative one; a start beyond the range starts at 1.
+    @Test func aListStartAtTheEdgeOfTheNumbersDoesNotOverflow() throws {
+        let max = Int.max
+        #expect(try parse("<ol start='\(max)'><li>一</li></ol>").map(\.text) == ["\(max). 一"])
+        #expect(try parse("<ol start='\(max - 1)'><li>一</li><li>二</li><li>三</li></ol>").map(\.text) == ["\(max - 1). 一", "\(max). 二", "\(max). 三"])
+        #expect(try parse("<ol start='99999999999999999999'><li>一</li></ol>").map(\.text) == ["1. 一"])
+        #expect(try parse("<ol start='-2'><li>一</li><li>二</li></ol>").map(\.text) == ["-2. 一", "-1. 二"])
+    }
+
     @Test func codeBlocksAndInlineStylesAreMarked() throws {
         let paragraphs = try parse("<pre><code>let x = 1\n  print(x)</code></pre><p>これは<strong>太字</strong>と<em>斜体</em>と<code>code()</code>です</p>")
         #expect(paragraphs[0].code == true && paragraphs[0].text == "let x = 1\n  print(x)")

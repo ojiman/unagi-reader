@@ -173,7 +173,9 @@ enum ArticleMarkup {
             if tag == "ul" || tag == "ol" { lists.append((tag == "ol", (try? element.attr("start")).flatMap { Int($0) } ?? 1)) }
             if tag == "li", let list = lists.last {
                 marker = list.ordered ? "\(list.next). " : (lists.count == 1 ? "• " : "◦ ")
-                lists[lists.count - 1].next += 1
+                // Feed HTML is input: at the edge of the number range the number stays, rather than stopping the app or wrapping.
+                let (next, overflow) = list.next.addingReportingOverflow(1)
+                lists[lists.count - 1].next = overflow ? list.next : next
             }
             if tag == "table" { tableDepth += 1 }
             if tag == "tr" { cell = 0 }
