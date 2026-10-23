@@ -59,6 +59,7 @@ A decision record says who decided what, when and why. It is not where the curre
 | [0063](0063-export-opml.md) | Export the subscriptions as an OPML file | valid (approved when its PR is merged) |
 | [0064](0064-opening-the-note-gives-it-the-keyboard.md) | Opening the note gives it the keyboard | valid (built) |
 | [0065](0065-ci-and-local-verification.md) | CI guards main; product behavior is verified locally | valid |
+| [0066](0066-the-feed-html-as-the-feed-gives-it.md) | The article shows the feed's HTML as the feed gives it, in native text | valid (approved when its PR is merged; not built) |
 
 ## Removed from the working tree
 
