@@ -17,18 +17,18 @@ import ReaderCore
     @Test func imagesSitWhereTheFeedPutsThemWithTheirLinks() throws {
         let view = ArticleTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         let text = "前🙂後ろ"
-        let paragraph = BodyParagraph(text: text, images: [
-            BodyImage(location: 0, url: "https://img.example/lead.jpg", link: "https://news.example/a", block: true),
-            BodyImage(location: ("前🙂" as NSString).length, url: "https://img.example/icon.png", width: 40, height: 20),
-            BodyImage(location: (text as NSString).length, url: "https://img.example/count.png", link: "https://b.example/entry", block: true)])
-        view.install(title: "合成", publisher: "合成購読", date: "", paragraphs: [text], unavailable: nil, bodyParagraphs: [paragraph])
+        let blocks = [BodyParagraph(text: "", images: [BodyImage(location: 0, url: "https://img.example/lead.jpg", link: "https://news.example/a")]),
+                      BodyParagraph(text: text, images: [BodyImage(location: ("前🙂" as NSString).length, url: "https://img.example/icon.png", width: 40, height: 20)]),
+                      BodyParagraph(text: "", images: [BodyImage(location: 0, url: "https://img.example/count.png", link: "https://b.example/entry"),
+                                                       BodyImage(location: 0, url: "https://img.example/button.png")])]
+        view.install(title: "合成", publisher: "合成購読", date: "", paragraphs: blocks.map(\.text), unavailable: nil, bodyParagraphs: blocks)
         let string = view.string as NSString
-        let start = string.range(of: "前🙂").location - 2          // the lead image and its line break come first
-        #expect(string.substring(with: NSRange(location: start, length: 2)) == "\u{FFFC}\u{2028}")
         let found = cells(view)
-        #expect(found.map(\.cell.url) == ["https://img.example/lead.jpg", "https://img.example/icon.png", "https://img.example/count.png"])
-        #expect(found.map(\.index) == [start, start + 2 + ("前🙂" as NSString).length, start + 2 + (text as NSString).length + 2])
-        #expect(string.substring(with: NSRange(location: found[2].index - 1, length: 1)) == "\u{2028}")
+        #expect(found.map(\.cell.url) == ["https://img.example/lead.jpg", "https://img.example/icon.png", "https://img.example/count.png", "https://img.example/button.png"])
+        let start = string.range(of: "前🙂").location
+        #expect(found[1].index == start + ("前🙂" as NSString).length)
+        #expect(string.substring(with: NSRange(location: found[0].index, length: 2)) == "\u{FFFC}\n")       // a paragraph of its own
+        #expect(found[3].index == found[2].index + 1)                                                    // one paragraph: side by side
         #expect((view.textStorage?.attribute(.link, at: found[0].index, effectiveRange: nil) as? URL)?.absoluteString == "https://news.example/a")
         #expect(view.textStorage?.attribute(.link, at: found[1].index, effectiveRange: nil) == nil)
         #expect(found[1].cell.cellSize() == NSSize(width: 40, height: 20))
@@ -38,9 +38,21 @@ import ReaderCore
         #expect(!view.plainText([all]).contains("\u{FFFC}") && view.plainText([all]).contains("\n前🙂後ろ\n"))
     }
 
+    /// Images of two blocks of the feed stand on two lines, whatever the width (review of #413).
+    @Test func imagesOfSeparateBlocksStandOnSeparateLines() throws {
+        let view = ArticleTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        let html = "<p><img src='https://img.example/1.png' width='120' height='80'></p><p><img src='https://img.example/2.png' width='120' height='80'></p>"
+        let xml = "<rss xmlns:c='http://purl.org/rss/1.0/modules/content/'><channel><title>合成</title><item><guid>a</guid><link>https://img.example/a</link><c:encoded><![CDATA[\(html)]]></c:encoded></item></channel></rss>"
+        let blocks = try #require(try FeedParser.parse(Data(xml.utf8), sourceURL: URL(string: "https://img.example/rss")!).entries.first?.bodyParagraphs)
+        view.install(title: "合成", publisher: "合成購読", date: "", paragraphs: blocks.map(\.text), unavailable: nil, bodyParagraphs: blocks)
+        let manager = try #require(view.layoutManager), container = try #require(view.textContainer)
+        let tops = cells(view).map { manager.boundingRect(forGlyphRange: manager.glyphRange(forCharacterRange: NSRange(location: $0.index, length: 1), actualCharacterRange: nil), in: container).minY }
+        #expect(tops.count == 2 && tops[1] >= tops[0] + 80)
+    }
+
     @Test func aWideImageFitsTheColumn() throws {
         let view = ArticleTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
-        let paragraph = BodyParagraph(text: "本文", images: [BodyImage(location: 0, url: "https://img.example/wide.jpg", width: 2000, height: 1000, block: true)])
+        let paragraph = BodyParagraph(text: "本文", images: [BodyImage(location: 0, url: "https://img.example/wide.jpg", width: 2000, height: 1000)])
         view.install(title: "合成", publisher: "合成購読", date: "", paragraphs: ["本文"], unavailable: nil, bodyParagraphs: [paragraph])
         let column = try #require(view.textContainer?.containerSize.width)
         let cell = try #require(cells(view).first?.cell)
@@ -59,7 +71,7 @@ import ReaderCore
         let scroll = NSScrollView(frame: view.frame); scroll.documentView = view
         let texts = (0..<60).map { "合成段落\($0)。" + String(repeating: "日本語の本文です。", count: 12) }
         let blocks = texts.enumerated().map { index, text in
-            BodyParagraph(text: text, images: index == 2 ? [BodyImage(location: 0, url: "https://img.example/late.jpg", block: true)] : nil)
+            BodyParagraph(text: text, images: index == 2 ? [BodyImage(location: 0, url: "https://img.example/late.jpg")] : nil)
         }
         view.install(title: "合成", publisher: "合成購読", date: "", paragraphs: texts, unavailable: nil, bodyParagraphs: blocks)
         view.restore(anchor: "paragraph-30", offset: 12)
@@ -81,7 +93,7 @@ import ReaderCore
         let texts = (0..<60).map { "合成段落\($0)。" + String(repeating: "日本語の本文です。", count: 12) }
         let url = "https://img.example/failed.png"
         let blocks = texts.enumerated().map { index, text in
-            BodyParagraph(text: text, images: index == 2 ? [BodyImage(location: 0, url: url, width: 600, height: 400, block: true)] : nil)
+            BodyParagraph(text: text, images: index == 2 ? [BodyImage(location: 0, url: url, width: 600, height: 400)] : nil)
         }
         view.install(title: "合成", publisher: "合成購読", date: "", paragraphs: texts, unavailable: nil, bodyParagraphs: blocks)
         let cell = try #require(cells(view).first?.cell)
@@ -96,7 +108,7 @@ import ReaderCore
 
     @Test func aBodyOfImagesOnlyIsDrawn() throws {
         let view = ArticleTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
-        let block = BodyParagraph(text: "", images: [BodyImage(location: 0, url: "https://img.example/comic.png", width: 300, height: 200, block: true)])
+        let block = BodyParagraph(text: "", images: [BodyImage(location: 0, url: "https://img.example/comic.png", width: 300, height: 200)])
         view.install(title: "第1話", publisher: "合成購読", date: "", paragraphs: [""], unavailable: nil, bodyParagraphs: [block])
         #expect(cells(view).map(\.cell.url) == ["https://img.example/comic.png"])
         #expect(view.plainText([NSRange(location: 0, length: (view.string as NSString).length)]) == "合成購読\n第1話\n\n\n")

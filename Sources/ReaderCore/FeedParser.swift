@@ -296,7 +296,8 @@ private final class FeedXMLReader: NSObject, XMLParserDelegate {
         let bodyHTML = values["bodyHTML"] ?? (values["bodyPlain"] == "true" ? nil : values["body"])
         let summaryParagraphs = summaryHTML.flatMap { ArticleMarkup.parse($0, base: summaryBase) }
         let bodyParagraphs = values["body"] == nil ? summaryParagraphs : bodyHTML.flatMap { ArticleMarkup.parse($0, base: bodyBase) }
-        let summary = summaryParagraphs?.map(\.text).joined(separator: "\n\n") ?? values["summary"] ?? ""
+        // The summary the list shows is text: the empty paragraphs of image blocks are left out.
+        let summary = summaryParagraphs?.map(\.text).filter { !$0.isEmpty }.joined(separator: "\n\n") ?? values["summary"] ?? ""
         let body = bodyParagraphs?.map(\.text).joined(separator: "\n\n") ?? values["body"] ?? summary
         if let html = values["bodyHTML"], let image = ImageMetadata.firstHTMLImage(html, base: bodyBase) { recordImage(image.absoluteString, base: bodyBase, priority: 3) }
         if let html = values["summaryHTML"], let image = ImageMetadata.firstHTMLImage(html, base: summaryBase) { recordImage(image.absoluteString, base: summaryBase, priority: 4) }

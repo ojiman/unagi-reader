@@ -8,21 +8,18 @@ public struct BodyLink: Sendable, Codable, Equatable {
     public init(location: Int, length: Int, url: String) { self.location = location; self.length = length; self.url = url }
 }
 
-/// An image of the feed's HTML, at a UTF-16 offset of its paragraph's text (decision 0066). `block` is an image whose own block had no
-/// text: it stands on a line of its own. Sizes are the feed's `width` / `height`, when it gives them.
+/// An image of the feed's HTML, at a UTF-16 offset of its paragraph's text (decision 0066). A block with images and no text is a
+/// paragraph without text, so the feed's blocks stay apart. Sizes are the feed's `width` / `height`, when it gives them.
 public struct BodyImage: Sendable, Codable, Equatable {
     public let location: Int
     public let url: String
     public let width: Int?
     public let height: Int?
     public let link: String?
-    public let block: Bool
-    public init(location: Int, url: String, width: Int? = nil, height: Int? = nil, link: String? = nil, block: Bool = false) {
-        self.location = location; self.url = url; self.width = width; self.height = height; self.link = link; self.block = block
+    public init(location: Int, url: String, width: Int? = nil, height: Int? = nil, link: String? = nil) {
+        self.location = location; self.url = url; self.width = width; self.height = height; self.link = link
     }
-    func at(_ location: Int, block: Bool? = nil) -> BodyImage {
-        BodyImage(location: location, url: url, width: width, height: height, link: link, block: block ?? self.block)
-    }
+    func at(_ location: Int) -> BodyImage { BodyImage(location: location, url: url, width: width, height: height, link: link) }
 }
 
 public struct BodyParagraph: Sendable, Codable, Equatable {
@@ -56,7 +53,6 @@ enum ArticleMarkup {
         let writer = Writer()
         writer.visit(root, base: base)
         writer.flush()
-        writer.finish()
         return writer.paragraphs
     }
     private final class Writer {
@@ -66,8 +62,6 @@ enum ArticleMarkup {
         var quoteDepth = 0
         var preformattedParagraph = false
         var images: [BodyImage] = []
-        /// Images of blocks without text: they open the next paragraph, or close the last one.
-        var pending: [BodyImage] = []
         func append(_ value: String, link: URL?) {
             let start = (text as NSString).length
             text += value
@@ -88,21 +82,12 @@ enum ArticleMarkup {
                     return BodyLink(location: intersection.location - range.location, length: intersection.length, url: link.url)
                 }
                 let placed = images.map { $0.at(min(max(0, $0.location - range.location), range.length)) }
-                paragraphs.append(BodyParagraph(text: trimmed, links: adjusted, quoteDepth: quoteDepth, images: pending + placed))
-                pending = []
-            } else {
-                pending += images.map { $0.at(0, block: true) }
+                paragraphs.append(BodyParagraph(text: trimmed, links: adjusted, quoteDepth: quoteDepth, images: placed))
+            } else if !images.isEmpty {
+                // A block of images only (a comic panel, a photo, a counter and a button) is a paragraph without text.
+                paragraphs.append(BodyParagraph(text: "", quoteDepth: quoteDepth, images: images.map { $0.at(0) }))
             }
             text = ""; links = []; images = []
-        }
-        func finish() {
-            guard !pending.isEmpty else { return }
-            // A body of images only (a comic, a photo) is one paragraph without text.
-            guard let last = paragraphs.last else { paragraphs = [BodyParagraph(text: "", quoteDepth: quoteDepth, images: pending)]; pending = []; return }
-            let end = (last.text as NSString).length
-            paragraphs[paragraphs.count - 1] = BodyParagraph(text: last.text, links: last.links, quoteDepth: last.quoteDepth,
-                                                             images: (last.images ?? []) + pending.map { $0.at(end) })
-            pending = []
         }
         func visit(_ node: Node, base: URL, link: URL? = nil, preformatted: Bool = false, depth: Int = 0) {
             guard depth <= 128 else { return }

@@ -21,7 +21,7 @@ There is no backend, no account and no AI proxy. The app has no AI of its own ([
 
 - Every URL is checked for its scheme; redirects are checked before they are followed.
 - The feed parser and `OPMLParser` refuse XML entity declarations (`<!ENTITY`). `OPMLParser` reads at most 5 MB, 2,000 outlines and 64 levels.
-- Feed HTML is never run; `ArticleMarkup` turns RSS HTML and Atom XHTML into paragraphs, UTF-16 link ranges (HTTP(S) only), quote depth and images (`BodyImage`: HTTP(S) address, UTF-16 offset, the feed's width and height, its link; an image of a block without text opens the next paragraph or closes the last; a body of images only is one paragraph without text, saved and shown like any body and counted by retention). A link is checked again when it is clicked. `BodyParagraph.images` is nil without images, so such bodies are saved as before.
+- Feed HTML is never run; `ArticleMarkup` turns RSS HTML and Atom XHTML into paragraphs, UTF-16 link ranges (HTTP(S) only), quote depth and images (`BodyImage`: HTTP(S) address, UTF-16 offset, the feed's width and height, its link; a block of images without text is a paragraph without text, so the feed's blocks stay apart; a body of images only is saved and shown like any body and counted by retention; the summary leaves those empty paragraphs out). A link is checked again when it is clicked. `BodyParagraph.images` is nil without images, so such bodies are saved as before.
 - The app never fetches an article's page for its text ([decision 0056](decisions/0056-the-feed-text-only.md)). Bodies extracted by earlier versions stay in the store with the coverage `extracted` and are shown like any body.
 
 ## 3. Store
