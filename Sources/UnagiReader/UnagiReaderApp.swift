@@ -14,12 +14,8 @@ struct UnagiReaderApp: App {
     init() {
         do {
             let args = ProcessInfo.processInfo.arguments
-            let directory: URL
-            if let index = args.firstIndex(of: "--data-directory"), args.indices.contains(index + 1) {
-                directory = URL(fileURLWithPath: args[index + 1], isDirectory: true)
-            } else {
-                directory = URL.applicationSupportDirectory.appending(path: AppIdentity.dataFolderName, directoryHint: .isDirectory)
-            }
+            let directory = try AppDataDirectory.resolve(arguments: args, bundleIdentifier: Bundle.main.bundleIdentifier,
+                normalDirectory: URL.applicationSupportDirectory.appending(path: AppIdentity.dataFolderName, directoryHint: .isDirectory))
             if ReadingBenchmark.requested { try ReadingBenchmark.validateFixture(at: directory, explicit: args.contains("--data-directory")) }
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let store = try ReaderStore(url: directory.appending(path: "Reader.store"), seedDemo: args.contains("--seed-demo"))

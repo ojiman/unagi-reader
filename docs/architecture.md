@@ -26,6 +26,8 @@ There is no backend, no account and no AI proxy. The app has no AI of its own ([
 
 ## 3. Store
 
+Before any directory, store, cache or refresh initialization, `AppDataDirectory` requires an explicit path for the synthetic bundle ID (`xyz.ojima.UnagiReader.Synthetic`) and its dotted child IDs. It refuses the normal library and descendants, resolving symlinks and comparing paths without case. Other bundle IDs keep the normal default/explicit-directory behavior.
+
 `ReaderStore.schema` has six models: `Feed`, `Article`, `ContentSnapshot`, `FeedMembership`, `ReaderSettings`, `Note`.
 
 - An article's identity, first-received and first-read times, Star and memberships are kept apart from its body (`ContentSnapshot`, which expires). An article belongs to one subscription (`Article.feedID`, joined by one `FeedMembership` that keeps the entry's source ID). Its identity is the subscription's address and the entry's link, or its source ID without a link (`ReaderStore.identity`, [decision 0067](decisions/0067-an-article-belongs-to-one-subscription.md)). Opening a library from an earlier version keeps each shared article in one subscription (`separateSharedArticles`).
@@ -125,7 +127,7 @@ The package build plugin compiles the catalog with Xcode's `xcstringstool`, incl
 
 ### CI: build and logic regressions
 
-- `regression` builds the app and runs ReaderCore tests and UI logic tests. Storage, recovery, cancellation, editing and command routing stay covered. Native layout, pixels, scrolling, animation and real-time performance assertions run only locally. The single exclusion list, with a reason per entry, is `scripts/ci-gate.sh local-tests`; a readiness wait alone does not make a logic test local-only. Tests are retained, not deleted.
+- `regression` builds the app and runs the synthetic startup process check, ReaderCore tests and UI logic tests. Storage, recovery, cancellation, editing and command routing stay covered. Native layout, pixels, scrolling, animation and real-time performance assertions run only locally. The single exclusion list, with a reason per entry, is `scripts/ci-gate.sh local-tests`; a readiness wait alone does not make a logic test local-only. Tests are retained, not deleted.
 - `release` builds the optimized app, packages it and checks its ad hoc signature after a ZIP round trip. It runs on every main push and manual run, and on PRs that change packaging or the workflow. There is no Developer ID signing, notarization or automatic release.
 - `check` remains the one required status. It checks documents and support scripts and requires every due regression/release job to pass. Documentation-only PRs skip the macOS jobs. CodeQL stays separate from this gate.
 - CI runs neither the real-app UI smoke suite nor the three filter timing samples. CI success does not establish product layout, feel, accessibility or performance on macOS 27.
