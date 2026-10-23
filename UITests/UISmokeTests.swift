@@ -251,8 +251,10 @@ import Carbon
         let exit = app.menuItems["Exit Full Screen"]
         if exit.exists {
             print("Leaving restored full-screen fixture: \(app.windows.firstMatch.frame)")
-            XCTAssertTrue(waitForCondition { exit.isHittable })
-            exit.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+            // The restored-start menu click did not consistently leave full screen.
+            // Dismiss it, then use the same native shortcut checked by the full-screen scenarios.
+            app.typeKey(.escape, modifierFlags: [])
+            window.typeKey("f", modifierFlags: .function)
         } else {
             app.typeKey(.escape, modifierFlags: [])
         }
