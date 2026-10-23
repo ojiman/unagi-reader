@@ -17,18 +17,17 @@ struct BodyImageMarkupTests {
 
     @Test func everyImageOfABookmarkEntryKeepsItsPlaceAndItsLink() throws {
         let paragraphs = try #require(ArticleMarkup.parse(Self.bookmark, base: Self.base))
-        #expect(paragraphs.map(\.text) == ["合成記事 - 合成新聞", "合成の要約です。"])
-        let cite = paragraphs[0], summary = paragraphs[1]
+        // A block with images and no text is a paragraph without text: the feed's blocks stay apart (review of #413).
+        #expect(paragraphs.map(\.text) == ["合成記事 - 合成新聞", "", "合成の要約です。", ""])
         // The favicon is inline, before the title.
-        #expect(cite.images == [BodyImage(location: 0, url: "https://favicon.example/64?url=news")])
-        // The entry image had a paragraph of its own: it opens the next paragraph, on its own line, with its link.
-        #expect(summary.images?.first == BodyImage(location: 0, url: "https://img.example/a.jpg", link: "https://news.example/a", block: true))
-        // The counter and the button had a paragraph with no text either, and come last.
-        let length = ("合成の要約です。" as NSString).length
-        #expect(summary.images?.dropFirst().map(\.url) == ["https://b.example/entry/image/a", "https://synthetic.example/images/append.gif"])
-        #expect(summary.images?.dropFirst().allSatisfy { $0.location == length && $0.block && $0.link == "https://b.example/entry/a" } == true)
-        #expect(summary.images?.last?.width == 16 && summary.images?.last?.height == 12)
-        #expect(cite.quoteDepth == 1 && summary.quoteDepth == 1)
+        #expect(paragraphs[0].images == [BodyImage(location: 0, url: "https://favicon.example/64?url=news")])
+        #expect(paragraphs[1].images == [BodyImage(location: 0, url: "https://img.example/a.jpg", link: "https://news.example/a")])
+        #expect(paragraphs[2].images == nil)
+        // The counter and the button share their paragraph, and stay together.
+        #expect(paragraphs[3].images?.map(\.url) == ["https://b.example/entry/image/a", "https://synthetic.example/images/append.gif"])
+        #expect(paragraphs[3].images?.allSatisfy { $0.location == 0 && $0.link == "https://b.example/entry/a" } == true)
+        #expect(paragraphs[3].images?.last?.width == 16 && paragraphs[3].images?.last?.height == 12)
+        #expect(paragraphs.allSatisfy { $0.quoteDepth == 1 })
     }
 
     @Test func anImageInsideTextSitsAtItsOffset() throws {
@@ -40,8 +39,8 @@ struct BodyImageMarkupTests {
     /// A comic or photo entry: the body has images and no text (review of #413).
     @Test func aBodyOfImagesOnlyKeepsThemInAParagraphWithoutText() throws {
         let paragraphs = try #require(ArticleMarkup.parse("<p><img src='https://synthetic.example/comic.png'></p><p><a href='/next'><img src='/b.png'></a></p>", base: Self.base))
-        #expect(paragraphs == [BodyParagraph(text: "", images: [BodyImage(location: 0, url: "https://synthetic.example/comic.png", block: true),
-                                                                 BodyImage(location: 0, url: "https://synthetic.example/b.png", link: "https://synthetic.example/next", block: true)])])
+        #expect(paragraphs == [BodyParagraph(text: "", images: [BodyImage(location: 0, url: "https://synthetic.example/comic.png")]),
+                               BodyParagraph(text: "", images: [BodyImage(location: 0, url: "https://synthetic.example/b.png", link: "https://synthetic.example/next")])])
     }
 
     @MainActor @Test func aBodyOfImagesOnlyIsSavedShownAndExpired() throws {
@@ -64,6 +63,14 @@ struct BodyImageMarkupTests {
         #expect(try store.content(articleID: article.id, at: at) == nil)
     }
 
+    /// The summary the list shows has the text only, without the empty paragraphs of image blocks.
+    @Test func theSummaryOfABodyWithImageBlocksHasNoEmptyLines() throws {
+        let xml = "<rss><channel><title>合成</title><item><guid>a</guid><link>https://synthetic.example/a</link><description><![CDATA[<p><img src='https://synthetic.example/a.png'></p><p>要約です。</p>]]></description></item></channel></rss>"
+        let entry = try #require(try FeedParser.parse(Data(xml.utf8), sourceURL: Self.base).entries.first)
+        #expect(entry.summary == "要約です。")
+        #expect(entry.bodyParagraphs?.map(\.text) == ["", "要約です。"] && entry.body == "\n\n要約です。")
+    }
+
     @Test func onlyWebImagesAreKept() throws {
         let html = "<p>本文<img src='javascript:alert(1)'><img src='data:image/png;base64,AAAA'><img><img src='file:///private/tmp/x.png'><img src='https://ok.example/x.png' width='wide'></p>"
         let paragraphs = try #require(ArticleMarkup.parse(html, base: Self.base))
@@ -81,7 +88,7 @@ struct BodyImageMarkupTests {
     }
 
     @Test func aTranslatedParagraphKeepsItsImagesAtItsEdges() {
-        let paragraph = BodyParagraph(text: "原文の段落", images: [BodyImage(location: 0, url: "https://a.example/1.png", block: true),
+        let paragraph = BodyParagraph(text: "原文の段落", images: [BodyImage(location: 0, url: "https://a.example/1.png"),
                                                                    BodyImage(location: 2, url: "https://a.example/2.png")])
         let plan = TranslationPlan(title: "", content: ArticleContent(articleID: UUID(), text: "原文の段落", summary: "", coverage: .feedProvided,
                                                                      originalURL: nil, bodyParagraphs: [paragraph]), target: "en")

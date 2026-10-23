@@ -141,35 +141,25 @@ import ReaderCore
         }
     }
 
-    /// Inserts the paragraph's images at their places (decision 0066) and returns the length added. An image whose block had no text
-    /// stands on a line of its own: a line separator keeps it apart from the text without making another paragraph.
+    /// Inserts the paragraph's images at their places (decision 0066) and returns the length added. A block of images only is a paragraph
+    /// of its own, so images of separate blocks stand on separate lines.
     private func insertImages(_ images: [BodyImage], into document: NSMutableAttributedString, paragraph range: NSRange, inset: CGFloat) -> Int {
         guard !images.isEmpty else { return 0 }
         let column = textContainer?.containerSize.width ?? 0
-        let ordered = images.enumerated().sorted { ($0.element.location, $0.offset) < ($1.element.location, $1.offset) }.map(\.element)
         let attributes = document.attributes(at: range.location, effectiveRange: nil).filter { [.font, .paragraphStyle].contains($0.key) }
-        var pieces: [(Int, NSAttributedString)] = []
-        for (position, image) in ordered.enumerated() {
-            let location = min(max(0, image.location), range.length)
+        var added = 0
+        // From the last to the first, so earlier offsets stay right and images at one offset keep their order.
+        for image in images.enumerated().sorted(by: { ($0.element.location, $0.offset) > ($1.element.location, $1.offset) }).map(\.element) {
             let cell = BodyImageCell(url: image.url, width: image.width, height: image.height, inset: inset)
             cell.fit(to: column)
             let attachment = NSTextAttachment(); attachment.attachmentCell = cell
             let piece = NSMutableAttributedString(attachment: attachment)
             if let link = image.link.flatMap({ ArticleURL.link($0) }) { piece.addAttribute(.link, value: link, range: NSRange(location: 0, length: piece.length)) }
-            let next = ordered.indices.contains(position + 1) ? ordered[position + 1] : nil
-            let prior = position > 0 ? ordered[position - 1] : nil
-            if image.block, range.length > 0, location == 0, !(next?.block == true && next?.location == 0) {
-                piece.append(NSAttributedString(string: "\u{2028}"))
-            }
-            if image.block, range.length > 0, location == range.length, !(prior?.block == true && prior?.location == range.length) {
-                piece.insert(NSAttributedString(string: "\u{2028}"), at: 0)
-            }
             piece.addAttributes(attributes, range: NSRange(location: 0, length: piece.length))
-            pieces.append((location, piece))
+            document.insert(piece, at: range.location + min(max(0, image.location), range.length))
+            added += piece.length
         }
-        // From the last to the first, so earlier offsets stay right and images at one offset keep their order.
-        for (location, piece) in pieces.reversed() { document.insert(piece, at: range.location + location) }
-        return pieces.reduce(0) { $0 + $1.1.length }
+        return added
     }
     private func loadImages(_ urls: [String]) {
         guard let loadImage else { return }
