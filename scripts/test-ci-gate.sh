@@ -52,6 +52,9 @@ expect_value "filter logic stays in CI" false "$(local_only 'ReaderCoreTests.Art
 expect_value "editor recovery stays in CI" false "$(local_only 'ReaderUITests.NoteTextEditorTests/aFailedSaveKeepsTheTypedTextInTheView()')"
 expect_value "copy recovery stays in CI" false "$(local_only 'ReaderUITests.SplitViewFoldTests/MarkdownCopyTests/aFailedSaveCopiesTheVisibleNote(initial:)')"
 expect_value "shortcut routing stays in CI" false "$(local_only 'ReaderUITests.OriginalKeyboardTests/nativeCommandsIgnoreModifiedInput()')"
+expect_value "note typing routing stays in CI" false "$(local_only 'ReaderUITests.SplitViewFoldTests/TranslationTests/aTTypedInTheNoteRightAfterOpeningItIsWrittenNotTranslated(competingWindow:)')"
+expect_value "article translation routing stays in CI" false "$(local_only 'ReaderUITests.SplitViewFoldTests/TranslationTests/aTWithTheKeyboardInTheArticleTranslates()')"
+expect_value "note selection routing stays in CI" false "$(local_only 'ReaderUITests.SplitViewFoldTests/SendToNoteTests/theSelectionIsTheArticlesOnlyWhenTheArticleHasTheKeyboard()')"
 expect_value "synthetic clock logic stays in CI" false "$(local_only 'ReaderUITests.ReaderPerformanceTests/theHeartbeatSubtractsItsExpectedTwentyMilliseconds()')"
 expect_value "Sepia restoration logic stays in CI" false "$(local_only 'ReaderUITests.SplitViewFoldTests/FullScreenSepiaTests/changingTheDetachedWindowRestoresThePreviousWindow()')"
 

@@ -60,8 +60,6 @@ case "${1:-}" in
       'ReaderUITests\.SplitViewFoldTests/NoteReaderTests/' # Hosted note/reader layout.
       'ReaderUITests\.SplitViewFoldTests/NotePanelTests/' # Inspector geometry.
       'ReaderUITests\.SplitViewFoldTests/SidebarBandTests/' # Heading/selection pixels.
-      'ReaderUITests\.SplitViewFoldTests/TranslationTests/' # Hosted reader rendering and transitions.
-      'ReaderUITests\.SplitViewFoldTests/SendToNoteTests/' # Folded reader/editor mounting.
       'ReaderUITests\.SplitViewFoldTests/FullScreenListTopTests/' # Native titlebar/list geometry.
       'ReaderUITests\.SplitViewFoldTests/FullScreenPresentationTests/completedExit' # Screen-constrained frame restoration.
       'ReaderUITests\.SplitViewFoldTests/MarkdownCopyTests/aCopyShowsACheckMarkForAMoment' # Tight real-time feedback interval (#388).
