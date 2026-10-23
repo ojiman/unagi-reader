@@ -26,6 +26,7 @@ import os
 from pathlib import Path
 import subprocess
 import plistlib
+import shlex
 import sys
 
 root = Path(sys.argv[1]).resolve()
@@ -48,6 +49,12 @@ def run(args, *, bundle=synthetic, refused=True):
         assert "synthetic app" in result.stderr, result.stderr
     assert marker.read_text() == "keep"
     return result
+
+helper_line = next(line for line in Path("scripts/make-synthetic-copy.sh").read_text().splitlines()
+                   if line.startswith("plutil -replace CFBundleIdentifier -string "))
+helper_id = shlex.split(helper_line)[4]
+run([], bundle=helper_id)
+print("ok   the synthetic helper's actual bundle ID is protected by startup refusal")
 
 for bundle in [synthetic, synthetic + ".UISmoke", synthetic + ".Probe"]:
     for args in [[], ["--seed-demo"], ["--data-directory"], ["--data-directory", ""],
