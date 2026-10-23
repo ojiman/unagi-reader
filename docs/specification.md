@@ -219,7 +219,8 @@ normal                original page (v)     note beside article   note with the 
 | `Esc` | Close the original page or the note and return to the same article at its reading position; with both open, the one that has the keyboard (3.1.3). While Japanese text is being composed, it cancels the composition first (decision 0050) |
 | `/` | Open the list filter and put the cursor in it, when no editable field is being typed in |
 | `t` | Translate the open article / show the original, when no editable field is being typed in |
-| `c` | Send the article to the note (3.3), when no editable field is being typed in |
+| `i` | Send the article to the note (3.3), when no editable field is being typed in. `c` no longer does. [not built #415] |
+| `⌘K` | Send the article to the note (3.3) wherever the keyboard is, also in the note's editor. It is the key of 「記事 ▸ 記事をノートに送る」. [not built #415] |
 
 - `j`, `k`, `s` and `n` also work in the original page.
 - In text fields (the note editor too), during input-method composition and with modifier keys, typing and the standard actions come first.
@@ -269,11 +270,12 @@ The **note** is the app's **one** plain-text Markdown document ([decision 0049](
 
 **「記事をノートに送る」 (Send article to note)** ([decision 0059](decisions/0059-send-the-article-to-the-note.md))
 
-- One command that puts the open article's source into the note. It is run by `c` (3.1.5) or by 「記事 ▸ 記事をノートに送る」 in the menu bar. There is no button in a band.
+- One command that puts the open article's source into the note. It is run by `i` or `⌘K` (3.1.5), or by 「記事 ▸ 記事をノートに送る」 in the menu bar, which shows `⌘K`. There is no button in a band. [not built #415]
+- `⌘K` works wherever the keyboard is: in the list, in the article, in the note's editor (where a letter key would only be typed), in the filter field, and with the note closed. With the original page shown the command is off and the page keeps `⌘K`. [not built #415]
 - With no article chosen, it does nothing.
 - What it inserts, as plain text:
   - No text selected in the article: one line, `[Title](URL)`.
-  - Text selected in the article: the selection with `> ` at the start of each line, then the line `> — [Title](URL)`.
+  - Text selected in the article, when the article has the keyboard: the selection with `> ` at the start of each line, then the line `> — [Title](URL)`. With the keyboard anywhere else, for example in the note, only the line `[Title](URL)` is inserted. [not built #415]
   - A title with `[` or `]` gets a backslash before each. With no title the line is the URL; with no URL it is the title.
   - A title on several lines becomes one line. A URL with a space or an unbalanced parenthesis is written inside `<` and `>`. Empty lines at either end of the selection are left out.
   - With a translation shown (3.6) it inserts the line `[Title](URL)` only, never the translated text.
@@ -527,7 +529,7 @@ These are the conditions for passing, not a list of what has passed. "Where it i
 | PRD-16 | Manage subscriptions | Right-click: refresh, rename (in the row; Return on the selected row too), move to a folder, unsubscribe. Moving works with the chooser and with drag and drop | unit tests, real Mac (right-click, Return, drag) |
 | PRD-17 | Narrow the list with a keyword | As in 3.1.4: `/` or the icon opens the filter; typing narrows the list to the articles of the scope whose title or feed summary contains it; clearing restores it; it stays across scopes and not across launches; `j` / `k` walk the filtered list; composing Japanese does not change the list | `ArticleFilterTests`, `ArticleFilterStoreTests`, `ReaderWorkspaceTests`, `ListFilterTests`; real Mac (the owner, with a library of several thousand articles; a real input method) |
 | PRD-18 | Read an article in another language | As in 3.6: `t` or the button translates the open article and shows the progress and the result row; again shows the original; moving to another article shows the original; the text of the note, the list and the sidebar does not change; no text leaves the Mac | real Mac (the owner: a long English article into Japanese, a language pack download, a Mac without Apple Intelligence, VoiceOver); `ArticleTranslationTests`, `LanguageDecisionTests`, `TranslationTests`, `TranslationControllerTests` (a fake translator); the Settings target, Match System, the remembered choice, target help and a target change while a translation is shown: |
-| PRD-19 | Send an article to the note | As in 3.3: `c` or 「記事 ▸ 記事をノートに送る」 inserts `[Title](URL)`, or the selection as a quotation with its source link, after the note's caret (at the end of a note never used), opening a closed note first; the keyboard stays where it was; one undo removes it; nothing is inserted while Japanese text is being composed; a failed save is shown; sending twice inserts twice; nothing else in the note changes | unit tests (`NoteClipTests`); UI tests (`NoteInsertionTests`, `SendToNoteTests`); real Mac (Japanese input, undo, VoiceOver, a long note) |
+| PRD-19 | Send an article to the note | As in 3.3: `i`, `⌘K` (also with the keyboard in the note) or 「記事 ▸ 記事をノートに送る」 inserts `[Title](URL)`, or the selection as a quotation with its source link, after the note's caret (at the end of a note never used), opening a closed note first; the keyboard stays where it was; one undo removes it; nothing is inserted while Japanese text is being composed; a failed save is shown; sending twice inserts twice; nothing else in the note changes; the keys `i` and `⌘K` are not built [not built #415] | unit tests (`NoteClipTests`); UI tests (`NoteInsertionTests`, `SendToNoteTests`); real Mac (Japanese input, undo, VoiceOver, a long note) |
 | PRD-20 | Choose the app language | As in 3.7: Match System and the bundled display languages are offered (all seven); Match System follows the Mac preferences or falls back to English; a choice applies at the next launch and matches System Settings; a manual choice survives restart; untranslated UI text falls back to English; article and note text stay unchanged; article translation keeps its own target | real Mac (menus, Settings, errors, shortcuts, accessibility labels and text expansion in each language; English and Japanese wording reviewed by the owner); `AppLanguageTests`, `CatalogTests` (temporary preferences, native matching, compiled resources and fallback) |
 
 ### 7.1 Conditions to ship 1.0
