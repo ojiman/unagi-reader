@@ -3,8 +3,10 @@ import SwiftUI
 /// Use AppKit's detached full-screen toolbar for the revealed window controls (#373). Normal windows have no toolbar and keep
 /// their custom bands (decision 0057). Restore the actual normal frame after AppKit completes exit; keep the content mode unchanged.
 struct FullScreenTitlebarFix: NSViewRepresentable {
+    var sepia = ThemeState.shared.sepia
+
     func makeNSView(context: Context) -> Anchor { Anchor() }
-    func updateNSView(_ view: Anchor, context: Context) {}
+    func updateNSView(_ view: Anchor, context: Context) { view.sepia = sepia }
     static func dismantleNSView(_ view: Anchor, coordinator: ()) { view.stopObserving() }
 
     final class Anchor: NSView {
@@ -16,6 +18,11 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
         private var originalToolbarVisible = false
         private var windowDelegate: WindowDelegate?
         private var normalFrame: NSRect?
+        private weak var nativeButton: NSButton?
+        private weak var tintedWindow: NSWindow?
+        private var originalTransparency = false
+        private var originalBackgroundColor: NSColor?
+        var sepia = false { didSet { updateControlsAppearance() } }
         init(center: NotificationCenter = .default) { self.center = center; super.init(frame: .zero) }
         required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
         override func viewDidMoveToWindow() {
@@ -24,6 +31,7 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
             guard let window else { return }
             let delegate = WindowDelegate(original: window.delegate, anchor: self)
             observedWindow = window
+            nativeButton = window.standardWindowButton(.closeButton)
             windowDelegate = delegate
             // This relies on SwiftUI not replacing window.delegate while the anchor remains attached.
             window.delegate = delegate
@@ -36,6 +44,28 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
             if let window = observedWindow, normalFrame == nil, !window.styleMask.contains(.fullScreen) { normalFrame = window.frame }
             showToolbar(true)
         }
+        func updateControlsAppearance() { updateControlsAppearance(in: nativeButton?.window) }
+        func updateControlsAppearance(in controlsWindow: NSWindow?) {
+            // Full screen moves the cached native button into AppKit's separate toolbar window. Clear only its title-bar
+            // background in Sepia, letting the reader's paper show through. Normal windows keep their own appearance.
+            guard sepia, let controlsWindow, controlsWindow !== observedWindow else { restoreControlsAppearance(); return }
+            if tintedWindow !== controlsWindow {
+                restoreControlsAppearance()
+                tintedWindow = controlsWindow
+                originalTransparency = controlsWindow.titlebarAppearsTransparent
+                originalBackgroundColor = controlsWindow.backgroundColor
+            }
+            controlsWindow.backgroundColor = AppPalette.paper
+            controlsWindow.titlebarAppearsTransparent = true
+        }
+        private func restoreControlsAppearance() {
+            if let window = tintedWindow {
+                window.backgroundColor = originalBackgroundColor
+                if window.titlebarAppearsTransparent { window.titlebarAppearsTransparent = originalTransparency }
+            }
+            tintedWindow = nil
+            originalBackgroundColor = nil
+        }
         func finishFullScreen() {
             showToolbar(false)
             defer { normalFrame = nil }
@@ -46,6 +76,7 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
             if window.frame != frame { window.setFrame(frame, display: true) }
         }
         func showToolbar(_ visible: Bool) {
+            if !visible { restoreControlsAppearance() }
             guard let window = observedWindow else { return }
             if visible {
                 if window.toolbar !== toolbar {
@@ -54,6 +85,7 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
                     window.toolbar = toolbar
                 }
                 toolbar.isVisible = true
+                updateControlsAppearance()
             } else {
                 if window.toolbar === toolbar {
                     window.toolbar = originalToolbar
@@ -70,6 +102,7 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
             observedWindow = nil
             windowDelegate = nil
             normalFrame = nil
+            nativeButton = nil
         }
     }
 
@@ -93,6 +126,10 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
             if options.contains(.fullScreen) { anchor?.prepareForFullScreen() } else { anchor?.showToolbar(false) }
             guard options.contains([.fullScreen, .autoHideMenuBar]) else { return options }
             return options.union(.autoHideToolbar)
+        }
+        func windowDidEnterFullScreen(_ notification: Notification) {
+            original?.windowDidEnterFullScreen?(notification)
+            anchor?.updateControlsAppearance()
         }
         func windowDidExitFullScreen(_ notification: Notification) {
             original?.windowDidExitFullScreen?(notification)

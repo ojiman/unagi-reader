@@ -43,6 +43,90 @@ extension SplitViewFoldTests {
         }
     }
 
+    @Suite(.serialized) @MainActor struct FullScreenSepiaTests {
+        private func window() -> NSWindow {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
+                                  styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            return window
+        }
+
+        @Test(arguments: [false, true])
+        func sepiaClearsOnlyTheDetachedTitlebarAndRestoresItsAppearance(wasTransparent: Bool) throws {
+            let normal = window(), controls = window()
+            defer { normal.close(); controls.close() }
+            normal.titlebarAppearsTransparent = false
+            controls.titlebarAppearsTransparent = wasTransparent
+            controls.backgroundColor = .cyan
+            let anchor = FullScreenTitlebarFix.Anchor()
+            try #require(normal.contentView).addSubview(anchor)
+            anchor.sepia = true
+            anchor.updateControlsAppearance(in: normal)
+            #expect(!normal.titlebarAppearsTransparent)
+            anchor.updateControlsAppearance(in: controls)
+            #expect(controls.titlebarAppearsTransparent)
+            #expect(controls.backgroundColor == AppPalette.paper)
+            anchor.sepia = false
+            #expect(controls.titlebarAppearsTransparent == wasTransparent)
+            #expect(controls.backgroundColor == NSColor.cyan)
+            anchor.sepia = true
+            anchor.updateControlsAppearance(in: controls)
+            anchor.showToolbar(false)
+            #expect(controls.titlebarAppearsTransparent == wasTransparent)
+            #expect(controls.backgroundColor == NSColor.cyan)
+            anchor.updateControlsAppearance(in: controls)
+            anchor.removeFromSuperview()
+            #expect(controls.titlebarAppearsTransparent == wasTransparent)
+            #expect(controls.backgroundColor == NSColor.cyan)
+        }
+
+        @Test func changingTheDetachedWindowRestoresThePreviousWindow() {
+            let first = window(), second = window()
+            defer { first.close(); second.close() }
+            first.titlebarAppearsTransparent = false
+            second.titlebarAppearsTransparent = false
+            let anchor = FullScreenTitlebarFix.Anchor()
+            anchor.sepia = true
+            anchor.updateControlsAppearance(in: first)
+            #expect(first.titlebarAppearsTransparent)
+            anchor.updateControlsAppearance(in: second)
+            #expect(!first.titlebarAppearsTransparent)
+            #expect(second.titlebarAppearsTransparent)
+            second.titlebarAppearsTransparent = false
+            anchor.stopObserving()
+            #expect(!second.titlebarAppearsTransparent, "Do not overwrite a later native appearance change")
+        }
+
+        private struct ThemeHost: View { var body: some View { FullScreenTitlebarFix() } }
+        @Test func themeChangesReachTheAttachedAnchor() async throws {
+            let previous = ThemeState.shared.sepia
+            defer { ThemeState.shared.sepia = previous }
+            ThemeState.shared.sepia = false
+            let host = NSHostingView(rootView: ThemeHost())
+            let window = window()
+            window.contentView = host
+            window.orderFront(nil)
+            defer { window.close() }
+            func find(_ view: NSView) -> FullScreenTitlebarFix.Anchor? {
+                if let anchor = view as? FullScreenTitlebarFix.Anchor { return anchor }
+                return view.subviews.lazy.compactMap { find($0) }.first
+            }
+            func wait(for sepia: Bool) async throws {
+                for _ in 0..<100 {
+                    host.layoutSubtreeIfNeeded()
+                    if find(host)?.sepia == sepia { return }
+                    try await Task.sleep(for: .milliseconds(20))
+                }
+                #expect(find(host)?.sepia == sepia)
+            }
+            try await wait(for: false)
+            ThemeState.shared.sepia = true
+            try await wait(for: true)
+            ThemeState.shared.sepia = false
+            try await wait(for: false)
+        }
+    }
+
     @Suite(.serialized) @MainActor struct FullScreenPresentationTests {
         @MainActor private final class WindowDelegate: NSObject, NSWindowDelegate {
             var calls = 0
