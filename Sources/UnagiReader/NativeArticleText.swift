@@ -42,7 +42,7 @@ import ReaderCore
         if heroView !== view { heroView?.removeFromSuperview(); heroView = view; if let view { addSubview(view) } }
         positionHero()
     }
-    /// Body, title and date follow the article text size. The publisher stays a reading-area heading.
+    /// Body, title and date follow the article text size. The source name above the title stays a reading-area heading.
     func install(title: String, publisher: String, date: String, paragraphs: [String], unavailable: String?, hero: Bool = false, bodyParagraphs: [BodyParagraph]? = nil, scale: CGFloat = 1) {
         if !paragraphs.isEmpty { onDisplayBegin?() }
         installing = true; defer { installing = false }

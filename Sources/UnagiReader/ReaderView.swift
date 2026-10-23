@@ -368,7 +368,7 @@ struct ReaderView: View {
 
     private var articleList: some View {
         // Swift 6.3 crashes compiling an actor-isolated method reference as the setter.
-        NativeArticleList(ids: visibleArticleIDs, article: { store.article(id: $0) }, feedTitle: { store.feed(id: $0.feedID)?.displayTitle ?? $0.displayPublisher },
+        NativeArticleList(ids: visibleArticleIDs, article: { store.article(id: $0) }, feedTitle: { store.sourceName(of: $0) },
             selection: Binding(get: { selection }, set: { selectArticle($0) }), initialTop: scrollMemory.state.listScrollAnchor, focus: listFocused && originalPage.url == nil,
             shortcutsEnabled: shortcutsEnabled, onTop: { scrollMemory.state.listScrollAnchor = $0 },
             onKey: { key in
@@ -506,7 +506,7 @@ struct ReaderView: View {
 
     @ViewBuilder private var detail: some View {
         if let article = selectedArticle {
-            ArticleDetailView(article: article, content: displayedContent?.articleID == article.id ? displayedContent : nil,
+            ArticleDetailView(article: article, source: store.sourceName(of: article), content: displayedContent?.articleID == article.id ? displayedContent : nil,
                 expiry: selectedExpiry, updateAvailable: loading.availableUpdate?.articleID == article.id,
                 error: loading.error, initialAnchor: scrollMemory.state.scrollAnchors[article.id], initialOffset: scrollMemory.state.scrollOffsets[article.id] ?? 0,
                 onScroll: { anchor, offset in scrollMemory.state.recordScroll(articleID: article.id, anchor: anchor, offset: offset) },
