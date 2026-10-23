@@ -32,15 +32,17 @@ enum AppDataDirectory {
     }
 
     private static func resolvedPath(_ directory: URL) -> String {
-        // Foundation can leave ancestor aliases unresolved when the final directory does not exist yet.
-        var ancestor = directory
-        var missing: [String] = []
-        while !FileManager.default.fileExists(atPath: ancestor.path), ancestor.path != "/" {
-            missing.append(ancestor.lastPathComponent)
-            ancestor.deleteLastPathComponent()
+        // Resolve each existing prefix before moving through ..; the final directory may not exist yet.
+        var resolved = URL(fileURLWithPath: "/", isDirectory: true)
+        for component in directory.pathComponents.dropFirst() {
+            switch component {
+            case ".", "": continue
+            case "..": if resolved.path != "/" { resolved.deleteLastPathComponent() }
+            default:
+                resolved.append(path: component)
+                resolved = resolved.resolvingSymlinksInPath()
+            }
         }
-        var resolved = ancestor.resolvingSymlinksInPath().standardizedFileURL
-        for component in missing.reversed() { resolved.append(path: component) }
-        return resolved.path
+        return resolved.standardizedFileURL.path
     }
 }

@@ -58,7 +58,10 @@ print("ok   missing and malformed paths refused before any store write, includin
 
 alias = root / "library-alias"
 alias.symlink_to(library, target_is_directory=True)
-for path in [library, library / "child", library / "../UnagiReader", alias, alias / "child", alias / "new/child", Path(os.path.relpath(library)),
+for path in [library, library / "child", library / "../UnagiReader", alias, alias / "child",
+             alias / "new/child", alias / "../UnagiReader/child", library.parent / "missing/../UnagiReader",
+             root / "missing/../owner/Library/Application Support/UnagiReader",
+             root / "missing/../library-alias/new/child", Path(os.path.relpath(library)),
              Path(str(library).upper()) / "child"]:
     run(["--data-directory", str(path)])
 assert list(library.iterdir()) == [marker]
@@ -69,6 +72,9 @@ run(["--data-directory", str(safe), "--seed-demo"], refused=False)
 assert (safe / "opened").read_text() == "opened\n"
 run(["--data-directory", str(safe)], bundle=synthetic + ".UISmoke", refused=False)
 assert not (library / "opened").exists()
+run(["--data-directory", str(root / "new/../allowed")], refused=False)
+assert (root / "allowed/opened").exists()
+run(["--data-directory", "/../../" + str(safe).lstrip("/")], refused=False)
 sibling = root / "owner/Library/Application Support/UnagiReader-extra"
 run(["--data-directory", str(sibling)], refused=False)
 assert (sibling / "opened").exists()
