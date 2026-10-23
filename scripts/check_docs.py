@@ -6,7 +6,7 @@
                                             acceptance scenario checked by tests is named by a test (`// Checks PRD-04`).
   python3 scripts/check_docs.py --online    Also: the issues named in the specification's status marks and in the active
                                             parts of the roadmap are open (a closed issue means the mark or the line is
-                                            stale); every open issue of the milestone Beta is in the roadmap's 'Now'; and every
+                                            stale); every open issue of the milestone 1.0 is in the roadmap's 'Now'; and every
                                             open `enhancement` of the milestone is named by a status mark of the
                                             specification, or has the label `no-spec`. Needs `gh` and a token (GH_TOKEN)
                                             that can read issues.
@@ -220,8 +220,8 @@ def closing_issues(text):
     return {int(n) for n in re.findall(r"\d+", text or "")}
 
 
-def beta_spec_problems(root, beta_issues, closing=frozenset()):
-    """Every open `enhancement` issue of the milestone Beta is named by a status mark of the specification
+def release_spec_problems(root, release_issues, closing=frozenset()):
+    """Every open `enhancement` issue of the milestone 1.0 is named by a status mark of the specification
     (`[not built #n]`), unless it has the label `no-spec` (it changes nothing the person sees). An issue the pull request
     closes is done: its mark goes away in that pull request."""
     path = os.path.join(root, "docs", "specification.md")
@@ -229,15 +229,15 @@ def beta_spec_problems(root, beta_issues, closing=frozenset()):
         return []
     with open(path, encoding="utf-8") as handle:
         marked = {number for number, _ in status_mark_issues(handle.read())}
-    return [f"docs/specification.md: #{issue['number']} is a beta enhancement, but no status mark names it: write the behavior in the "
+    return [f"docs/specification.md: #{issue['number']} is a 1.0 enhancement, but no status mark names it: write the behavior in the "
             f"specification with `[not built #{issue['number']}]`, or give the issue the label `no-spec`"
-            for issue in beta_issues
+            for issue in release_issues
             if "enhancement" in label_names(issue) and "no-spec" not in label_names(issue)
             and issue["number"] not in marked and issue["number"] not in closing]
 
 
-def beta_roadmap_problems(root, beta_issues, closing=frozenset()):
-    """Every open issue of the milestone Beta is linked from the roadmap's section 'Now', except the ones the pull request closes."""
+def release_roadmap_problems(root, release_issues, closing=frozenset()):
+    """Every open issue of the milestone 1.0 is linked from the roadmap's section 'Now', except the ones the pull request closes."""
     path = os.path.join(root, "docs", "roadmap.md")
     if not os.path.isfile(path):
         return []
@@ -250,12 +250,13 @@ def beta_roadmap_problems(root, beta_issues, closing=frozenset()):
         elif in_now:
             now.append(line)
     listed = {int(n) for n in ROADMAP_ISSUE.findall("\n".join(now))}
-    return [f"docs/roadmap.md: #{issue['number']} is in the milestone Beta, but the section 'Now' does not list it"
-            for issue in beta_issues if issue["number"] not in listed and issue["number"] not in closing]
+    return [f"docs/roadmap.md: #{issue['number']} is in the milestone 1.0, but the section 'Now' does not list it"
+            for issue in release_issues if issue["number"] not in listed and issue["number"] not in closing]
 
 
-def github_beta_issues(repository):
-    result = subprocess.run(["gh", "issue", "list", "--repo", repository, "--milestone", "Beta", "--state", "open", "--limit", "200",
+def github_release_issues(repository):
+    # Milestone 1 keeps its identity when its title changes from Beta to 1.0.
+    result = subprocess.run(["gh", "issue", "list", "--repo", repository, "--milestone", "1", "--state", "open", "--limit", "200",
                              "--json", "number,labels"], capture_output=True, text=True, check=False)
     if result.returncode != 0:
         raise LookupError(result.stderr.strip() or "gh failed")
@@ -278,7 +279,7 @@ def main(argv=None):
     parser.add_argument("--online", action="store_true", help="also check the issues named in the marks and the roadmap")
     parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
     parser.add_argument("--closing", default=os.environ.get("CLOSING_ISSUES", ""),
-                        help="the issues the pull request closes, such as \"126,139\": the beta checks treat them as done")
+                        help="the issues the pull request closes, such as \"126,139\": the release checks treat them as done")
     args = parser.parse_args(argv)
     problems = link_problems(args.root) + decision_problems(args.root) + scenario_tag_problems(args.root)
     if args.online:
@@ -292,12 +293,12 @@ def main(argv=None):
         else:
             problems += issue_problems(args.root, github_state(repository))
             try:
-                beta = github_beta_issues(repository)
+                release = github_release_issues(repository)
             except (LookupError, ValueError) as error:
-                problems.append(f"the issues of the milestone Beta cannot be read ({error})")
+                problems.append(f"the issues of the milestone 1.0 cannot be read ({error})")
             else:
                 closing = closing_issues(args.closing)
-                problems += beta_spec_problems(args.root, beta, closing) + beta_roadmap_problems(args.root, beta, closing)
+                problems += release_spec_problems(args.root, release, closing) + release_roadmap_problems(args.root, release, closing)
     if problems:
         print("\n".join(problems))
         print(f"\ndocs check: {len(problems)} problem(s)")
