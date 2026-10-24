@@ -39,7 +39,7 @@ public enum FeedDiscovery {
                   let url = ArticleURL.validated(href, relativeTo: baseURL), !url.path.lowercased().hasSuffix(".svg"),
                   !(baseURL.scheme?.lowercased() == "https" && url.scheme?.lowercased() == "http") else { continue }
             let size = ((try? link.attr("sizes")) ?? "").lowercased().split(whereSeparator: \.isWhitespace)
-                .compactMap { $0.split(separator: "x").first.flatMap { Int($0) } }.max()
+                .compactMap { $0.split(separator: "x").first.flatMap { Int($0) } }.filter { $0 > 0 }.max()   // a size that is not positive counts as none
             let fit = switch size { case .some(let size) where size >= 32: (0, size); case .some(let size): (2, -size); case nil: (1, 0) }
             let rank = (touch ? 1 : 0, fit.0 * 100_000 + fit.1)
             if best == nil || rank < best!.rank { best = (rank, url) }

@@ -20,6 +20,13 @@ import Testing
         #expect(icon(#"<link rel="icon" href="/s.png" sizes="16x16"><link rel="icon" href="/m.png" sizes="48x48">"#) == "https://blog.example/m.png")
         #expect(icon(#"<link rel="icon" href="/s.png" sizes="16x16">"#) == "https://blog.example/s.png")
     }
+    @Test func sizesThatAreNotPositiveCountAsNoSize() {
+        // The page writes `sizes`; a negative number must not overflow the ranking (review of #443).
+        for bad in ["\(Int.min)x\(Int.min)", "\(Int.min + 1)x1", "-5x-5", "0x0"] {
+            #expect(icon(#"<link rel="icon" href="/bad.png" sizes="\#(bad)"><link rel="icon" href="/s.png" sizes="16x16">"#) == "https://blog.example/bad.png", "\(bad)")
+            #expect(icon(#"<link rel="icon" href="/bad.png" sizes="\#(bad)"><link rel="icon" href="/m.png" sizes="32x32">"#) == "https://blog.example/m.png", "\(bad)")
+        }
+    }
     @Test func relIsReadLikeTheBrowsersDo() {
         #expect(icon(#"<link rel="Shortcut Icon" href="favicon.png">"#, base: URL(string: "https://blog.example/posts/")!) == "https://blog.example/posts/favicon.png")
         #expect(icon(#"<link rel="apple-touch-icon-precomposed" href="/touch.png">"#) == "https://blog.example/touch.png")
