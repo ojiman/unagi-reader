@@ -45,7 +45,7 @@ struct ArticleDetailView: View {
                 paragraphs: available ? (translated?.paragraphs.map(\.text) ?? content!.paragraphs) : [],
                 unavailable: available ? nil : (article.contentDeletedAt != nil ? String(localized: "The article body and RSS summary have been deleted.", bundle: ReaderLocalization.bundle) : String(localized: "The article body is unavailable.", bundle: ReaderLocalization.bundle)),
                 initialAnchor: initialAnchor, initialOffset: initialOffset, reduceMotion: reduceMotion || !pageMotion, onScroll: onScroll, onInteraction: onInteraction, onDisplayBegin: onDisplayBegin, onDisplayed: onDisplayed,
-                imageLoader: imageLoader, heroURL: available ? article.imageURL.flatMap { ArticleURL.validated($0) } : nil,
+                imageLoader: imageLoader, heroURL: available && !content!.bodyParagraphs.contains { $0.images != nil } ? article.imageURL.flatMap { ArticleURL.validated($0) } : nil,
                 bodyParagraphs: available ? (translated?.paragraphs ?? content!.bodyParagraphs) : nil, pageForward: pageForward,
                 textScale: CGFloat(ArticleTextSize.scale(textSize)))
         }.background(AppPalette.surfaceColor)
