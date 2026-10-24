@@ -4,13 +4,9 @@ How to start Unagi Reader, how it keeps your data, and how to use it. This guide
 
 ## 1. Start the app
 
-You need macOS 27.0 or later and the Swift toolchain from Xcode. From the project folder:
+You need an Apple silicon Mac with macOS 27.0 or later. Download the DMG from the [latest release](https://github.com/ojiman/unagi-reader/releases/latest), drag Unagi Reader to Applications and open it. The app is not notarized, so the first time, and after each update, macOS asks you to choose Open Anyway in System Settings ▸ Privacy & Security. The [README](../README.md#install) explains why, and how to check that the download is genuine. To update, download the new DMG and replace the app.
 
-```sh
-bash scripts/build-app.sh release
-```
-
-This makes `.build/Unagi Reader.app`; open it from Finder. It is ad hoc signed, not signed with a Developer ID and not notarized.
+To build from source, you need the Swift toolchain from Xcode. From the project folder, `bash scripts/build-app.sh release` makes `.build/Unagi Reader.app`.
 
 To look around without your real library, start a separate copy with synthetic subscriptions:
 
@@ -23,12 +19,12 @@ Run the launch command it prints. It uses a temporary app with its own bundle ID
 ## 2. Your data
 
 - The library is `~/Library/Application Support/UnagiReader/Reader.store`. A new library starts empty. Restarting the same version keeps everything.
-- **During the beta, a new version may not open an older library.** The app then shows 「ライブラリを開けませんでした」 (Could not open the library) and never deletes or recreates it by itself. From 1.0, data is kept across updates.
-- If an older library with several notes can be opened, the app keeps only the note you edited last and deletes the other notes. This cannot be undone; back up before updating. This does not guarantee that every older beta library can be opened.
+- **From 1.0, an update keeps your library.** A library from a beta (before 1.0) may not open in a newer version. The app then shows 「ライブラリを開けませんでした」 (Could not open the library) and never deletes or recreates it by itself.
+- If an older library with several notes can be opened, the app keeps only the note you edited last and deletes the other notes. This cannot be undone; back up before updating. This does not guarantee that every beta library can be opened.
 
 ### Back up the library by hand
 
-Do this before you update a beta, or when the app cannot open the library and you want to start again empty. These steps have not been tried on a real Mac yet.
+Do this before you update from a beta, or when the app cannot open the library and you want to start again empty. These steps have not been tried on a real Mac yet.
 
 1. Quit Unagi Reader (⌘Q).
 2. In Finder choose Go ▸ Go to Folder (移動 ▸ フォルダへ移動) and open `~/Library/Application Support/`.
