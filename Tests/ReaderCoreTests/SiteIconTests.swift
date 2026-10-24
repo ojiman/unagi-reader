@@ -104,7 +104,7 @@ import Testing
         #expect(store.feeds.first?.iconURL == home.appending(path: "icon.png").absoluteString)
     }
     @Test func aSavedPageIconNotifiesTheFeedsReaders() async throws {
-        // The sidebar's icon view reads the address from the feed; the save must notify it (review of #443).
+        // The sidebar and the list read the address from the feed; the save must notify them.
         let library = try TestLibrary(); defer { library.cleanup() }
         let store = try ReaderStore(url: library.url, now: .now)
         let home = site(), url = home.appending(path: "feed")

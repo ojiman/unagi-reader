@@ -374,7 +374,7 @@ import SwiftData
     }
 
     /// Keeps the icon a subscription's home page names (#441), unless the subscription changed its address or got an icon meanwhile.
-    /// The library's own model takes the value, so a view that reads it (`SubscriptionIconView`) is notified.
+    /// The library's own model takes the value, so the views that read it are notified.
     func setPageIcon(_ icon: URL, feedID: UUID, sourceURL: String) throws {
         try reloadIfNeeded()
         guard let feed = feed(id: feedID), feed.sourceURL == sourceURL, feed.iconURL == nil else { return }

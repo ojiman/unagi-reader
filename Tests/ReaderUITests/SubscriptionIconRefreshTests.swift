@@ -5,8 +5,8 @@ import Testing
 @testable import UnagiReader
 
 /// An icon found on the home page after a refresh (#441) reaches the selected sidebar row at once, as it reaches the article list: the
-/// subscription and its article stay selected. Seen in the packaged app (review of #443): the list showed the icon, the sidebar row kept
-/// its fallback symbol until another subscription was selected.
+/// subscription and its article stay selected. A review of #443 reported the selected row stale from window captures; it was not
+/// reproduced, and this test guards it.
 @Suite(EnglishLanguage()) @MainActor struct SubscriptionIconRefreshTests {
     /// The feed (one entry, no icon), its home page (naming `/icon.png`, held until released) and a magenta icon.
     private actor Site: HTTPFetching {
