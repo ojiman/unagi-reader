@@ -63,7 +63,7 @@ A decision record says who decided what, when and why. It is not where the curre
 | [0067](0067-an-article-belongs-to-one-subscription.md) | An article belongs to one subscription | valid (built) |
 | [0068](0068-an-ad-hoc-signed-dmg-on-github-releases.md) | Product 1.0 is an ad hoc signed DMG on GitHub Releases, built by CI from a tag | valid (workflow built) |
 | [0069](0069-vision-wording-for-1-0.md) | The vision's wording for 1.0 | valid |
-| [0070](0070-the-note-closes-at-once.md) | The note closes at once | valid |
+| [0070](0070-closing-the-note-has-no-reverse-motion.md) | Closing the note has no reverse motion | valid |
 
 ## Removed from the working tree
 

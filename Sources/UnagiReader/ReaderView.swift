@@ -633,7 +633,7 @@ struct ReaderView: View {
         moveNote()
         if focusEditor { noteLink.focusWhenShown() }
     }
-    /// The note's ✕, `Esc` and the note's toggle restore the reading layout at once (specification 3.1.3).
+    /// The note's ✕, `Esc` and the note's toggle close the note without the reverse motion (specification 3.1.3, decision 0070).
     private func closeNote() {
         guard noteOpen else { return }
         noteLink.cancelFocus()
@@ -650,7 +650,7 @@ struct ReaderView: View {
         listFocused = false
         Task { @MainActor in listFocused = true }
     }
-    /// Opens with the left columns folding away (decision 0049); closes all columns at once (#215).
+    /// Opens with the left columns folding away (decision 0049); closes the note and the list at once, the sidebar with the system's slide (#215).
     private func moveNote() {
         ReaderPerformance.motionBegan(noteOpen ? "note-close" : "note-open", duration: SidebarFold.motionDuration)
         // Keep a split-view animation transaction: nil can widen a narrow window when the sidebar returns (#215).
