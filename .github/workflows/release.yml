@@ -1,0 +1,90 @@
+name: Unagi Reader release
+
+# Decision 0068: a tag vX.Y.Z builds the ad hoc signed DMG from that commit, with its SHA-256 and a build provenance
+# attestation, as a draft release. The owner checks that DMG on macOS 27 and publishes the draft; this workflow never
+# publishes. A release that already exists for the tag is not replaced.
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  draft:
+    name: draft
+    # The same build floor as ci.yml's release job (docs/architecture.md#5-build-and-ci).
+    runs-on: macos-26
+    timeout-minutes: 30
+    permissions:
+      contents: write # the draft release
+      id-token: write # the attestation's signing certificate
+      attestations: write # the attestation itself
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          # The build number counts every commit (scripts/build-app.sh), and the tag must be on main.
+          fetch-depth: 0
+      - name: Check the tag
+        run: |
+          version=$(bash scripts/release-version.sh "$TAG")
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "DMG=$RUNNER_TEMP/release/UnagiReader-$version.dmg" >> "$GITHUB_ENV"
+          {
+            git rev-parse HEAD
+            sw_vers
+            uname -m
+            xcodebuild -version
+            swift --version
+          } | tee "$RUNNER_TEMP/environment.txt"
+      - name: Build and verify the ad hoc Release app
+        run: |
+          UNAGI_READER_VERSION=$VERSION bash scripts/build-app.sh release
+          UNAGI_READER_VERSION=$VERSION bash scripts/test-build-app.sh
+      - name: Make the DMG
+        run: bash scripts/make-dmg.sh ".build/Unagi Reader.app" "$DMG"
+      - name: Attest the build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ env.DMG }}
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          name=$(basename "$DMG")
+          sha=$(cut -d ' ' -f 1 "$DMG.sha256")
+          commit=$(git rev-parse HEAD)
+          notes="$RUNNER_TEMP/notes.md"
+          cat > "$notes" <<NOTES
+          **Before publishing:** write what changed, and install this DMG on macOS 27.
+
+          ## Install
+
+          Open \`$name\` and drag Unagi Reader to Applications. The app is ad hoc signed and not notarized, so macOS stops it the first time, and again after each update: choose Open Anyway in System Settings ▸ Privacy & Security. The library in \`~/Library/Application Support/UnagiReader/\` is kept.
+
+          ## Check the download
+
+          GitHub Actions built this DMG from commit $commit; nothing was built or uploaded by hand.
+
+          \`\`\`sh
+          gh attestation verify $name --repo $REPO
+          shasum -a 256 $name
+          \`\`\`
+
+          SHA-256: \`$sha\`
+          NOTES
+          gh release create "$TAG" "$DMG" "$DMG.sha256" --repo "$REPO" --draft --verify-tag \
+            --title "Unagi Reader $VERSION" --notes-file "$notes"

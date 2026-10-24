@@ -30,6 +30,7 @@ local_log=$(mktemp /private/tmp/unagi-reader-local-tests.XXXXXX)
 swift test --scratch-path /private/tmp/unagi-reader-dogfooding-build --filter "$(bash scripts/ci-gate.sh local-tests)" --xunit-output "$local_log.xml" > "$local_log" 2>&1 &&
     bash scripts/check-test-log.sh "$local_log" "$local_log-swift-testing.xml" # CI-excluded tests; scope in architecture 5
 bash scripts/build-app.sh release                                        # ad hoc signed .build/Unagi Reader.app (debug is the default)
+bash scripts/make-dmg.sh '.build/Unagi Reader.app' <new>.dmg              # the release disk image and its .sha256 (test: scripts/test-make-dmg.sh)
 bash scripts/fetch-ci-app.sh <PR number>                                  # a PR's CI-built app, without the quarantine attribute (needs gh)
 bash scripts/make-synthetic-copy.sh                                      # copies the built app with a synthetic bundle ID; prints the launch command
 bash scripts/test-make-synthetic-copy.sh                                 # copy, path refusal and failure checks (no app is launched)
