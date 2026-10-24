@@ -9,7 +9,7 @@ The owner already uses the beta daily and fixes problems found there. This is th
 The milestone [1.0](https://github.com/ojiman/unagi-reader/milestone/1) tracks required release work. **1.0 is ready when its milestone issues and the shipping conditions below are complete.** Next and Candidates are not automatically required for 1.0.
 
 1. **Real-device check by the owner:** [#145](https://github.com/ojiman/unagi-reader/issues/145) and a week of daily use. Bugs found here come before any polish.
-2. **Shipping conditions:** [specification 7.1](specification.md#71-conditions-to-ship-10), including data preservation across updates from 1.0. Before the tag: the frozen schema [#449](https://github.com/ojiman/unagi-reader/issues/449) and the fixed values with the beta library check [#451](https://github.com/ojiman/unagi-reader/issues/451). After the tag `v1.0.0` and before the owner publishes the draft: the CI check from 1.0 [#450](https://github.com/ojiman/unagi-reader/issues/450).
+2. **Shipping conditions:** [specification 7.1](specification.md#71-conditions-to-ship-10), including data preservation across updates from 1.0. Before the tag: the fixed values with the beta library check [#451](https://github.com/ojiman/unagi-reader/issues/451). After the tag `v1.0.0` and before the owner publishes the draft: the CI check from 1.0 [#450](https://github.com/ojiman/unagi-reader/issues/450).
 3. **Distribution:** an ad hoc signed DMG on GitHub Releases, built by CI from a tag ([decision 0068](decisions/0068-an-ad-hoc-signed-dmg-on-github-releases.md)). The owner tags the release and publishes the draft.
 4. **Documents:** prune them before the release (the second pass was done on 2026-10-14).
 
