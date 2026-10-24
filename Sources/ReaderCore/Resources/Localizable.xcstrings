@@ -6617,6 +6617,53 @@
         }
       }
     },
+    "Send Article to Note (i, ⌘K)": {
+      "comment": "Sources/UnagiReader/ReaderView.swift",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send Article to Note (i, ⌘K)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記事をノートに送る (i, ⌘K)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将文章发送到笔记 (i, ⌘K)"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "將文章傳送到筆記 (i, ⌘K)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기사를 노트로 보내기 (i, ⌘K)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enviar artículo a la nota (i, ⌘K)"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enviar artigo para a nota (i, ⌘K)"
+          }
+        }
+      }
+    },
     "Send article to note (selected text becomes a quotation)": {
       "comment": "Sources/ReaderCore/ReaderShortcuts.swift",
       "localizations": {
