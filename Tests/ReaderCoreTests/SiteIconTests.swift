@@ -118,7 +118,7 @@ import Testing
         try store.setPageIcon(home.appending(path: "other.png"), feedID: feed.id, sourceURL: url.absoluteString)
         #expect(store.feed(id: feed.id)?.iconURL == home.appending(path: "icon.png").absoluteString)
     }
-    @Test func aSlowHomePageNeverHoldsBackTheRefresh() async throws {
+    @Test(.timeLimit(.minutes(5))) func aSlowHomePageNeverHoldsBackTheRefresh() async throws {
         let library = try TestLibrary(); defer { library.cleanup() }
         let store = try ReaderStore(url: library.url, now: .now)
         let list = (0..<4).map { OPMLFeed(title: "F\($0)", url: URL(string: "https://p\($0).example/feed")!, siteURL: nil, folder: "") }
@@ -127,9 +127,10 @@ import Testing
         let refresh = FeedRefreshController(store: store, client: FeedClient(http: pages))
         let running = Task { await refresh.refresh(feedIDs: ids) }
         // Four feeds and three request slots: the fourth starts only when a slot is free, so all four articles mean the held pages took none.
-        let deadline = ContinuousClock.now + .seconds(30)
-        while store.articles.count < 4 && ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
-        #expect(store.articles.count == 4 && store.feeds.allSatisfy { $0.iconURL == nil })
+        // The pages stay held until then, so no wall-clock budget: other main-actor tests of a CI run can hold the main actor for tens of
+        // seconds (a 30 s budget failed there twice); the time limit only ends a run that hangs.
+        while store.articles.count < 4 { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(store.feeds.allSatisfy { $0.iconURL == nil })
         await pages.release()
         await running.value
         await refresh.iconLookupsFinished()
