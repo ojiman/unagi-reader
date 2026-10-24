@@ -40,7 +40,8 @@ import Foundation
 import ReaderCore
 
 // Two subscriptions (one in a folder), an article with a body, one with a summary only, one whose body was deleted, a read and starred
-// article, a second Star, 90 days of retention and the note. expected.json records what this release reads back.
+// article, one read and then marked unread (its first-read time stays), a second Star, 90 days of retention and the note.
+// expected.json records what this release reads back, including the memberships that build the subscription lists.
 @main struct ReleaseStore {
     @MainActor static func main() throws {
         let destination = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
@@ -68,8 +69,10 @@ import ReaderCore
             guard let found = store.articles.first(where: { $0.title == title }) else { fatalError("no synthetic article \(title)") }
             return found
         }
-        let read = article("本文のある記事"), deleted = article("本文を消した記事"), starred = article("未分類の記事")
+        let read = article("本文のある記事"), unread = article("要約だけの記事"), deleted = article("本文を消した記事"), starred = article("未分類の記事")
         try store.markDisplayed(articleID: read.id, at: at.addingTimeInterval(60))
+        try store.markDisplayed(articleID: unread.id, at: at.addingTimeInterval(90))
+        try store.setRead(unread, false)
         try store.setStar(articleID: read.id, isStarred: true, at: at.addingTimeInterval(120))
         try store.setStar(articleID: starred.id, isStarred: true, at: at.addingTimeInterval(130))
         try store.deleteContent(articleIDs: [deleted.id], at: at.addingTimeInterval(140))
@@ -80,7 +83,7 @@ import ReaderCore
             let content = try store.content(articleID: item.id, at: at.addingTimeInterval(200))
             articles.append([
                 "id": item.id.uuidString, "feedID": item.feedID.uuidString, "title": item.title, "identityKey": item.identityKey ?? "",
-                "firstReadAt": item.firstReadAt?.timeIntervalSince1970 ?? -1, "starredAt": item.starredAt?.timeIntervalSince1970 ?? -1,
+                "firstReadAt": item.firstReadAt?.timeIntervalSince1970 ?? -1, "isRead": item.isRead, "starredAt": item.starredAt?.timeIntervalSince1970 ?? -1,
                 "text": content.map { $0.text as Any } ?? NSNull(), "links": content?.bodyParagraphs.flatMap { $0.links.map(\.url) } ?? []
             ])
         }
@@ -88,7 +91,14 @@ import ReaderCore
             "tag": tag, "commit": commit, "at": at.timeIntervalSince1970, "readAt": at.addingTimeInterval(200).timeIntervalSince1970,
             "feeds": store.feeds.map { ["id": $0.id.uuidString, "title": $0.title, "folder": $0.folder, "sourceURL": $0.sourceURL] },
             "feedID": feed.id.uuidString, "otherFeedID": other.id.uuidString, "articles": articles,
-            "retentionDays": store.retentionDays, "noteText": store.note?.text ?? "", "noteCount": store.notes.count
+            "retentionDays": store.retentionDays, "noteText": store.note?.text ?? "", "noteCount": store.notes.count,
+            "memberships": store.memberships.map { ["feedID": $0.feedID.uuidString, "articleID": $0.articleID.uuidString, "sourceID": $0.sourceID] },
+            "lists": store.feeds.map { feed in
+                ["feedID": feed.id.uuidString,
+                 "all": store.visibleArticleIDs(feedID: feed.id, unreadOnly: false, keeping: nil).map(\.uuidString),
+                 "unread": store.visibleArticleIDs(feedID: feed.id, unreadOnly: true, keeping: nil).map(\.uuidString)]
+            },
+            "unreadCount": store.unreadCount
         ]
         try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys, .prettyPrinted])
             .write(to: destination.appending(path: "expected.json"))
