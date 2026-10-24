@@ -103,20 +103,20 @@ import Testing
         await refresh.iconLookupsFinished()
         #expect(store.feeds.first?.iconURL == home.appending(path: "icon.png").absoluteString)
     }
-    @Test func aSavedPageIconIsPublished() async throws {
+    @Test func aSavedPageIconNotifiesTheFeedsReaders() async throws {
+        // The sidebar's icon view reads the address from the feed; the save must notify it (review of #443).
         let library = try TestLibrary(); defer { library.cleanup() }
         let store = try ReaderStore(url: library.url, now: .now)
         let home = site(), url = home.appending(path: "feed")
         let feed = try store.importFeed(FeedParser.parse(rss(site: home), sourceURL: url))
-        let revision = store.iconRevision
         final class Flag: @unchecked Sendable { nonisolated(unsafe) var raised = false }
         let notified = Flag()
-        withObservationTracking { _ = store.iconRevision } onChange: { notified.raised = true }
+        withObservationTracking { _ = feed.iconURL } onChange: { notified.raised = true }
         try store.setPageIcon(home.appending(path: "icon.png"), feedID: feed.id, sourceURL: url.absoluteString)
-        #expect(notified.raised && store.iconRevision == revision + 1)
-        // Nothing saved, nothing published: the subscription has an icon now.
+        #expect(notified.raised && feed.iconURL == home.appending(path: "icon.png").absoluteString)
+        // A subscription that has an icon keeps it.
         try store.setPageIcon(home.appending(path: "other.png"), feedID: feed.id, sourceURL: url.absoluteString)
-        #expect(store.iconRevision == revision + 1 && store.feed(id: feed.id)?.iconURL == home.appending(path: "icon.png").absoluteString)
+        #expect(store.feed(id: feed.id)?.iconURL == home.appending(path: "icon.png").absoluteString)
     }
     @Test func aSlowHomePageNeverHoldsBackTheRefresh() async throws {
         let library = try TestLibrary(); defer { library.cleanup() }

@@ -279,7 +279,6 @@ struct ReaderView: View {
 
     /// The sidebar's rows: the three views, then the subscriptions, unfiled first and then by folder.
     private var sidebarList: some View {
-        _ = store.iconRevision                                      // a page icon is saved without a new list of feeds (#441)
         let grouped = Dictionary(grouping: store.feeds, by: \.folder)
         let folders = grouped.keys.filter { !$0.isEmpty }.sorted()
         return List(selection: $scope) {
