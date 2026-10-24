@@ -62,6 +62,7 @@ A decision record says who decided what, when and why. It is not where the curre
 | [0066](0066-the-feed-html-as-the-feed-gives-it.md) | The article shows the feed's HTML as the feed gives it, in native text | valid (built) |
 | [0067](0067-an-article-belongs-to-one-subscription.md) | An article belongs to one subscription | valid (built) |
 | [0068](0068-an-ad-hoc-signed-dmg-on-github-releases.md) | Product 1.0 is an ad hoc signed DMG on GitHub Releases, built by CI from a tag | valid (workflow built) |
+| [0069](0069-vision-wording-for-1-0.md) | The vision's wording for 1.0 | valid |
 
 ## Removed from the working tree
 
