@@ -274,8 +274,8 @@ import Carbon
         XCTAssertTrue(app.outlines.staticTexts["Smoke local feed"].exists)
     }
 
-    // #441, review of #443: an icon found on the home page after a refresh reaches the selected sidebar row, as it reaches the article
-    // list. The packaged app showed it in the list while the selected row kept its fallback symbol until another subscription was chosen.
+    // #441: an icon found on the home page after a refresh reaches the selected sidebar row, as it reaches the article list. A review of
+    // #443 reported the row stale from window captures; it was not reproduced, and this case guards it in the packaged app.
     func testPageIconReachesTheSelectedSidebarRow() throws {
         useNormalWindow()
         let local = try XCTUnwrap(ProcessInfo.processInfo.environment["UNAGI_UI_SMOKE_FEED"])
