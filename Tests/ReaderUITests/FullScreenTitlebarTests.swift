@@ -15,6 +15,7 @@ extension SplitViewFoldTests {
             let center = NotificationCenter()
             let anchor = FullScreenTitlebarFix.Anchor(center: center)
             let frame = window.frame
+            window.toolbarStyle = .expanded
             try #require(window.contentView).addSubview(anchor)
             #expect(window.toolbar == nil)
             #expect(window.frame == frame)
@@ -23,21 +24,28 @@ extension SplitViewFoldTests {
                 _ = window.delegate?.window?(window, willUseFullScreenPresentationOptions: options)
                 let toolbar = try #require(window.toolbar)
                 #expect(toolbar.isVisible)
+                // #435: the revealed bar fits the window buttons.
+                #expect(window.toolbarStyle == .unifiedCompact)
                 #expect(window.frame == frame, "Preparing native full-screen controls must preserve the normal frame")
                 #expect(window.styleMask.contains(.fullSizeContentView))
                 window.delegate?.windowDidFailToEnterFullScreen?(window)
                 #expect(window.toolbar == nil)
+                #expect(window.toolbarStyle == .expanded)
                 _ = window.delegate?.window?(window, willUseFullScreenPresentationOptions: options)
                 center.post(name: NSWindow.willExitFullScreenNotification, object: window)
                 #expect(window.toolbar == nil)
                 window.delegate?.windowDidFailToExitFullScreen?(window)
                 #expect(toolbar.isVisible)
+                #expect(window.toolbarStyle == .unifiedCompact)
                 window.delegate?.windowDidExitFullScreen?(Notification(name: NSWindow.didExitFullScreenNotification, object: window))
                 #expect(window.toolbar == nil)
+                #expect(window.toolbarStyle == .expanded)
                 #expect(window.frame == frame)
             }
+            _ = window.delegate?.window?(window, willUseFullScreenPresentationOptions: [.fullScreen, .autoHideMenuBar])
             anchor.removeFromSuperview()
             #expect(window.toolbar == nil)
+            #expect(window.toolbarStyle == .expanded)
             _ = window.delegate?.window?(window, willUseFullScreenPresentationOptions: [.fullScreen, .autoHideMenuBar])
             #expect(window.toolbar == nil)
         }
