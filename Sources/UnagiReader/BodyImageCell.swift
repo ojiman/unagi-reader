@@ -41,7 +41,8 @@ final class BodyImageCell: NSTextAttachmentCell {
         return fit(to: column)
     }
 
-    override func cellSize() -> NSSize { size }
+    /// The SDK declares this nonisolated; the text view's layout calls it on the main thread (no background layout).
+    override nonisolated func cellSize() -> NSSize { MainActor.assumeIsolated { size } }
     override func cellBaselineOffset() -> NSPoint { .zero }
     override func wantsToTrackMouse() -> Bool { false }
     override func draw(withFrame cellFrame: NSRect, in controlView: NSView?) {
