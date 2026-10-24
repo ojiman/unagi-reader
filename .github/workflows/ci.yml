@@ -107,8 +107,8 @@ jobs:
           retention-days: 7
 
   # The optimized build, the ad hoc signature, and the packaged app. It takes the longest, so a pull request runs it
-  # only when it changes how the app is built or packaged (Package.swift, scripts/build-app.sh, the notices file,
-  # app assets, or the workflows). Every push to main and every manual run builds it.
+  # only when it changes how the app is built or packaged (Package.swift, scripts/build-app.sh, scripts/make-dmg.sh,
+  # the notices file, app assets, or the workflows). Every push to main and every manual run builds it.
   release:
     name: release
     needs: changes
@@ -144,6 +144,10 @@ jobs:
           codesign --verify --deep --strict "$package_dir/Unagi Reader.app"
           test -s "$package_dir/Unagi Reader.app/Contents/Resources/AppIcon.icns"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$package_dir/Unagi Reader.app/Contents/Info.plist")" = AppIcon
+      - name: Make and check the DMG
+        run: |
+          bash scripts/test-make-dmg.sh
+          bash scripts/make-dmg.sh ".build/Unagi Reader.app" "$CI_RESULTS/UnagiReader-0.0.0.dmg"
       - name: Save logs and artifacts
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -175,6 +179,8 @@ jobs:
         run: bash scripts/test-check-test-log.sh
       - name: Test the UI smoke support
         run: bash scripts/test-run-ui-smoke.sh
+      - name: Test the release tag check
+        run: bash scripts/test-release-version.sh
       - name: Test the documents check
         run: bash scripts/test-check-docs.sh
       - name: Check the documents (links, decision numbers, status marks and issues in the roadmap)
