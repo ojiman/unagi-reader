@@ -15,7 +15,7 @@ PY
 source_dir=$(mktemp -d /private/tmp/unagi-reader-v1-source.XXXXXX)
 baseline=${2:-53102cc42ea665b3379ad2a23d842c3186ad9c3e}
 case "$baseline" in
-    53102cc42ea665b3379ad2a23d842c3186ad9c3e|f9db83b49a82947a7031ddf874bc94fcb91ef89d|1007dce64ebc5d1c9d7ac6f0b3e05869c8581ba4|215b901ffc3863b3e1afd1e17a76b18101fc0cb6|52429b44c647a4a3ee2c95fb039bf99d5e674f18|ae8aa781856a586ab6fa10d17449e16fa0cddda8|60da7dff8ff3741afc0707652bedea256f9e83df) ;;
+    53102cc42ea665b3379ad2a23d842c3186ad9c3e|f9db83b49a82947a7031ddf874bc94fcb91ef89d|1007dce64ebc5d1c9d7ac6f0b3e05869c8581ba4|215b901ffc3863b3e1afd1e17a76b18101fc0cb6|52429b44c647a4a3ee2c95fb039bf99d5e674f18|ae8aa781856a586ab6fa10d17449e16fa0cddda8|60da7dff8ff3741afc0707652bedea256f9e83df|d37f41b9c72613f207c5fc2d3a59ef2485e23879) ;;
     *) echo "Use a tested baseline commit" >&2; exit 2 ;;
 esac
 git archive "$baseline" | tar -x -C "$source_dir"
@@ -186,6 +186,49 @@ import ReaderCore
             "keptUpdatedAt": at.addingTimeInterval(300).timeIntervalSince1970,
             "deletedNoteIDs": [old.id.uuidString, middle.id.uuidString],
             "firstReadAt": at.addingTimeInterval(60).timeIntervalSince1970
+        ]
+        try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys, .prettyPrinted])
+            .write(to: destination.appending(path: "expected.json"))
+    }
+}
+SWIFT
+fi
+if [ "$baseline" = "d37f41b9c72613f207c5fc2d3a59ef2485e23879" ]; then
+cat > "$source_dir/Sources/V1Fixture/main.swift" <<'SWIFT'
+import Foundation
+import ReaderCore
+
+// The store of `main` just before the schema got a version (#449): the six models of 1.0, written without a version. Two
+// subscriptions, one in a folder; a read and starred article; 90 days of retention; the note.
+@main struct V1Fixture {
+    @MainActor static func main() throws {
+        let destination = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
+        let at = Date(timeIntervalSince1970: 1_791_152_000)
+        let store = try ReaderStore(url: destination.appending(path: "Reader.store"), now: at)
+        let first = """
+        <rss version="2.0"><channel><title>合成フィード</title>
+        <item><guid>synthetic-1</guid><title>合成記事1</title><link>https://synthetic.example/article/1</link><description>合成RSS要約1</description></item>
+        <item><guid>synthetic-2</guid><title>合成記事2</title><link>https://synthetic.example/article/2</link><description>合成RSS要約2</description></item>
+        </channel></rss>
+        """
+        let second = """
+        <rss version="2.0"><channel><title>未分類の合成フィード</title>
+        <item><guid>other-1</guid><title>合成記事3</title><link>https://other.example/article/1</link><description>合成RSS要約3</description></item>
+        </channel></rss>
+        """
+        let feed = try store.importFeed(FeedParser.parse(Data(first.utf8), sourceURL: URL(string: "https://synthetic.example/rss")!), receivedAt: at)
+        try store.updateSubscription(feed, title: "合成購読", folder: "技術")
+        let other = try store.importFeed(FeedParser.parse(Data(second.utf8), sourceURL: URL(string: "https://other.example/rss")!), receivedAt: at)
+        guard let read = store.articles.first(where: { $0.title == "合成記事1" }) else { fatalError("no synthetic article") }
+        try store.markDisplayed(articleID: read.id, at: at.addingTimeInterval(60))
+        try store.setStar(articleID: read.id, isStarred: true, at: at.addingTimeInterval(120))
+        try store.applyRetention(days: 90, at: at)
+        try store.saveNote(text: "# 1.0 の前のノート\n- 残ること", at: at.addingTimeInterval(180))
+        let manifest: [String: Any] = [
+            "baseline": "d37f41b9c72613f207c5fc2d3a59ef2485e23879", "at": at.timeIntervalSince1970,
+            "feedID": feed.id.uuidString, "otherFeedID": other.id.uuidString, "readArticleID": read.id.uuidString,
+            "articleIDs": store.articles.map(\.id.uuidString), "noteText": store.note?.text ?? "",
+            "firstReadAt": at.addingTimeInterval(60).timeIntervalSince1970, "starredAt": at.addingTimeInterval(120).timeIntervalSince1970
         ]
         try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys, .prettyPrinted])
             .write(to: destination.appending(path: "expected.json"))
