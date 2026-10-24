@@ -24,6 +24,8 @@ struct ReaderView: View {
     @State private var saveError: String?
     /// How 「記事をノートに送る」 reaches the note's editor (specification 3.3).
     @State private var noteLink: NoteEditorLink
+    /// The reader's window, to see where the keyboard is when a menu key arrives (#315, #415).
+    @State private var window = WindowAnchor.Reference()
     @State private var loading: ArticleLoadingController
     private var displayedContent: ArticleContent? { loading.displayed }
     /// Set while the "add subscription" sheet is open: the folder the new subscription goes to.
@@ -215,6 +217,7 @@ struct ReaderView: View {
         .onKeyPress("s") { guard shortcutsEnabled else { return .ignored }; perform(.toggleStar); return .handled }
         .onKeyPress("v") { guard shortcutsEnabled else { return .ignored }; openOriginal(); return .handled }
         .onKeyPress("n") { guard shortcutsEnabled else { return .ignored }; toggleNote(); return .handled }
+        .background(WindowAnchor(reference: window))
     }
 
     /// The subscription sheet.
@@ -627,9 +630,11 @@ struct ReaderView: View {
         }
     }
     /// 「記事をノートに送る」 (specification 3.3): the article's link, or the text selected in it as a quotation, into the note. A closed note
-    /// opens first and takes the text at its end. The keyboard does not go into the note. Not from the original page.
+    /// opens first and takes the text at its end. The keyboard does not go into the note. Not from the original page, and not while
+    /// any field composes text: ⌘K is a menu key and reaches here from the filter field too (#415).
     private func sendToNote() {
-        guard originalPage.url == nil, let article = selectedArticle else { return }
+        guard originalPage.url == nil, !ReaderKeyboardCommands.hasMarkedText((window.view?.window ?? NSApp.keyWindow)?.firstResponder),
+              let article = selectedArticle else { return }
         let selected = translation.isOn(for: article.id) ? nil : ArticleTextView.selectedText(in: NSApp.keyWindow)
         let url = article.originalURL.flatMap { ArticleURL.link($0) }?.absoluteString
         guard let text = NoteClip.text(title: article.displayTitle, url: url, selection: selected) else { return }
