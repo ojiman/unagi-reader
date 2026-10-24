@@ -35,15 +35,12 @@ import SwiftData
     @ObservationIgnored private var reloadHook: (() throws -> Void)?
     @ObservationIgnored private var needsReload = false
 
-    public static var schema: Schema {
-        Schema([Feed.self, Article.self, ContentSnapshot.self, FeedMembership.self, ReaderSettings.self,
-                Note.self])
-    }
+    public static var schema: Schema { Schema(versionedSchema: ReaderSchemaV1.self) }
 
     public convenience init(url: URL, seedDemo: Bool = false, now: Date = .now) throws {
         let schema = Self.schema
         let configuration = ModelConfiguration("Reader", schema: schema, url: url, cloudKitDatabase: .none)
-        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let container = try ModelContainer(for: schema, migrationPlan: ReaderMigrationPlan.self, configurations: [configuration])
         try self.init(container: container, seedDemo: seedDemo, now: now)
     }
 
