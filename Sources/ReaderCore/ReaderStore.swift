@@ -373,6 +373,14 @@ import SwiftData
         try save(); try reload()
     }
 
+    /// Keeps the icon a subscription's home page names (#441), unless the subscription changed its address or got an icon meanwhile.
+    func setPageIcon(_ icon: URL, feedID: UUID, sourceURL: String) throws {
+        try reloadIfNeeded()
+        guard let feed = feed(id: feedID), feed.sourceURL == sourceURL, feed.iconURL == nil else { return }
+        feed.iconURL = icon.absoluteString
+        try save()
+    }
+
     public func unsubscribe(_ feed: Feed) throws {
         try reloadIfNeeded()
         guard let feed = self.feed(id: feed.id) else { return }

@@ -41,38 +41,35 @@ import Testing
         Data("<rss><channel><title>T</title><link>\(site.absoluteString)</link>\(image.map { "<image><url>\($0)</url></image>" } ?? "")<item><guid>1</guid><title>A</title></item></channel></rss>".utf8)
     }
     private func html(_ head: String) -> Data { Data("<!doctype html><html><head>\(head)</head><body>home</body></html>".utf8) }
-    private func parsed(_ result: FeedFetchResult) -> ParsedFeed? { if case .modified(let parsed, _, _) = result { parsed } else { nil } }
+    private func feed(site: URL, image: String? = nil) throws -> ParsedFeed { try FeedParser.parse(rss(site: site, image: image), sourceURL: site.appending(path: "feed")) }
 
     @Test func aFeedWithoutAnIconTakesTheOneItsHomePageNames() async throws {
-        let home = site(), feed = home.appending(path: "feed")
-        StubURLProtocol.register(.init(data: rss(site: home)), at: feed)
+        let home = site()
         StubURLProtocol.register(.init(data: html(#"<link rel="icon" href="/icon.png" sizes="32x32">"#)), at: home)
-        #expect(parsed(try await client.fetch(url: feed, findsPageIcon: true))?.iconURL == home.appending(path: "icon.png"))
+        #expect(await client.pageIcon(for: try feed(site: home)) == home.appending(path: "icon.png"))
         // A page that names none settles on its /favicon.ico, so it is not read again.
-        let bare = site(), bareFeed = bare.appending(path: "feed")
-        StubURLProtocol.register(.init(data: rss(site: bare)), at: bareFeed)
+        let bare = site()
         StubURLProtocol.register(.init(data: html("<title>Home</title>")), at: bare)
-        #expect(parsed(try await client.fetch(url: bareFeed, findsPageIcon: true))?.iconURL == bare.appending(path: "favicon.ico"))
+        #expect(await client.pageIcon(for: try feed(site: bare)) == bare.appending(path: "favicon.ico"))
     }
-    @Test func aMissingPageNeverStopsTheFeed() async throws {
+    @Test func aPageThatCannotBeReadDecidesNothing() async throws {
         for reply in [StubURLProtocol.Reply(status: 404), .init(error: .timedOut), .init(data: Data(repeating: 65, count: 3 * 1024 * 1024))] {
-            let home = site(), feed = home.appending(path: "feed")
-            StubURLProtocol.register(.init(data: rss(site: home)), at: feed)
+            let home = site()
             StubURLProtocol.register(reply, at: home)
-            let result = try #require(parsed(try await client.fetch(url: feed, findsPageIcon: true)))
-            #expect(result.entries.count == 1 && result.iconURL == nil)          // nothing decided: the next refresh asks again
+            #expect(await client.pageIcon(for: try feed(site: home)) == nil)        // the next refresh asks again
         }
     }
-    @Test func thePageIsReadOnlyWhenTheIconIsUnknown() async throws {
-        let home = site(), feed = home.appending(path: "feed")
-        StubURLProtocol.register(.init(data: rss(site: home)), at: feed)
-        StubURLProtocol.register(.init(data: html(#"<link rel="icon" href="/icon.png">"#)), at: home)
-        #expect(parsed(try await client.fetch(url: feed))?.iconURL == nil)
-        #expect(StubURLProtocol.request(at: home) == nil)
-        let own = site(), ownFeed = own.appending(path: "feed")
-        StubURLProtocol.register(.init(data: rss(site: own, image: own.appending(path: "logo.png").absoluteString)), at: ownFeed)
+    @Test func aRefreshReadsThePageOnlyWhenTheIconIsUnknown() async throws {
+        let library = try TestLibrary(); defer { library.cleanup() }
+        let store = try ReaderStore(url: library.url, now: .now)
+        let own = site(), ownURL = own.appending(path: "feed")
+        StubURLProtocol.register(.init(data: rss(site: own, image: own.appending(path: "logo.png").absoluteString)), at: ownURL)
         StubURLProtocol.register(.init(data: html(#"<link rel="icon" href="/icon.png">"#)), at: own)
-        #expect(parsed(try await client.fetch(url: ownFeed, findsPageIcon: true))?.iconURL == own.appending(path: "logo.png"))
+        let ownFeed = try store.importFeed(FeedParser.parse(rss(site: own), sourceURL: ownURL))
+        let refresh = FeedRefreshController(store: store, client: client)
+        await refresh.refresh(feedIDs: [ownFeed.id])
+        await refresh.iconLookupsFinished()
+        #expect(store.feed(id: ownFeed.id)?.iconURL == own.appending(path: "logo.png").absoluteString)
         #expect(StubURLProtocol.request(at: own) == nil)                         // the feed's own icon comes first
     }
     @Test func aSiteAddressGivesItsIconWithItsFeed() async throws {
@@ -90,10 +87,45 @@ import Testing
         StubURLProtocol.register(.init(data: html(#"<link rel="icon" href="/icon.png">"#)), at: home)
         let refresh = FeedRefreshController(store: store, client: client)
         await refresh.refresh(feedIDs: [feed.id])
+        await refresh.iconLookupsFinished()
         #expect(store.feeds.first?.iconURL == home.appending(path: "icon.png").absoluteString)
         // Known now: the next refresh does not read the page, and keeps the icon.
         StubURLProtocol.register(.init(data: html(#"<link rel="icon" href="/other.png">"#)), at: home)
         await refresh.refresh(feedIDs: [feed.id])
+        await refresh.iconLookupsFinished()
         #expect(store.feeds.first?.iconURL == home.appending(path: "icon.png").absoluteString)
+    }
+    @Test func aSlowHomePageNeverHoldsBackTheRefresh() async throws {
+        let library = try TestLibrary(); defer { library.cleanup() }
+        let store = try ReaderStore(url: library.url, now: .now)
+        let list = (0..<4).map { OPMLFeed(title: "F\($0)", url: URL(string: "https://p\($0).example/feed")!, siteURL: nil, folder: "") }
+        let ids = try store.importSubscriptions(list).addedFeedIDs
+        let pages = HeldPages()
+        let refresh = FeedRefreshController(store: store, client: FeedClient(http: pages))
+        let running = Task { await refresh.refresh(feedIDs: ids) }
+        // Four feeds and three request slots: the fourth starts only when a slot is free, so all four articles mean the held pages took none.
+        let deadline = ContinuousClock.now + .seconds(30)
+        while store.articles.count < 4 && ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(store.articles.count == 4 && store.feeds.allSatisfy { $0.iconURL == nil })
+        await pages.release()
+        await running.value
+        await refresh.iconLookupsFinished()
+        #expect(store.feeds.allSatisfy { $0.iconURL == "https://\(URL(string: $0.sourceURL ?? "")?.host ?? "")/icon.png" })
+    }
+}
+
+/// Feeds answer at once; home pages wait until they are released, then name `/icon.png`.
+private actor HeldPages: HTTPFetching {
+    private var held: [CheckedContinuation<Void, Never>] = []
+    private var released = false
+    func release() { released = true; held.forEach { $0.resume() }; held = [] }
+    func fetch(url: URL, headers: [String: String], maximumBytes: Int) async throws -> HTTPResponse {
+        let host = url.host ?? ""
+        if url.path == "/" {
+            if !released { await withCheckedContinuation { held.append($0) } }
+            return HTTPResponse(data: Data(#"<html><head><link rel="icon" href="/icon.png"></head></html>"#.utf8), finalURL: url, statusCode: 200, headers: [:])
+        }
+        let xml = "<rss><channel><title>\(host)</title><item><guid>\(host)</guid><title>A</title></item></channel></rss>"
+        return HTTPResponse(data: Data(xml.utf8), finalURL: url, statusCode: 200, headers: [:])
     }
 }
