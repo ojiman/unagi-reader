@@ -73,15 +73,10 @@ import ReaderCore
             append(paragraph, size: 16)
             guard let blocks = bodyParagraphs, blocks.indices.contains(index), blocks[index].text == paragraph else { paragraphRanges.append(range); continue }
             let block = blocks[index]
-            var indent: CGFloat?
-            if block.quoteDepth > 0 {
-                let depth = CGFloat(min(block.quoteDepth, 3)) * 20
-                let style = NSMutableParagraphStyle(); style.lineSpacing = 8 * scale; style.paragraphSpacing = 22 * scale
-                style.headIndent = depth; style.firstLineHeadIndent = depth
-                // With its newline: a paragraph of images only has no text, and its images take the style from it.
-                document.addAttributes([.paragraphStyle: style, .foregroundColor: NSColor.secondaryLabelColor], range: NSRange(location: range.location, length: range.length + 1))
-                indent = depth
-            }
+            let indent: CGFloat? = block.quoteDepth > 0 ? CGFloat(min(block.quoteDepth, 3)) * 20 : nil
+            Self.applyLook(of: block, to: document, range: range, quoteIndent: indent ?? 0, scale: scale)
+            // A code block's lines are lines, not paragraphs: no paragraph gap between them. Same length, so anchors stay; copy turns them back.
+            if block.code == true { document.mutableString.replaceOccurrences(of: "\n", with: "\u{2028}", options: [], range: range) }
             for link in block.links {
                 guard link.location >= 0, link.length > 0, link.location <= range.length, link.length <= range.length - link.location,
                       let url = ArticleURL.link(link.url) else { continue }
@@ -99,6 +94,53 @@ import ReaderCore
         layoutDocument()
         needsDisplay = true
         loadImages(imageURLs)
+    }
+
+    /// The look of a block of the feed's HTML (decision 0066): quotes, headings, lists, code, tables and emphasis. A heading stays
+    /// smaller than the title; every size follows the article text size.
+    private static func applyLook(of block: BodyParagraph, to document: NSMutableAttributedString, range: NSRange, quoteIndent: CGFloat, scale: CGFloat) {
+        let plain = block.quoteDepth == 0 && block.heading == nil && block.listDepth == nil && block.code == nil && block.table == nil
+        if !plain {
+            let style = NSMutableParagraphStyle(); style.lineSpacing = 8 * scale; style.paragraphSpacing = 22 * scale
+            var first = quoteIndent, rest = quoteIndent
+            if let depth = block.listDepth {
+                let hanging = 18 * scale
+                first += CGFloat(min(depth, 4) - 1) * 22 * scale + 6 * scale
+                rest = first + hanging
+                let marked = block.text.hasPrefix("• ") || block.text.hasPrefix("◦ ") || block.text.range(of: #"^\d+\. "#, options: .regularExpression) != nil
+                if !marked { first = rest }
+                style.paragraphSpacing = 8 * scale
+            }
+            if block.heading != nil { style.lineSpacing = 4 * scale; style.paragraphSpacingBefore = 8 * scale; style.paragraphSpacing = 12 * scale }
+            if block.code == true { style.lineSpacing = 3 * scale; style.lineBreakMode = .byCharWrapping }
+            if block.table == true {
+                style.paragraphSpacing = 6 * scale
+                style.tabStops = (1...8).map { NSTextTab(textAlignment: .left, location: first + CGFloat($0) * 150 * scale) }
+                style.defaultTabInterval = 150 * scale
+            }
+            style.firstLineHeadIndent = first; style.headIndent = rest
+            // With its newline: a paragraph of images only has no text, and its images take the style from it.
+            let paragraph = NSRange(location: range.location, length: range.length + 1)
+            document.addAttribute(.paragraphStyle, value: style, range: paragraph)
+            if block.quoteDepth > 0 { document.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: paragraph) }
+        }
+        if let level = block.heading {
+            let size: CGFloat = [22, 20, 18, 17, 16, 16][min(max(level, 1), 6) - 1]
+            document.addAttribute(.font, value: NSFont.systemFont(ofSize: size * scale, weight: .semibold), range: range)
+        }
+        if block.code == true { document.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 14 * scale, weight: .regular), range: range) }
+        for style in block.styles ?? [] {
+            guard style.location >= 0, style.length > 0, style.location <= range.length, style.length <= range.length - style.location else { continue }
+            let part = NSRange(location: range.location + style.location, length: style.length)
+            let font = document.attribute(.font, at: part.location, effectiveRange: nil) as? NSFont ?? NSFont.systemFont(ofSize: 16 * scale)
+            switch style.kind {
+            case .strong: document.addAttribute(.font, value: NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask), range: part)
+            case .emphasis: document.addAttribute(.font, value: NSFontManager.shared.convert(font, toHaveTrait: .italicFontMask), range: part)
+            case .code:
+                document.addAttributes([.font: NSFont.monospacedSystemFont(ofSize: font.pointSize * 0.9, weight: .regular),
+                                        .backgroundColor: NSColor.quaternaryLabelColor.withAlphaComponent(0.2)], range: part)
+            }
+        }
     }
 
     /// Inserts the paragraph's images at their places (decision 0066) and returns the length added. A block of images only is a paragraph
