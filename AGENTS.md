@@ -99,7 +99,7 @@ Evidence stays small: a verification record only for a risky change or a PASS th
 
 ## Language
 
-The chat with the owner is in Japanese; everything else is in English (the owner, 2026-10-14). Plain English: short sentences, common words, the same term for the same thing. The app's String Catalog uses English source text; the specification and other internal documents quote the Japanese labels exactly, with a short gloss when it helps; the README and the user guide use the English labels. Old decision records and old commits stay as they are.
+The chat with the owner is in Japanese; everything else is in English (the owner, 2026-10-14). Plain English: short sentences, common words, the same term for the same thing. The app's String Catalog uses English source text; documents quote that English text exactly. Old decision records and old commits stay as they are.
 
 ## Known gotchas
 

@@ -40,32 +40,32 @@ These words mean the same thing in this specification, the user guide, the decis
 
 | Term | Meaning | Code |
 |---|---|---|
-| subscription (購読) | One feed the person follows; one row in the sidebar | `Feed` |
-| source name (購読元) | The name of a subscription, shown in the sidebar and on each article in the list. 「購読元」 is also the sidebar section's heading | `Feed.title` |
-| feed (フィード) | An RSS 1.0, RSS 2.0 or Atom document; its address is `Feed.sourceURL` | `FeedParser`, `ParsedFeed` |
-| folder (フォルダ) | A one-level group of subscriptions. It exists only by name and disappears with its last subscription | `Feed.folder` |
-| 未分類 (unfiled) | Subscriptions in no folder. Not usable as a folder name | empty `Feed.folder`, `FolderPicker` |
-| scope (対象) | What the list shows: all articles, unread, Star, a folder or one subscription | `ReaderWorkspaceScope` |
+| subscription | One feed the person follows; one row in the sidebar | `Feed` |
+| source name | The name of a subscription, shown in the sidebar and on each article in the list. The sidebar section's heading is **Subscriptions** | `Feed.title` |
+| feed | An RSS 1.0, RSS 2.0 or Atom document; its address is `Feed.sourceURL` | `FeedParser`, `ParsedFeed` |
+| folder | A one-level group of subscriptions. It exists only by name and disappears with its last subscription | `Feed.folder` |
+| Unfiled | Subscriptions in no folder. Not usable as a folder name | empty `Feed.folder`, `FolderPicker` |
+| scope | What the list shows: all articles, unread, Star, a folder or one subscription | `ReaderWorkspaceScope` |
 
 **Articles and reading**
 
 | Term | Meaning | Code |
 |---|---|---|
-| article (記事) | One item of a feed | `Article` |
-| body (本文) | The text to read: what the feed provided (a body an earlier version extracted from the page is kept and shown the same way) | `ContentSnapshot`, `ArticleContent` |
-| RSS summary (RSS要約) | The short description the feed gives an article | `Article.summary` |
-| read / unread (既読・未読) | An article becomes read, and its first read time is saved, when its body or RSS summary is actually shown in the article area | `Article.firstReadAt`, `ReaderStore.markDisplayed` |
+| article | One item of a feed | `Article` |
+| body | The text to read: what the feed provided (a body an earlier version extracted from the page is kept and shown the same way) | `ContentSnapshot`, `ArticleContent` |
+| RSS summary | The short description the feed gives an article | `Article.summary` |
+| read / unread | An article becomes read, and its first read time is saved, when its body or RSS summary is actually shown in the article area | `Article.firstReadAt`, `ReaderStore.markDisplayed` |
 | Star | The mark "come back to chew on this" (3.2) | `Article.starredAt` |
-| retention period (保持期間) | Days the body and RSS summary are kept: 7, 30, 90 or 365 | `RetentionPolicy`, `ReaderSettings` |
-| expired (期限切れ) | A body or RSS summary past the period. It is deleted; the Star, title and URL stay | `Article.contentDeletedAt`, `ReaderStore.purgeExpired` |
+| retention period (Retention) | Days the body and RSS summary are kept: 7, 30, 90 or 365 | `RetentionPolicy`, `ReaderSettings` |
+| expired | A body or RSS summary past the period. It is deleted; the Star, title and URL stay | `Article.contentDeletedAt`, `ReaderStore.purgeExpired` |
 
 **Fetching and adding**
 
 | Term | Meaning | Code |
 |---|---|---|
-| refresh (更新) | Fetching the feeds again for new articles: by hand, at launch, on return, every 30 minutes | `FeedRefreshController` |
+| refresh | Fetching the feeds again for new articles: by hand, at launch, on return, every 30 minutes | `FeedRefreshController` |
 | add sheet | The sheet that adds a subscription from a URL | `SubscriptionSheet` |
-| check (確認) | Fetching and parsing the URL being typed to see if it can be added | `FeedChecker`, `FeedCheckRequest` |
+| check | Fetching and parsing the URL being typed to see if it can be added | `FeedChecker`, `FeedCheckRequest` |
 | feed discovery | Finding the feed a site's page announces | `FeedDiscovery` |
 | OPML | The file format that carries a list of subscriptions, for import and export | `OPMLParser`, `OPMLImporter`, `OPMLImportFlow`, `OPMLWriter`, `OPMLExportFlow` |
 
@@ -73,18 +73,18 @@ These words mean the same thing in this specification, the user guide, the decis
 
 | Term | Meaning | Code |
 |---|---|---|
-| note (ノート) | The app's one Markdown note (3.3) | `Note` |
-| 「Markdownをコピー」 (Copy Markdown) | Puts the note's text, unchanged, on the pasteboard (3.3) | `NotePanel`, `ReaderView.copyNote` |
+| note | The app's one Markdown note (3.3) | `Note` |
+| **Copy Markdown** | Puts the note's text, unchanged, on the pasteboard (3.3) | `NotePanel`, `ReaderView.copyNote` |
 | list title | The scope's name above the list, with a count only while filtering (3.1.4) | `ListHeader` |
 | ✕ | The button at the top left of the right column. It closes the original page, and the note | `OriginalPageView`, `NotePanel` |
-| Settings (設定) | The settings window: 「一般」, 「記事」 and 「ショートカット」 (3.7) | `ReaderSettingsView` |
+| Settings | The settings window: **General**, **Articles** and **Shortcuts** (3.7) | `ReaderSettingsView` |
 
 **Word use**
 
-- Say 「元ページ」 (original page) for the web page, never 「原文」. 「原文」 is only the article's untranslated text, in translation (3.6).
-- Say 「一覧」 (list) for the article list; 「リスト」 only for a Markdown list.
-- 「購読」 is one subscription; 「購読元」 is the section heading and the name of the subscription an article came from.
-- Quote screen labels exactly; this specification gives the Japanese labels, whatever the display language (3.7). The app uses an English-source String Catalog with Japanese translations.
+- Say "original page" for the web page. "Original" alone (**Show Original**, **Return to Original**) is only the article's untranslated text, in translation (3.6).
+- "The list" is the article list; a list in the note is a "Markdown list".
+- A "subscription" is one feed the person follows; **Subscriptions** is the sidebar heading; the "source name" is the name of the subscription an article came from.
+- Quote screen labels exactly, in the English source text of the String Catalog ([spec style](spec-style.md)); the other display languages translate it (3.7).
 
 ### 3.1 The screen and reading
 
@@ -94,11 +94,11 @@ The screen has **four areas**. Reading shows three of them side by side (sidebar
 
 | Area | Code | Role |
 |---|---|---|
-| sidebar (サイドバー) | `ReaderView.sidebar`, `SidebarRow` | Choose what to read (Feeds, folders, subscriptions) |
-| list (一覧) | `NativeArticleList`, `ListHeader` | The articles of the chosen scope |
-| article (記事) | `ArticleDetailView`, `NativeArticleText` | The article's body (the RSS view) |
-| original page (元ページ) | `OriginalPageView` | The original web page in an in-app browser, in place of the article area |
-| note (ノート) | `ReaderView.notePanel` (inspector) | The one Markdown note (3.3) |
+| sidebar | `ReaderView.sidebar`, `SidebarRow` | Choose what to read (Feeds, folders, subscriptions) |
+| list | `NativeArticleList`, `ListHeader` | The articles of the chosen scope |
+| article | `ArticleDetailView`, `NativeArticleText` | The article's body (the RSS view) |
+| original page | `OriginalPageView` | The original web page in an in-app browser, in place of the article area |
+| note | `ReaderView.notePanel` (inspector) | The one Markdown note (3.3) |
 
 #### 3.1.2 Four layouts
 
@@ -153,20 +153,20 @@ normal                original page (v)     note beside article   note with the 
 
 - One style: monochrome symbols of one size and one hit area; colour only for a state (a filled Star, a filled translate). No links and no accent-coloured symbols in a band.
 - Dragging an empty part of a band moves the window; a double-click does what the system setting says.
-- In full screen the bands stay at the top of the screen and the columns keep their places. When the pointer reveals the menu bar, the system's title bar comes down with it, over the top of the columns, with the window buttons, add subscription and refresh. The bar is the system's compact height: it fits the window buttons, and the other two sit on their line. This temporary bar uses the system appearance in light and dark themes; in Sepia its background blends with the paper colour. The green button, the system's full-screen shortcut and 「表示」 (View) ▸ 「フルスクリーンを終了」 (Exit Full Screen) leave full screen, and the window returns at its old size. If the displays change, the restored window stays accessible on a current screen.
+- In full screen the bands stay at the top of the screen and the columns keep their places. When the pointer reveals the menu bar, the system's title bar comes down with it, over the top of the columns, with the window buttons, add subscription and refresh. The bar is the system's compact height: it fits the window buttons, and the other two sit on their line. This temporary bar uses the system appearance in light and dark themes; in Sepia its background blends with the paper colour. The green button, the system's full-screen shortcut and View ▸ Exit Full Screen leave full screen, and the window returns at its old size. If the displays change, the restored window stays accessible on a current screen.
 - Every band control also has a menu bar command; the keys stay as they are (3.1.5).
 
 **Headings**
 
-- Feeds, 「購読元」, the list's current scope and the article's source name use a small 12 pt semibold heading. The top headings sit at the same visual height below the bands. When both lists are at the top, the first sidebar row and first article row's selection backgrounds start at the same height.
+- Feeds, **Subscriptions**, the list's current scope and the article's source name use a small 12 pt semibold heading. The top headings sit at the same visual height below the bands. When both lists are at the top, the first sidebar row and first article row's selection backgrounds start at the same height.
 
 **Sidebar**
 
-- Choose the scope from Feeds (all articles, unread, Star) and 「購読元」 (folders and subscriptions). Each subscription shows its site icon. The 「購読元」 section can be collapsed.
+- Choose the scope from Feeds (all articles, unread, Star) and **Subscriptions** (folders and subscriptions). Each subscription shows its site icon. The **Subscriptions** section can be collapsed.
 - Each folder stays open or closed as the person left it, also after a restart; at the first launch all are closed, and a folder made again after it disappeared starts closed.
 - The rows and their scroll bar start below the sidebar's band: scrolled rows stop at its lower edge and never pass under the window buttons.
 - At the top right, right-aligned: add subscription, then refresh. While a refresh runs, the refresh arrow itself turns (not with Reduce Motion) and the button stays enabled (pressing it again does nothing).
-- A small orange ＋ appears at the right end of the 「購読元」 heading on mouse-over and adds a subscription. The heading stays in place however long the list is.
+- A small orange ＋ appears at the right end of the **Subscriptions** heading on mouse-over and adds a subscription. The heading stays in place however long the list is.
 - No Hide Sidebar button and no folder-management button. The sidebar shows and folds only with the layout: a drag of its edge that folds it, or brings it out while it is folded, springs back at once (#389).
 
 **List**
@@ -177,8 +177,8 @@ normal                original page (v)     note beside article   note with the 
 - The reading surfaces (list, article, note) are one dark colour, with no separate grey bars or lines in the bands; only the sidebar is slightly lighter.
 - One calm orange accent, only for the unread mark, the add and refresh buttons and the note's list markers. The selected row is a quiet grey, not the system blue.
 - When a refresh brings new articles and the list is at the top, each new row slides in at its place in the order and pushes the rows below it down, with no limit on the number (the system's table motion, as in Mail). With Reduce Motion the new rows fade in instead. When the list is not at the top, the article being read does not move; new rows inside the visible part fade in. The selected article stays selected. Manual and automatic refreshes behave the same.
-- Publication time: the time for today, date and time for earlier days, the year too for other years. An unknown time is 「—」; the received time is never used instead.
-- Unread: the source name in the accent colour and brighter text. Read: the whole row a calm grey. A long source name ends in 「…」. The selected row keeps readable contrast.
+- Publication time: the time for today, date and time for earlier days, the year too for other years. An unknown time is "—"; the received time is never used instead.
+- Unread: the source name in the accent colour and brighter text. Read: the whole row a calm grey. A long source name ends in "…". The selected row keeps readable contrast.
 
 **List filter** (decision 0055)
 
@@ -193,12 +193,12 @@ normal                original page (v)     note beside article   note with the 
 
 **Article**
 
-- Above the title, the article's source name (3.0), the same name its list row shows, as written (the site's address only when its subscription is gone). Below the title, the weekday, date and time of publication in the system's time zone and format, for example 「Friday, Oct 23, 2026 at 19:56」, or 「Publication date unknown」. The source name scrolls with the article and keeps the same size and starting position when the article text size changes. The title is 26 pt semibold. The buttons at the top: Star and the external browser (globe). The theme and the text size are in Settings (3.7).
+- Above the title, the article's source name (3.0), the same name its list row shows, as written (the site's address only when its subscription is gone). Below the title, the weekday, date and time of publication in the system's time zone and format, for example "Friday, Oct 23, 2026 at 19:56", or "Publication date unknown". The source name scrolls with the article and keeps the same size and starting position when the article text size changes. The title is 26 pt semibold. The buttons at the top: Star and the external browser (globe). The theme and the text size are in Settings (3.7).
 - Opening an article shows the feed's body (or the RSS summary) as it is; it never fetches the original page or swaps the text (RSS first, decision 0033). For more, `v` (in the app) or `b` (the browser).
 - The app never takes text from the original page (decision 0056): no full-text fetch, and no line under the article that says how much text there is.
 - Links and quotes of the feed's text are kept. A link opens in the default browser. Quotes look different from the text, with one bar along all the paragraphs and images of a quote; a quote inside a quote has its own bar beside it. A saved body without layout data is shown as plain text.
-- The feed's HTML is shown as the feed gives it, with no handling per site (decision 0066). Images appear where the feed puts them, at their own size and never wider than the text; an image whose block has no text stands on a line of its own, and images of separate blocks on separate lines; an image taller than a line of text stands on a line of its own too, while a smaller one, such as a bookmark counter, stays in the line (an image without a size is placed when it arrives); an image in a link opens the link. When the body has images, the representative image is not shown above it. A late image never moves the text being read; a failed or offline one gives back the space kept for it, and the text being read stays. A body of images only, such as a comic, is shown as its images. Selecting, copying and 「記事をノートに送る」 take the text without the images. A translated paragraph keeps its images at its start or end.
-- Headings are larger and semibold, and stay smaller than the title. List items keep their marker (「•」, 「◦」 inside another list, or their number) with a hanging indent per level. Code is monospaced; a code block keeps its line breaks and wraps a long line at the column. Bold and italic text keep their look; inline code has a light background. A table is one line per row with its cells at tab stops, and header cells bold. Every size follows the article text size. Copy keeps the markers, line breaks and tabs. A translated paragraph keeps its kind of block but not its bold, italic or code runs.
+- The feed's HTML is shown as the feed gives it, with no handling per site (decision 0066). Images appear where the feed puts them, at their own size and never wider than the text; an image whose block has no text stands on a line of its own, and images of separate blocks on separate lines; an image taller than a line of text stands on a line of its own too, while a smaller one, such as a bookmark counter, stays in the line (an image without a size is placed when it arrives); an image in a link opens the link. When the body has images, the representative image is not shown above it. A late image never moves the text being read; a failed or offline one gives back the space kept for it, and the text being read stays. A body of images only, such as a comic, is shown as its images. Selecting, copying and **Send Article to Note** take the text without the images. A translated paragraph keeps its images at its start or end.
+- Headings are larger and semibold, and stay smaller than the title. List items keep their marker ("•", "◦" inside another list, or their number) with a hanging indent per level. Code is monospaced; a code block keeps its line breaks and wraps a long line at the column. Bold and italic text keep their look; inline code has a light background. A table is one line per row with its cells at tab stops, and header cells bold. Every size follows the article text size. Copy keeps the markers, line breaks and tabs. A translated paragraph keeps its kind of block but not its bold, italic or code runs.
 - The next article comes in from below, the previous from above, short and quick (following the list order). The text area does not change height when loading ends. The scroll bar shows only for an article longer than the area: moving to an article that fits shows none.
 - An article becomes read when its body or RSS summary is actually shown in the article area. Scrolling the list or fetching the body does not mark it read. Receiving or showing it again does not change the first read time.
 
@@ -220,7 +220,7 @@ normal                original page (v)     note beside article   note with the 
 | `/` | Open the list filter and put the cursor in it, when no editable field is being typed in |
 | `t` | Translate the open article / show the original, when no editable field is being typed in |
 | `i` | Send the article to the note (3.3), when no editable field is being typed in |
-| `⌘K` | Send the article to the note (3.3) wherever the keyboard is, also in the note's editor. It is the key of 「記事 ▸ 記事をノートに送る」 |
+| `⌘K` | Send the article to the note (3.3) wherever the keyboard is, also in the note's editor. It is the key of Article ▸ Send Article to Note |
 
 - `j`, `k`, `s` and `n` also work in the original page.
 - In text fields (the note editor too), during input-method composition and with modifier keys, typing and the standard actions come first.
@@ -247,7 +247,7 @@ The **note** is the app's **one** plain-text Markdown document ([decision 0049](
 - No list of notes, no new note, no name, no folders, no delete, no undo of a delete. No goals, tags, search or nesting.
 - Every change is saved; the next launch continues where the person stopped.
 - The text is saved exactly as typed. A failed save is never shown as saved. Input-method composition is never disturbed.
-- Nothing writes into the note unless the person types, pastes, or runs 「記事をノートに送る」 (below): not the app, not an AI, not opening, closing or a layout change.
+- Nothing writes into the note unless the person types, pastes, or runs **Send Article to Note** (below): not the app, not an AI, not opening, closing or a layout change.
 
 **Editor**
 
@@ -262,15 +262,15 @@ The **note** is the app's **one** plain-text Markdown document ([decision 0049](
 - Paste and drop insert plain text only.
 - Not in V1: bold, italic, code, tables, check lists, a preview.
 
-**「Markdownをコピー」 (Copy Markdown)**
+**Copy Markdown**
 
 - In the note panel's header. Copies the note's text exactly, as UTF-8 text on the system pasteboard, the end unchanged.
 - Disabled when the note is empty or only whitespace.
-- The app starts no other app, makes no file and uses no network. After a copy the button's symbol is a check mark for about 1.5 s, with no motion and no dialog (VoiceOver says 「ノートをコピーしました」); after a failure it stays as it was and the error shows.
+- The app starts no other app, makes no file and uses no network. After a copy the button's symbol is a check mark for about 1.5 s, with no motion and no dialog (VoiceOver says "Note copied"); after a failure it stays as it was and the error shows.
 
-**「記事をノートに送る」 (Send article to note)** ([decision 0059](decisions/0059-send-the-article-to-the-note.md))
+**Send Article to Note** ([decision 0059](decisions/0059-send-the-article-to-the-note.md))
 
-- One command that puts the open article's source into the note. It is run by `i` or `⌘K` (3.1.5), or by 「記事 ▸ 記事をノートに送る」 in the menu bar, which shows `⌘K`.
+- One command that puts the open article's source into the note. It is run by `i` or `⌘K` (3.1.5), or by Article ▸ Send Article to Note in the menu bar, which shows `⌘K`.
 - The article band has a button for it, beside the note button; its help names the keys. It is off when no article is open and while the original page is shown. Clicking it does not move the keyboard.
 - `⌘K` works wherever the keyboard is: in the list, in the article, in the note's editor (where a letter key would only be typed), in the filter field, and with the note closed. With the original page shown the command is off and the page keeps `⌘K`.
 - With no article chosen, it does nothing.
@@ -284,7 +284,7 @@ The **note** is the app's **one** plain-text Markdown document ([decision 0049](
 - The note closed: the note opens with the same motion as `n` (3.1.3), then the text is inserted at the end of the note. The article, the list selection and the reading position do not change.
 - The keyboard does not move into the note, so `j` / `k` keep working. With the note open it stays where it was; when a closed note opens, the list folds away and the article takes it (with `n` the note's editor takes it).
 - It is one undo step of the note's own undo.
-- Where the text went is shown with the system's find indicator (a short highlight): at once when the note is open; when a closed note opens, after it has come in. VoiceOver says 「ノートに送りました」. Nothing is shown when nothing was inserted.
+- Where the text went is shown with the system's find indicator (a short highlight): at once when the note is open; when a closed note opens, after it has come in. VoiceOver says "Sent to note". Nothing is shown when nothing was inserted.
 - While Japanese text is being composed in the note, it does nothing and the composition is not disturbed.
 - A failed save is shown as with typing and never reported as done; the inserted text stays in the editor.
 - The same article sent twice is inserted twice. No record, link or mark is kept about the article.
@@ -317,39 +317,39 @@ The **note** is the app's **one** plain-text Markdown document ([decision 0049](
 
 **Adding from a URL**
 
-- A subscription is added from an RSS or Atom URL. The add sheet has only the URL field, 「キャンセル」 and 「追加」 (decision 0032).
-- An `http://` address is checked, and subscribed, as `https://`. An address with a port number is used as typed (decision 0040). A feed that is only on `http://` is not supported: when the `https://` form cannot be loaded, the app shows 「HTTPSでは読み込めませんでした。HTTPには対応していません。」 (decision 0053).
+- A subscription is added from an RSS or Atom URL. The add sheet has only the URL field, **Cancel** and **Add** (decision 0032).
+- An `http://` address is checked, and subscribed, as `https://`. An address with a port number is used as typed (decision 0040). A feed that is only on `http://` is not supported: when the `https://` form cannot be loaded, the app shows "Could not load over HTTPS. HTTP is not supported." (decision 0053).
 - A site's URL works too: the app finds the feeds the page announces (`<link rel="alternate" type="application/rss+xml">` and the like), uses the first, shows its URL, and subscribes to it. A saved subscription's refresh does not do this (decision 0038).
 - The URL is checked while it is typed (decision 0036):
-  - About 0.8 s after typing stops (at once after a paste), the app fetches and parses it and shows one line under the field: 「確認中…」, 「✓ <feed name>」 or why it failed.
-  - 「追加」 is enabled only when the feed could be read (parsed as RSS 1.0, RSS 2.0 or Atom, not only a 200 answer). The checked feed is the one added.
+  - About 0.8 s after typing stops (at once after a paste), the app fetches and parses it and shows one line under the field: **Checking…**, ✓ and the feed name, or why it failed.
+  - **Add** is enabled only when the feed could be read (parsed as RSS 1.0, RSS 2.0 or Atom, not only a 200 answer). The checked feed is the one added.
   - While typing, a URL whose host does not look complete (`https://exa`, `https://example.c`) is not sent. Return sends names such as localhost too.
-  - A URL already subscribed shows 「すでに購読しています」 and is not added.
+  - A URL already subscribed shows "Already subscribed: <feed name>" and is not added.
   - A failure has a short sentence per cause: 404, unreadable, server error, no network, no answer, server not found, no secure connection, http not usable, too large, a web page and not a feed, an XML error. When the only problem is control characters that XML forbids, they are removed and the feed is read.
 - Direct XML input and the synthetic sample appear only when the sheet is opened with ⌥ held (for checking failures).
 
 **The folder when adding**
 
-- Opened from the ＋ that appears on a folder row, the sheet adds to that folder and says so in its heading, for example 「「Tech」に購読を追加」.
-- Opened from the 「購読元」 heading or the sidebar's ＋, a folder field with candidates (the same part as 「フォルダへ移動…」) appears once the feed is read, when at least one folder exists. Paste and Return with nothing chosen adds to 未分類 (the fast path stays). Typing a name selects the closest candidate; a new name offers 「作って追加」 (decision 0037).
+- Opened from the ＋ that appears on a folder row, the sheet adds to that folder and says so in its heading, for example **Add Subscription to “Tech”**.
+- Opened from the **Subscriptions** heading or the sidebar's ＋, a folder field with candidates (the same part as **Move to Folder…**) appears once the feed is read, when at least one folder exists. Paste and Return with nothing chosen adds to Unfiled (the fast path stays). Typing a name selects the closest candidate; a new name offers **Create “<name>” and Add** (decision 0037).
 
 **Importing OPML**
 
-- File ▸ 「OPMLを取り込む…」. No shortcut.
-- Subscriptions are added at once in one save; articles arrive afterwards. Folders are one level: deeper levels go into the top folder. Existing subscriptions are neither added again nor moved. The result is an alert (decision 0041). Its title is the result: 「N件の購読を追加しました」, or 「新しい購読はありませんでした」 when nothing was added (「このファイルに購読は見つかりませんでした」 for an empty file). Below it, one line for each of these that is not zero, and nothing when all went well: 「・登録済み: N件」 (already subscribed, left as they are), 「・通信安全化: N件」 (plain `http://` addresses changed to `https://`), 「・失敗: N件」 (addresses that could not be used). A file that cannot be read gives the title 「OPMLを取り込めませんでした」 and the reason below it.
+- File ▸ Import OPML…. No shortcut.
+- Subscriptions are added at once in one save; articles arrive afterwards. Folders are one level: deeper levels go into the top folder. Existing subscriptions are neither added again nor moved. The result is an alert (decision 0041). Its title is the result: "Subscriptions added: N", or "No new subscriptions" when nothing was added ("No subscriptions were found in this file" for an empty file). Below it, one line for each of these that is not zero, and nothing when all went well: "• Already subscribed: N" (left as they are), "• Changed to HTTPS: N" (plain `http://` addresses changed to `https://`), "• Failed: N" (addresses that could not be used). A file that cannot be read gives the title "Could not import the OPML file" and the reason below it.
 
 **Exporting OPML**
 
-- File ▸ 「OPMLを書き出す…」, under the import. No shortcut. The save panel suggests 「Unagi Reader Subscriptions YYYY-MM-DD.opml」.
+- File ▸ Export OPML…, under the import. No shortcut. The save panel suggests `Unagi Reader Subscriptions YYYY-MM-DD.opml`.
 - The file holds the subscriptions and their folders, nothing else: each folder holds its subscriptions, in the order of folder names, and the unfiled ones follow at the top level. Nothing is fetched, and there is no limit on the number of subscriptions. Importing the file into an empty library gives the same subscriptions and folders (decision 0063).
-- A written file shows no message; a file that cannot be written shows 「購読を書き出せませんでした」 and the reason.
+- A written file shows no message; a file that cannot be written shows "The subscriptions could not be exported" and the reason.
 
 **Managing subscriptions**
 
 - Right-click a subscription: refresh, rename (in the row itself), move to a folder, unsubscribe (decision 0043).
-- 「購読を解除…」 (Unsubscribe) asks 「購読を解除しますか？」 (Unsubscribe?), with 「購読を解除」 (Unsubscribe) and 「キャンセル」 (Cancel), and the message 「記事・本文はライブラリに残ります。」 (Articles and their content stay in the library). Cancel keeps the subscription. Confirm removes it; removing the selected subscription returns to 「すべての記事」 (All Articles).
+- **Unsubscribe…** asks **Unsubscribe?**, with **Unsubscribe** and **Cancel**, and the message "Articles and their content stay in the library." Cancel keeps the subscription. Confirm removes it; removing the selected subscription returns to **All Articles**.
 - A subscription moved to another folder moves smoothly to its new place, and the folder opens (not with Reduce Motion).
-- Two ways to move to a folder: 「フォルダへ移動…」 in the menu (a small chooser with a field: typing filters the folders; a new name offers 「作って移動」; ↑ ↓, Return, Esc; 「未分類」 too; a folder is made by moving its first subscription into it), and drag and drop in the sidebar.
+- Two ways to move to a folder: **Move to Folder…** in the menu (a small chooser with a field: typing filters the folders; a new name offers **Create “<name>” and Move**; ↑ ↓, Return, Esc; **Unfiled** too; a folder is made by moving its first subscription into it), and drag and drop in the sidebar.
 - A folder can be renamed (a name that already exists joins the two folders) and shows the articles of all its subscriptions. No empty folders and no nesting: a folder disappears with its last subscription.
 - Each subscription's entries are its own articles (decision 0067). A page that two subscriptions carry, such as a social bookmark feed and the page's own site, is two articles, each with its own feed's title, date and text, and each read, starred and counted on its own. Subscribing again to an address finds the articles kept after unsubscribing.
 
@@ -359,32 +359,32 @@ A button translates the open article into another language, on the Mac, with the
 
 **Button and key**
 
-- A button 「翻訳」 (Translate) sits in the article band, before 「元ページをブラウザで開く」. Its help names the target, for example 「日本語に翻訳／原文に戻す (t)」; its icon (`character.bubble`; the system's `translate` has no filled form) is filled while a translation is shown. It is always there and is disabled when no article is open or while the target is being resolved (the toolbar does not change height).
-- The same command is in the menu bar: 「表示 ▸ 翻訳 / 原文に戻す」, without a key.
+- A button **Translate** sits in the article band, before **Open original page in browser**. Its help names the target, for example "Translate into Japanese or show original (t)"; its icon (`character.bubble`; the system's `translate` has no filled form) is filled while a translation is shown. It is always there and is disabled when no article is open or while the target is being resolved (the toolbar does not change height).
+- The same command is in the menu bar: View ▸ Translate (Return to Original while a translation is shown), without a key.
 - `t` does the same, when no editable field is being typed in (3.1.5).
 - Pressing it translates the title and the body of the open article, in place. Pressing it again shows the original.
 
 **What is translated**
 
 - Only the article's reader text (the feed's text). The note, the list and the sidebar are never translated.
-- While the original page is open the button is disabled, with the help text 「元ページの表示中は翻訳できません。記事の表示に戻る (Esc) と翻訳できます」.
+- While the original page is open the button is disabled, with the help text "Translation is unavailable while viewing the original page. Return to the article (Esc) to translate.".
 - Links in the translated text are plain text. The original is one press away.
 - Translation is not sticky: moving to another article shows that article in its original language and stops the running translation. Nothing is translated that the person did not ask for.
 
 **While it works and when it is done**
 
-- The status, as short text at the left of the article band, says 「翻訳中 3/12」 (paragraphs done of all), or 「言語を準備しています…」 while the system downloads a language pack. Title and paragraphs change from the top as results arrive. The reading position is kept. Reduce Motion: no animation.
-- When done, the status says what was done, for example 「英語 → 日本語」, with a link 「原文を表示」.
-- If the article is already in the target language, the status says so, for example 「すでに日本語です」, and nothing else happens.
+- The status, as short text at the left of the article band, says "Translating 3/12" (paragraphs done of all), or "Preparing languages…" while the system downloads a language pack. Title and paragraphs change from the top as results arrive. The reading position is kept. Reduce Motion: no animation.
+- When done, the status says what was done, for example "English → Japanese", with a link **Show Original**.
+- If the article is already in the target language, the status says so, for example "Already in Japanese", and nothing else happens.
 - A failure is one short sentence in the row, never an alert: the language pair is not supported; the download was not allowed; the language pack is missing and the Mac is offline. If one paragraph fails, its original text stays and the row says how many failed.
 
 **Language**
 
-- The target is 「記事翻訳」 (Article Translation) in Settings (3.7). Its first item is 「システムに合わせる」 (Match System); then every target language the system reports, with localized names.
+- The target is **Article Translation** in Settings (3.7). Its first item is **Match System**; then every target language the system reports, with localized names.
 - Match System uses the first of the Mac's preferred languages that the system can translate into, compared by language and script (region ignored), or English if none can. It follows later changes of the Mac's preferences.
 - A manual choice is remembered across launches until Match System is chosen again; changing the display language never changes it.
 - The article button, `t` and the menu-bar command translate into that target or return to the original; the article button has no language menu.
-- The button's help names the target, for example 「日本語に翻訳／原文に戻す (t)」.
+- The button's help names the target, for example "Translate into Japanese or show original (t)".
 - The button stays enabled when the article is already in the target language; a press shows the same-language status above, with the target's name, and translates nothing. The article's language is compared with the target, never with the display language.
 - Changing the target starts no translation: a shown translation returns to the original and the button is off, running work is dropped, and the next press uses the new target.
 - A remembered target that the system no longer reports is kept; a press shows the "pair not supported" sentence above.
@@ -403,28 +403,28 @@ Not built: translating the original page, an "always translate" choice per subsc
 
 ### 3.7 Settings
 
-The settings window (Unagi Reader ▸ 「設定…」, `⌘,`) has the panes below. Settings stay few: what is used often sits beside the content it acts on, not here. A choice about the article that is made once, such as its text size or its translation target, is here; the action it serves (the size keys, the translate button) stays beside the article.
+The settings window (Unagi Reader ▸ Settings…, `⌘,`) has the panes below. Settings stay few: what is used often sits beside the content it acts on, not here. A choice about the article that is made once, such as its text size or its translation target, is here; the action it serves (the size keys, the translate button) stays beside the article.
 
 | Pane | Holds, in this order | Code |
 |---|---|---|
-| 「一般」 (General) | the theme, the article's text size, and the display language with its note (below) | `ReaderSettingsView`, `AppearancePicker` |
-| 「記事」 (Articles) | the article's translation target (3.6) and the retention period (3.3) | `ReaderSettingsView` |
-| 「ショートカット」 (Shortcuts) | the keys, to read | `ShortcutList`, `ReaderShortcuts` |
+| General | the theme, the article's text size, and the display language with its note (below) | `ReaderSettingsView`, `AppearancePicker` |
+| Articles | the article's translation target (3.6) and the retention period (3.3) | `ReaderSettingsView` |
+| Shortcuts | the keys, to read | `ShortcutList`, `ReaderShortcuts` |
 
-- 「一般」 holds only how the app as a whole looks and speaks; a choice about articles goes to 「記事」. There is no 「保存」 (Storage) pane, and no 「ノート」 (Note) pane until the note has a setting of its own
-- The window opens on the pane that was shown last; a pane saved by an earlier version opens 「一般」
+- **General** holds only how the app as a whole looks and speaks; a choice about articles goes to **Articles**. There is no Storage pane, and no Note pane until the note has a setting of its own
+- The window opens on the pane that was shown last; a pane saved by an earlier version opens **General**
 - Every choice is kept across launches and applies at once, except the display language (below).
 
 **Language**
 
 | Setting | Choices | Match System |
 |---|---|---|
-| 「記事翻訳」 (Article Translation) | 「システムに合わせる」 (Match System), then the system's translation languages | the first of the Mac's preferred languages the system can translate into, or English (3.6) |
-| 「表示言語」 (App Language) | 「システムに合わせる」 (Match System), English, Japanese, Simplified Chinese, Traditional Chinese, Korean, Spanish, Brazilian Portuguese | chosen the way macOS chooses an app's language from the Mac's preferred languages (for example `zh-TW` gives Traditional Chinese), or English |
+| **Article Translation** | **Match System**, then the system's translation languages | the first of the Mac's preferred languages the system can translate into, or English (3.6) |
+| **App Language** | **Match System**, English, Japanese, Simplified Chinese, Traditional Chinese, Korean, Spanish, Brazilian Portuguese | chosen the way macOS chooses an app's language from the Mac's preferred languages (for example `zh-TW` gives Traditional Chinese), or English |
 
 - The two choices are independent; a manual choice in either is remembered across launches until Match System is chosen again.
 - The display language changes the app's own labels, menus, help, errors, status, shortcut descriptions and accessibility text, never the person's subscriptions, articles or note.
-- The display language is the app's language in System Settings ▸ General ▸ Language & Region ▸ Applications: a change in either shows in the other. It applies at the next launch; below the choice, 「次回の起動から反映されます」 (applies at the next launch). The app does not restart itself.
+- The display language is the app's language in System Settings ▸ General ▸ Language & Region ▸ Applications: a change in either shows in the other. It applies at the next launch; below the choice, "Applies at next launch." The app does not restart itself.
 - Only languages with bundled translations are offered; a missing UI translation falls back to English.
 - The user guide names the display languages that were prepared with AI and not reviewed by a person, and says how to report a wrong translation (decision 0060).
 
@@ -432,10 +432,10 @@ The settings window (Unagi Reader ▸ 「設定…」, `⌘,`) has the panes bel
 
 | Tile | Look |
 |---|---|
-| 「システム」 | Light or dark, as macOS is set. It never selects Sepia |
-| 「ライト」 | Always light |
-| 「ダーク」 | Always dark |
-| 「セピア」 | A light look on a warm paper colour |
+| **System** | Light or dark, as macOS is set. It never selects Sepia |
+| **Light** | Always light |
+| **Dark** | Always dark |
+| **Sepia** | A light look on a warm paper colour |
 
 - Each tile shows a small picture of the reader in that look instead of a description.
 - Sepia covers the whole window: the reading surfaces (list, article, note and their bands) take the paper colour (#F4ECD8), and the sidebar a slightly darker one (#EADFC7). System controls and text are drawn light, with the light look's text colours, the selected row and the accent.
@@ -444,7 +444,7 @@ The settings window (Unagi Reader ▸ 「設定…」, `⌘,`) has the panes bel
 
 **Text size**
 
-- 「文字サイズ」 is a slider with five steps: 14, 16 (standard), 18, 20 and 22 pt.
+- **Text Size** is a slider with five steps: 14, 16 (standard), 18, 20 and 22 pt.
 - It sets the article's body. The title (26 pt at standard) and date line scale by the same ratio. The source name keeps the heading size of the other reading areas (3.1.4).
 - The list, the sidebar and the note keep their sizes (decision 0028).
 - A change shows at once in the open article; the paragraph at the top of the article stays at the top.
@@ -452,8 +452,8 @@ The settings window (Unagi Reader ▸ 「設定…」, `⌘,`) has the panes bel
 
 **Shortcuts**
 
-- 「ショートカット」 lists the keys of 3.1.5 and the note's keys, to read, grouped as 「読む」 (reading), 「一覧」 (the list), 「元ページ」 (the original page) and 「ノート」 (the note). Each row shows the key, what it does, and where it does not work (for example 「文字の入力中は効きません」, not while typing).
-- Help ▸ 「ショートカット一覧」 opens Settings on this pane.
+- **Shortcuts** lists the keys of 3.1.5 and the note's keys, to read, grouped as **Reading**, **List**, **Original Page** and **Note**. Each row shows the key, what it does, and where it does not work (for example "Unavailable while typing").
+- Help ▸ Keyboard Shortcuts opens Settings on this pane.
 - The list is made from the same definitions the key handlers use, so it shows what the app does.
 - Keys cannot be changed (the roadmap's "Not planned": key remapping).
 
@@ -485,7 +485,7 @@ The app has **no AI of its own** ([decision 0049](decisions/0049-one-note-and-no
 
 ### 5.2 Giving the note to another AI
 
-- The person presses 「Markdownをコピー」 (3.3) and pastes the text into any AI (Claude, Codex, Gemini and so on). Text leaves the Mac only when the person pastes it.
+- The person presses **Copy Markdown** (3.3) and pastes the text into any AI (Claude, Codex, Gemini and so on). Text leaves the Mac only when the person pastes it.
 
 ## 6. Limits and what V1 does not build
 
@@ -504,7 +504,7 @@ The app has **no AI of its own** ([decision 0049](decisions/0049-one-note-and-no
 | Subscriptions | nested folders, empty folders | 3.5 |
 | Note | more than one note; folders, levels, tags, search or goals for notes; daily or weekly notes; system sharing services | decisions 0019, 0049 |
 | Fetching | taking text from the original page (decision 0056); bypassing paywalls, subscriptions, logins or captchas; a full-text guarantee | section 4 |
-| AI | an AI of the app's own (summary, draft help: a new decision is needed), keys or API calls in the app, AI off the Mac (Private Cloud Compute and the like), a dedicated link to one AI app (only 「Markdownをコピー」), sending or recording automatically, a guarantee of facts | decision 0049 |
+| AI | an AI of the app's own (summary, draft help: a new decision is needed), keys or API calls in the app, AI off the Mac (Private Cloud Compute and the like), a dedicated link to one AI app (only **Copy Markdown**), sending or recording automatically, a guarantee of facts | decision 0049 |
 | Settings | an in-app time zone setting; changing keys; a text size for the note or the list; themes other than the four of 3.7 | 3.7 |
 | Old data | the prototype's Like and any migration of it (Star is a new mark) | decision 0001 |
 
@@ -519,7 +519,7 @@ These are the conditions for passing, not a list of what has passed. "Where it i
 | PRD-01 | Read smoothly, with subscriptions in order | The four areas, the four layouts, appearance, folders and unread counts, the keys and the note open and close as in 3.1. No wrong body, no visible stall, no scroll jump; input, input methods and VoiceOver are not disturbed. The budgets of 2.1 hold | real Mac (the owner); parts in UI tests; 2.1 |
 | PRD-02 | Open an article from the unread list | Scrolling the list keeps articles unread. Showing the body or the RSS summary saves the first read time | unit tests, synthetic app |
 | PRD-04 | Write in the note | `n`, the button or `⌥⌘I` opens the note with the same motion as `v`: the article on the left, the note on the right, the keyboard in the note. The layout button adds the list (three columns). `j` / `k` move between articles with the note open; `Esc` or the ✕ closes it and returns to the screen before. Works without AI; still there after a restart, offline, after unsubscribing and after the body expires. Japanese input is not disturbed | UI tests, real Mac (Japanese input, VoiceOver) |
-| PRD-05 | Give the note to another AI | 「Markdownをコピー」 copies the text exactly; the person pastes it into any AI. The app starts no app, makes no file, uses no network. Disabled for an empty note | unit tests, real Mac |
+| PRD-05 | Give the note to another AI | **Copy Markdown** copies the text exactly; the person pastes it into any AI. The app starts no app, makes no file, uses no network. Disabled for an empty note | unit tests, real Mac |
 | PRD-06 | (unused) | The app's own summary was removed by decision 0049; the number stays because other documents cite it | — |
 | PRD-07 | Review the final demo | The owner sees this table and the product scope demonstrated and approves them explicitly. Until then the product is not accepted | the owner |
 | PRD-08 | Set retention and deletion | The periods, the confirmations and "the note is never deleted automatically" of 3.3 hold. An expired body never looks readable | unit tests |
@@ -528,12 +528,12 @@ These are the conditions for passing, not a list of what has passed. "Where it i
 | PRD-11 | Read many articles | Folders (open or closed as left, also after a restart), counts without duplicates, icons and article images work; a late, failed or offline image never changes the row height, the selection or the position | UI tests, real Mac |
 | PRD-12 | (unused) | Removed by decision 0019 (unsorted Stars, theme suggestions) | — |
 | PRD-13 | A Mac without AI | With Writing Tools unavailable, the note can be written, edited and copied, and the app uses no network for AI | real Mac (Writing Tools off) |
-| PRD-14 | Add a subscription from a URL | As in 3.5: the check runs when typing stops; 「追加」 only when the feed was read; a site URL finds its feed; `http://` is checked as `https://`, and a feed only on http says that http is not supported; each failure has its sentence; an existing subscription is not added; the folder field appears only when it should | unit tests, synthetic app, real Mac (Japanese input) |
-| PRD-15 | Move from another reader with OPML | File ▸ 「OPMLを取り込む…」: subscriptions appear at once, articles arrive later, folders are one level, existing subscriptions do not change, the result is a short title and a line for each thing that was not plain success | unit tests, real Mac (the menu, a real OPML file) |
+| PRD-14 | Add a subscription from a URL | As in 3.5: the check runs when typing stops; **Add** only when the feed was read; a site URL finds its feed; `http://` is checked as `https://`, and a feed only on http says that http is not supported; each failure has its sentence; an existing subscription is not added; the folder field appears only when it should | unit tests, synthetic app, real Mac (Japanese input) |
+| PRD-15 | Move from another reader with OPML | File ▸ Import OPML…: subscriptions appear at once, articles arrive later, folders are one level, existing subscriptions do not change, the result is a short title and a line for each thing that was not plain success | unit tests, real Mac (the menu, a real OPML file) |
 | PRD-16 | Manage subscriptions | Right-click: refresh, rename (in the row; Return on the selected row too), move to a folder, unsubscribe. Moving works with the chooser and with drag and drop | unit tests, real Mac (right-click, Return, drag) |
 | PRD-17 | Narrow the list with a keyword | As in 3.1.4: `/` or the icon opens the filter; typing narrows the list to the articles of the scope whose title or feed summary contains it; clearing restores it; it stays across scopes and not across launches; `j` / `k` walk the filtered list; composing Japanese does not change the list | `ArticleFilterTests`, `ArticleFilterStoreTests`, `ReaderWorkspaceTests`, `ListFilterTests`; real Mac (the owner, with a library of several thousand articles; a real input method) |
 | PRD-18 | Read an article in another language | As in 3.6: `t` or the button translates the open article and shows the progress and the result row; again shows the original; moving to another article shows the original; the text of the note, the list and the sidebar does not change; no text leaves the Mac | real Mac (the owner: a long English article into Japanese, a language pack download, a Mac without Apple Intelligence, VoiceOver); `ArticleTranslationTests`, `LanguageDecisionTests`, `TranslationTests`, `TranslationControllerTests` (a fake translator); the Settings target, Match System, the remembered choice, target help and a target change while a translation is shown: |
-| PRD-19 | Send an article to the note | As in 3.3: `i`, `⌘K` (also with the keyboard in the note), the band button or 「記事 ▸ 記事をノートに送る」 inserts `[Title](URL)`, or the article's selection as a quotation with its source link wherever the keyboard is, after the note's caret (at the end of a note never used), opening a closed note first; the keyboard stays where it was; one undo removes it; nothing is inserted while Japanese text is being composed; a failed save is shown; sending twice inserts twice; nothing else in the note changes | unit tests (`NoteClipTests`); UI tests (`NoteInsertionTests`, `SendToNoteTests`); real Mac (Japanese input, undo, VoiceOver, a long note) |
+| PRD-19 | Send an article to the note | As in 3.3: `i`, `⌘K` (also with the keyboard in the note), the band button or Article ▸ Send Article to Note inserts `[Title](URL)`, or the article's selection as a quotation with its source link wherever the keyboard is, after the note's caret (at the end of a note never used), opening a closed note first; the keyboard stays where it was; one undo removes it; nothing is inserted while Japanese text is being composed; a failed save is shown; sending twice inserts twice; nothing else in the note changes | unit tests (`NoteClipTests`); UI tests (`NoteInsertionTests`, `SendToNoteTests`); real Mac (Japanese input, undo, VoiceOver, a long note) |
 | PRD-20 | Choose the app language | As in 3.7: Match System and the bundled display languages are offered (all seven); Match System follows the Mac preferences or falls back to English; a choice applies at the next launch and matches System Settings; a manual choice survives restart; untranslated UI text falls back to English; article and note text stay unchanged; article translation keeps its own target | real Mac (menus, Settings, errors, shortcuts, accessibility labels and text expansion in each language; English and Japanese wording reviewed by the owner); `AppLanguageTests`, `CatalogTests` (temporary preferences, native matching, compiled resources and fallback) |
 
 ### 7.1 Conditions to ship 1.0
