@@ -2,7 +2,7 @@
 
 The **order** of the work toward product 1.0, and why. The units of work are [GitHub issues](https://github.com/ojiman/unagi-reader/issues); how they are written and taken is in [AGENTS.md](../AGENTS.md). The value is in the [vision](vision.md), the product in the [specification](specification.md).
 
-## Now: 1.0 release checks
+## Now: v1.0.0
 
 The owner uses the app daily and fixes problems found there. The `v1.0.0` tag has been pushed and CI has created a draft release. The remaining work is to complete the shipping conditions before the owner publishes it.
 
