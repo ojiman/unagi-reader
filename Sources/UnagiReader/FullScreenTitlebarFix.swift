@@ -16,6 +16,7 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
         private let toolbar = NSToolbar(identifier: "FullScreenControls")
         private var originalToolbar: NSToolbar?
         private var originalToolbarVisible = false
+        private var originalToolbarStyle: NSWindow.ToolbarStyle?
         private var windowDelegate: WindowDelegate?
         private var normalFrame: NSRect?
         private weak var nativeButton: NSButton?
@@ -84,6 +85,9 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
                     originalToolbarVisible = window.toolbar?.isVisible ?? false
                     window.toolbar = toolbar
                 }
+                // The compact bar fits the window buttons; the default style leaves a tall empty band below them (#435).
+                if originalToolbarStyle == nil { originalToolbarStyle = window.toolbarStyle }
+                window.toolbarStyle = .unifiedCompact
                 toolbar.isVisible = true
                 updateControlsAppearance()
             } else {
@@ -91,6 +95,8 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
                     window.toolbar = originalToolbar
                     originalToolbar?.isVisible = originalToolbarVisible
                 }
+                if let originalToolbarStyle { window.toolbarStyle = originalToolbarStyle }
+                originalToolbarStyle = nil
                 originalToolbar = nil
             }
         }
