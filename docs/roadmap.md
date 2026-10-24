@@ -1,15 +1,17 @@
 # Roadmap
 
-The **order** of the work to the beta and 1.0, and why. The units of work are [GitHub issues](https://github.com/ojiman/unagi-reader/issues); how they are written and taken is in [AGENTS.md](../AGENTS.md). The value is in the [vision](vision.md), the product in the [specification](specification.md).
+The **order** of the work toward product 1.0, and why. The units of work are [GitHub issues](https://github.com/ojiman/unagi-reader/issues); how they are written and taken is in [AGENTS.md](../AGENTS.md). The value is in the [vision](vision.md), the product in the [specification](specification.md).
 
-## Now: the beta
+## Now: toward 1.0
 
-**What the beta is for** (a draft by the agent, 2026-10-14; the owner confirms or rewrites it): the first build that someone other than the owner uses. It answers one question: does the loop (read → note → understand) hold for an engineer who reads many feeds, without the owner beside them? What we want back: where they waited (specification 2.1), where they had to manage or decide something (vision, question 2), and whether they still write in the note after a week. Who, and how many: the owner decides.
+The owner already uses the beta daily and fixes problems found there. This is the beta testing period; the next release goal is product 1.0 (the owner, 2026-10-24).
 
-Everything that must be done before the beta is an issue in the milestone [Beta](https://github.com/ojiman/unagi-reader/milestone/1). It is closed to new issues; only the owner adds to it. **The beta is done when every issue in it is closed.**
+The milestone [1.0](https://github.com/ojiman/unagi-reader/milestone/1) tracks required release work. **1.0 is ready when its milestone issues and the shipping conditions below are complete.** Next and Candidates are not automatically required for 1.0.
 
-1. **Real-device check by the owner:** [#145](https://github.com/ojiman/unagi-reader/issues/145) and a dogfooding week (#136 was closed after the owner's light check on 2026-10-18). Bugs found here come before any polish.
-2. **Other conditions:** the owner decides how the beta is signed and published ([findings](superpowers/plans/2026-10-14-beta-distribution.md), section 6).
+1. **Real-device check by the owner:** [#145](https://github.com/ojiman/unagi-reader/issues/145) and a week of daily use. Bugs found here come before any polish.
+2. **Shipping conditions:** [specification 7.1](specification.md#71-conditions-to-ship-10), including data preservation across updates from 1.0.
+3. **Distribution:** the owner decides how product 1.0 is signed and published. The earlier [beta distribution research](superpowers/plans/2026-10-14-beta-distribution.md) is background, not an approved release plan.
+4. **Documents:** prune them before the release (the second pass was done on 2026-10-14).
 
 ## Next
 
@@ -29,10 +31,6 @@ Ideas: no order, no issue. When the owner decides to build one, it moves to Next
 ## Not planned
 
 Goals and learning plans; AI suggestions of notes; AI editing of the note; sync and accounts; a settings framework; key remapping.
-
-## Before 1.0
-
-The conditions in [specification 7.1](specification.md). A prune of the documents before the release (the second pass was done on 2026-10-14).
 
 ## Done
 
