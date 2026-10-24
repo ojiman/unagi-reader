@@ -371,7 +371,7 @@ struct NativeArticleText: NSViewRepresentable {
         proposal.replacingUnspecifiedDimensions(by: CGSize(width: 600, height: 400))
     }
     func makeNSView(context: Context) -> NSScrollView {
-        let scroll = ArticleScrollView(); scroll.hasVerticalScroller = true; scroll.drawsBackground = true; scroll.backgroundColor = AppPalette.surface
+        let scroll = ArticleScrollView(); scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true; scroll.drawsBackground = true; scroll.backgroundColor = AppPalette.surface
         let text = ArticleTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         scroll.documentView = text
         scroll.contentView.postsBoundsChangedNotifications = true
