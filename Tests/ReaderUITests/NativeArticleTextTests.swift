@@ -161,6 +161,29 @@ import ReaderCore
         #expect(!view.hasVisibleBody)
     }
 
+    /// An article that fits the area shows no scroll bar, also when the next article replaces it; a long one shows it.
+    @Test func theScrollBarShowsOnlyWhenTheArticleIsLongerThanTheArea() throws {
+        func article(_ id: UUID, paragraphs: Int) -> NativeArticleText {
+            NativeArticleText(articleID: id, title: "合成記事", publisher: "SYNTHETIC", date: "", paragraphs: (0..<paragraphs).map { "合成本文\($0)" }, unavailable: nil,
+                              initialAnchor: nil, initialOffset: 0, reduceMotion: false, onScroll: { _, _ in }, onInteraction: {}, onDisplayBegin: {}, onDisplayed: {})
+        }
+        let host = NSHostingView(rootView: article(UUID(), paragraphs: 1))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.contentView = host
+        defer { window.close() }
+        host.layoutSubtreeIfNeeded()
+        func findScroll(_ view: NSView) -> NSScrollView? {
+            if let scroll = view as? NSScrollView { return scroll }
+            return view.subviews.lazy.compactMap(findScroll).first
+        }
+        let scroll = try #require(findScroll(host))
+        for paragraphs in [1, 2, 80, 1] {
+            host.rootView = article(UUID(), paragraphs: paragraphs); host.layoutSubtreeIfNeeded()
+            let long = (scroll.documentView?.frame.height ?? 0) > scroll.contentSize.height
+            #expect(scroll.verticalScroller?.isHidden == !long, "\(paragraphs) paragraphs")
+        }
+    }
+
     @Test func theHeadlineIsCalmerThanBodyEmphasis() throws {
         let view = ArticleTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         view.install(title: "合成記事", publisher: "合成", date: "", paragraphs: ["合成本文"], unavailable: nil)
