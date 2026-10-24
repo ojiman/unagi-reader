@@ -162,7 +162,8 @@ struct ReaderView: View {
     // The reader's modifiers are split into stages, in their original order: one long chain made the CI compiler give up (#132).
     private var splitView: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            sidebar.navigationSplitViewColumnWidth(min: 185, ideal: 215, max: 280)
+            // At most 320 pt: with the list (280) and the article (360) it still fits the narrowest window (960; #438).
+            sidebar.navigationSplitViewColumnWidth(min: 185, ideal: 215, max: 320)
         } content: {
             articleList.id(scope).background(AppPalette.surfaceColor)
                 .modifier(ListColumnCollapse(collapsed: SidebarFold.listFolded(noteOpen: noteOpen, listShown: workspace.noteListShown), animated: !reduceMotion, space: windowSpace))
