@@ -455,6 +455,9 @@ struct ReaderView: View {
             buttons: [
                 BandButton(id: "note", symbol: "note.text", help: String(localized: "Open or Close Note (⌥⌘I)", bundle: ReaderLocalization.bundle),
                            label: noteOpen ? String(localized: "Close Note", bundle: ReaderLocalization.bundle) : String(localized: "Open Note", bundle: ReaderLocalization.bundle), action: toggleNote),
+                // 「記事をノートに送る」 (specification 3.3): off as the menu command is. A click leaves the keyboard and the article's selection where they are.
+                BandButton(id: "send-to-note", symbol: "text.append", help: String(localized: "Send Article to Note (i, ⌘K)", bundle: ReaderLocalization.bundle),
+                           label: String(localized: "Send Article to Note", bundle: ReaderLocalization.bundle), enabled: article != nil && originalPage.url == nil, action: sendToNote),
                 BandButton(id: "star", symbol: article?.starredAt == nil ? "star" : "star.fill", help: String(localized: "Toggle Star (s)", bundle: ReaderLocalization.bundle),
                            label: article?.starredAt == nil ? String(localized: "Add Star", bundle: ReaderLocalization.bundle) : String(localized: "Remove Star", bundle: ReaderLocalization.bundle), enabled: article != nil) { perform(.toggleStar) },
                 // `translate` has no filled form (specification 3.6).
@@ -635,7 +638,7 @@ struct ReaderView: View {
     private func sendToNote() {
         guard originalPage.url == nil, !ReaderKeyboardCommands.hasMarkedText((window.view?.window ?? NSApp.keyWindow)?.firstResponder),
               let article = selectedArticle else { return }
-        let selected = translation.isOn(for: article.id) ? nil : ArticleTextView.selectedText(in: NSApp.keyWindow)
+        let selected = translation.isOn(for: article.id) ? nil : ArticleTextView.selectedText(in: window.view?.window ?? NSApp.keyWindow)
         let url = article.originalURL.flatMap { ArticleURL.link($0) }?.absoluteString
         guard let text = NoteClip.text(title: article.displayTitle, url: url, selection: selected) else { return }
         if noteOpen, noteLink.insert(text) != .noEditor { return }

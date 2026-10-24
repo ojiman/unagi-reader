@@ -341,7 +341,7 @@ extension SplitViewFoldTests {
             try await settle(h) { bandFrames().filter { $0.minX >= noteLeft - 1 }.count == 5 }
             // Nothing of the folded list is left in the band over the article (the list's magnifier went with its column).
             let overArticle: Int = bandFrames().filter { $0.maxX <= noteLeft }.count
-            #expect(overArticle == 4)
+            #expect(overArticle == 5)                                                          // note, send to the note (#417), Star, translate, globe
         }
 
         /// Issue #370 (specification 3.3): dragging the note's edge to the right stops at the panel's minimum and never folds the panel.
