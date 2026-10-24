@@ -304,12 +304,16 @@ import ReaderCore
 }
 
 extension ArticleTextView {
-    /// The text the person selected in the article, when the article has the keyboard (「記事をノートに送る」, specification 3.3).
-    /// Several selected pieces are joined by line breaks.
+    /// The text the person selected in the article, wherever the keyboard is: the selection stays, in grey, when the keyboard moves
+    /// (「記事をノートに送る」, specification 3.3, #417). Several selected pieces are joined by line breaks.
     static func selectedText(in window: NSWindow?) -> String? {
-        guard let view = window?.firstResponder as? ArticleTextView else { return nil }
+        guard let view = window?.contentView.flatMap(find) else { return nil }
         let text = view.plainText(view.selectedRanges.map(\.rangeValue))
         return text.isEmpty ? nil : text
+    }
+    private static func find(in view: NSView) -> ArticleTextView? {
+        if let article = view as? ArticleTextView { return article }
+        return view.subviews.lazy.compactMap { find(in: $0) }.first
     }
 }
 

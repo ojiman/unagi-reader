@@ -42,7 +42,8 @@ import Testing
         // The band is the top 52 pt of the window (AppKit counts y from the bottom).
         let inBand = buttons(host).map { $0.convert($0.bounds, to: nil) }.filter { $0.minY >= 800 - ArticleBand.height && $0.width >= 20 }
         let articleButtons = inBand.filter { $0.minX >= column.minX && $0.maxX <= column.maxX + 1 }
-        #expect(articleButtons.count == 4, "buttons in the band: \(inBand)")                       // note, Star, translate, globe
+        // note, send to the note (#417; its place is checked by the UI smoke test, which reads labels), Star, translate, globe
+        #expect(articleButtons.count == 5, "buttons in the band: \(inBand)")
         #expect((articleButtons.map(\.maxX).max() ?? 0) > column.maxX - 60)                         // at the right end of the column
     }
 }

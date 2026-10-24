@@ -297,7 +297,7 @@ extension SplitViewFoldTests {
         }
     }
 
-    /// 「記事をノートに送る」 from the list's key handler, as the app's `i` reaches it (specification 3.3). Checks PRD-19.
+    /// 「記事をノートに送る」 from the list's key handler, as the app's `i` reaches it, and as the menu and the band button run it (specification 3.3). Checks PRD-19.
     @Suite(EnglishLanguage(), .serialized) @MainActor struct SendToNoteTests {
         private let t = NoteReaderTests()
 
@@ -310,6 +310,11 @@ extension SplitViewFoldTests {
             try await t.settle(h.host) { t.find(ArticleTextView.self, in: h.host)?.string.contains("合成記事 \(row)") == true }
         }
         private func noteText(_ h: NoteReaderTests.Harness) -> String { h.store.note?.text ?? "" }
+        /// The same `sendToNote` the menu's ⌘K and the band button run, without the key handler's own check for typing.
+        private func sendFromTheMenu(_ h: NoteReaderTests.Harness) throws {
+            let list = try #require(try table(h).delegate as? NativeArticleList.Coordinator)
+            list.parent.onKey("i")
+        }
 
         @Test func aClosedNoteOpensAndTakesTheLinkAtItsEnd() async throws {
             let h = try t.harness(scope: { _ in .all }) { store in try store.saveNote(text: "メモ", at: .now) }
@@ -365,9 +370,7 @@ extension SplitViewFoldTests {
             let editor = try #require(field.currentEditor() as? NSTextView)
             editor.setMarkedText("にほん", selectedRange: NSRange(location: 3, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
             try #require(editor.hasMarkedText() && h.window.firstResponder === editor)
-            // The same `sendToNote` the menu's ⌘K runs, without the key handler's own check for typing.
-            let list = try #require(try table(h).delegate as? NativeArticleList.Coordinator)
-            list.parent.onKey("i")
+            try sendFromTheMenu(h)
             pumpRunLoop(0.4)
             #expect(noteText(h) == "メモ")
             #expect(!t.containsText("メモ", in: h.host))                                        // the note did not open
@@ -384,7 +387,8 @@ extension SplitViewFoldTests {
             #expect(!t.containsText("メモ", in: h.host))                                        // the note did not open
         }
 
-        @Test func theSelectionIsTheArticlesOnlyWhenTheArticleHasTheKeyboard() async throws {
+        // #417: the article's selection counts wherever the keyboard is; it stays in the article, in grey, when the keyboard moves.
+        @Test func theArticlesSelectionCountsWhereverTheKeyboardIs() async throws {
             let h = try t.harness(scope: { _ in .all }) { _ in }
             defer { t.finish(h) }
             try await choose(0, in: h)
@@ -398,7 +402,43 @@ extension SplitViewFoldTests {
             #expect(ArticleTextView.selectedText(in: h.window) == nil)                         // a caret is not a selection
             article.setSelectedRange(range)
             h.window.makeFirstResponder(try table(h))
-            #expect(ArticleTextView.selectedText(in: h.window) == nil)                         // the list has the keyboard
+            #expect(ArticleTextView.selectedText(in: h.window) == "合成本文")                  // the list has the keyboard
+        }
+
+        // #417: from the note's editor, as ⌘K does, the article's selection becomes a quotation; the keyboard stays in the note.
+        @Test func fromTheNoteTheArticlesSelectionIsQuoted() async throws {
+            let h = try t.harness(scope: { _ in .all }, noteOpen: true) { store in try store.saveNote(text: "メモ", at: .now) }
+            defer { t.finish(h) }
+            try await t.settle(h.host) { t.containsText("メモ", in: h.host) }
+            try await choose(0, in: h)
+            let article = try #require(t.find(ArticleTextView.self, in: h.host))
+            let range = (article.string as NSString).range(of: "合成本文")
+            try #require(range.location != NSNotFound)
+            h.window.makeFirstResponder(article)
+            article.setSelectedRange(range)
+            let note = try #require(t.find(NoteTextView.self, in: h.host))
+            h.window.makeFirstResponder(note)
+            try sendFromTheMenu(h)
+            try await t.settle(h.host) { noteText(h).contains("> 合成本文") }
+            #expect(noteText(h).contains("> 合成本文\n> — [合成記事 0]("), "note: \(noteText(h).debugDescription)")
+            #expect(h.window.firstResponder === note)
+        }
+
+        // #417: a selection made in one article is never quoted from the next one.
+        @Test func aSelectionInAnotherArticleIsNotQuoted() async throws {
+            let h = try t.harness(scope: { _ in .all }, noteOpen: true) { store in try store.saveNote(text: "メモ", at: .now) }
+            defer { t.finish(h) }
+            try await t.settle(h.host) { t.containsText("メモ", in: h.host) }
+            try await choose(0, in: h)
+            let article = try #require(t.find(ArticleTextView.self, in: h.host))
+            let range = (article.string as NSString).range(of: "合成本文")
+            try #require(range.location != NSNotFound)
+            article.setSelectedRange(range)
+            try await choose(1, in: h)
+            h.window.makeFirstResponder(try table(h))
+            try sendFromTheMenu(h)
+            try await t.settle(h.host) { noteText(h).contains("[合成記事 1](") }
+            #expect(!noteText(h).contains(">"), "note: \(noteText(h).debugDescription)")
         }
     }
 }
