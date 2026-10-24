@@ -91,6 +91,8 @@ private actor RefreshGate: HTTPFetching {
     var peak = 0
     var pending: [(URL, CheckedContinuation<HTTPResponse, any Error>)] = []
     func fetch(url: URL, headers: [String: String], maximumBytes: Int) async throws -> HTTPResponse {
+        // A feed without an icon also asks for its home page (#441); only the feeds are counted and held.
+        if url.path == "/" { return HTTPResponse(data: Data(), finalURL: url, statusCode: 404, headers: [:]) }
         started += 1; peak = max(peak, pending.count + 1)
         return try await withCheckedThrowingContinuation { pending.append((url, $0)) }
     }

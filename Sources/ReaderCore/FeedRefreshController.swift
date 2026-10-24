@@ -12,7 +12,7 @@ import Observation
     public init(store: ReaderStore, client: FeedClient = FeedClient(), batchDelay: Duration = .milliseconds(500)) {
         self.store = store; self.client = client; self.batchDelay = batchDelay
     }
-    private struct Request: Sendable { let id: UUID; let url: URL; let etag: String?; let modified: String? }
+    private struct Request: Sendable { let id: UUID; let url: URL; let etag: String?; let modified: String?; let findsIcon: Bool }
     private enum Event: Sendable { case fetched(Request, Result<FeedFetchResult, any Error>), due }
     /// Fetched feeds are applied together (one save, one list reload) when this many are in, or when the first of them
     /// has waited this long, or when the last fetch ends (#131). A slow feed does not hold back the others. One feed per main-actor
@@ -26,7 +26,7 @@ import Observation
         let feeds = store.feeds.compactMap { feed -> Request? in
             guard requested == nil || requested!.contains(feed.id), let source = feed.sourceURL,
                   let url = ArticleURL.validated(source) else { return nil }
-            return Request(id: feed.id, url: url, etag: feed.etag, modified: feed.lastModified)
+            return Request(id: feed.id, url: url, etag: feed.etag, modified: feed.lastModified, findsIcon: feed.iconURL == nil)
         }
         await withTaskGroup(of: Event.self) { group in
             var iterator = feeds.makeIterator()
@@ -35,7 +35,7 @@ import Observation
             func enqueue(_ request: Request) {
                 let client = self.client
                 fetching += 1
-                group.addTask { .fetched(request, await Result { try await client.fetch(url: request.url, etag: request.etag, lastModified: request.modified) }) }
+                group.addTask { .fetched(request, await Result { try await client.fetch(url: request.url, etag: request.etag, lastModified: request.modified, findsPageIcon: request.findsIcon) }) }
             }
             var applied = false
             @MainActor func applyPending() {
