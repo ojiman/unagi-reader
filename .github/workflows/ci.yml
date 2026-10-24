@@ -183,13 +183,13 @@ jobs:
         run: bash scripts/test-release-version.sh
       - name: Test the documents check
         run: bash scripts/test-check-docs.sh
-      - name: Check the documents (links, decision numbers, status marks and issues in the roadmap)
+      - name: Check the documents (links, decision numbers, status marks, closed issues and 1.0 features)
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
         run: |
-          # A pull request that closes a 1.0 issue removes its roadmap line and marks; the check treats that issue as done.
+          # A pull request that closes a 1.0 issue removes its status mark; the check treats that issue as done.
           if [ -n "$PR" ]; then
             CLOSING_ISSUES=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json closingIssuesReferences --jq '[.closingIssuesReferences[].number] | map(tostring) | join(",")')
             export CLOSING_ISSUES
