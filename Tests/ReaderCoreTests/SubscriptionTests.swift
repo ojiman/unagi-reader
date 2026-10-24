@@ -45,6 +45,7 @@ import Testing
             let article = try #require(store.articles.first { $0.originalURL != nil })
             let articleID = article.id
             try store.markDisplayed(articleID: article.id, at: Date(timeIntervalSince1970: 123))
+            try store.saveNote(text: "Keep my note when unsubscribing", at: Date(timeIntervalSince1970: 123))
             try store.updateSubscription(feed, title: "自分の名前", folder: "Engineering")
             _ = try store.importFeed(first, receivedAt: Date(timeIntervalSince1970: 123))
             #expect(store.articles.count == 1)
@@ -73,6 +74,7 @@ import Testing
         let article = try #require(reopened.articles.first { $0.id == id })
         #expect(article.firstReadAt == Date(timeIntervalSince1970: 123))
         #expect(reopened.feeds.isEmpty)
+        #expect(reopened.note?.text == "Keep my note when unsubscribing")
         #expect(reopened.memberships.filter { $0.articleID == id }.isEmpty)
     }
 
