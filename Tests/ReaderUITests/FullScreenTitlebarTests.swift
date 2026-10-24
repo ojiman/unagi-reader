@@ -7,6 +7,27 @@ import Testing
 extension SplitViewFoldTests {
     /// Private notifications exercise attachment without sending fake full-screen events to AppKit.
     @Suite(.serialized) @MainActor struct FullScreenTitlebarTests {
+        // #401: scene restoration can complete entry without the earlier presentation-options callback.
+        @Test func completedEntryInstallsTheToolbarWithoutThePresentationCallback() throws {
+            let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 1000, height: 650),
+                                  styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            defer { window.close() }
+            let anchor = FullScreenTitlebarFix.Anchor(center: NotificationCenter())
+            try #require(window.contentView).addSubview(anchor)
+            let frame = window.frame
+            #expect(window.toolbar == nil)
+            window.delegate?.windowDidEnterFullScreen?(Notification(name: NSWindow.didEnterFullScreenNotification, object: window))
+            let toolbar = try #require(window.toolbar)
+            #expect(toolbar.isVisible)
+            #expect(window.frame == frame)
+            window.delegate?.windowDidEnterFullScreen?(Notification(name: NSWindow.didEnterFullScreenNotification, object: window))
+            #expect(window.toolbar === toolbar)
+            window.delegate?.windowDidExitFullScreen?(Notification(name: NSWindow.didExitFullScreenNotification, object: window))
+            #expect(window.toolbar == nil)
+            #expect(window.frame == frame)
+        }
+
         @Test func theFullScreenToolbarDoesNotChangeTheNormalFrame() throws {
             let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 1000, height: 650),
                                   styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)

@@ -129,7 +129,8 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
         }
         func windowDidEnterFullScreen(_ notification: Notification) {
             original?.windowDidEnterFullScreen?(notification)
-            anchor?.updateControlsAppearance()
+            // Scene restoration can skip the earlier presentation-options callback.
+            anchor?.showToolbar(true)
         }
         func windowDidExitFullScreen(_ notification: Notification) {
             original?.windowDidExitFullScreen?(notification)
