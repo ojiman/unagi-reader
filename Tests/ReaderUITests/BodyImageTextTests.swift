@@ -97,7 +97,7 @@ import ReaderCore
         let screenY = before.offset
         view.show(NSImage(size: NSSize(width: 500, height: 300)), for: "https://img.example/late.jpg")
         let after = view.readingPosition()
-        #expect(cells(view).first?.cell.cellSize() == NSSize(width: 500, height: 300))
+        #expect(cells(view).first?.cell.pictureSize == NSSize(width: 500, height: 300))      // taller than the text: drawn at its size on a line of its own (#429)
         #expect(after.anchor == before.anchor && abs(after.offset - screenY) < 1)
         // An image that does not come (failed, offline) leaves everything as it was.
         view.show(nil, for: "https://img.example/never.jpg")
