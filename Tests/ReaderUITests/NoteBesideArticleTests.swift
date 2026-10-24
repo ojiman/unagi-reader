@@ -403,6 +403,14 @@ extension SplitViewFoldTests {
         }
 
         @Test func aLateSidebarFoldCannotOverrideClosingTheNote() async throws {
+            try await closeWithLateSidebarFold(checkGeometry: false)
+        }
+
+        @Test func aLateSidebarFoldKeepsTheRestoredListWidth() async throws {
+            try await closeWithLateSidebarFold(checkGeometry: true)
+        }
+
+        private func closeWithLateSidebarFold(checkGeometry: Bool) async throws {
             let h = try harness(width: 1_600)
             defer { finish(h) }
             try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
@@ -418,11 +426,11 @@ extension SplitViewFoldTests {
             try press("n", in: h)
             try await settle(h) { !noteVisible(h) && sidebarButtonsMounted(h) }
             item.isCollapsed = true
-            try await settle(h) {
-                !item.isCollapsed && sidebarButtonsMounted(h) && !noteVisible(h)
-                    && abs((list.enclosingScrollView?.bounds.width ?? 0) - listWidth) < 1
+            try await settle(h) { !item.isCollapsed && sidebarButtonsMounted(h) && !noteVisible(h) }
+            if checkGeometry {
+                try await settle(h) { abs((list.enclosingScrollView?.bounds.width ?? 0) - listWidth) < 1 }
+                #expect(h.window.frame == frame)
             }
-            #expect(h.window.frame == frame)
             #expect(h.window.firstResponder === list)
         }
 
