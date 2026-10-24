@@ -44,6 +44,11 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
             if let window = observedWindow, normalFrame == nil, !window.styleMask.contains(.fullScreen) { normalFrame = window.frame }
             showToolbar(true)
         }
+        func completeFullScreenEntry() {
+            // Scene restoration can skip the earlier presentation-options callback.
+            if observedWindow?.toolbar !== toolbar { showToolbar(true) }
+            else { updateControlsAppearance() }
+        }
         func updateControlsAppearance() { updateControlsAppearance(in: nativeButton?.window) }
         func updateControlsAppearance(in controlsWindow: NSWindow?) {
             // Full screen moves the cached native button into AppKit's separate toolbar window. Clear only its title-bar
@@ -129,8 +134,7 @@ struct FullScreenTitlebarFix: NSViewRepresentable {
         }
         func windowDidEnterFullScreen(_ notification: Notification) {
             original?.windowDidEnterFullScreen?(notification)
-            // Scene restoration can skip the earlier presentation-options callback.
-            anchor?.showToolbar(true)
+            anchor?.completeFullScreenEntry()
         }
         func windowDidExitFullScreen(_ notification: Notification) {
             original?.windowDidExitFullScreen?(notification)
