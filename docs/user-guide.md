@@ -24,12 +24,14 @@ Run the launch command it prints. It uses a temporary app with its own bundle ID
 
 ### Back up the library by hand
 
-Do this before you update from a beta, or when the app cannot open the library and you want to start again empty. These steps have not been tried on a real Mac yet.
+Do this before you update from a beta. These steps have not been tried on a real Mac yet.
 
 1. Quit Unagi Reader (⌘Q).
 2. In Finder choose Go ▸ Go to Folder (移動 ▸ フォルダへ移動) and open `~/Library/Application Support/`.
-3. Rename the whole `UnagiReader` folder, for example to `UnagiReader-backup-20261014`. Keep `Reader.store`, `Reader.store-shm` and `Reader.store-wal` together; do not copy only one file.
-4. Start Unagi Reader. It makes a new, empty library. Keep the renamed folder until you have checked the new one. A backup is not a promise that the data can be converted back.
+3. Select the whole `UnagiReader` folder and choose File ▸ Duplicate (ファイル ▸ 複製). Rename the copy, for example to `UnagiReader-backup-20261014`. Copy the whole folder, so that `Reader.store`, `Reader.store-shm` and `Reader.store-wal` stay together; do not copy only one file.
+4. Leave the original `UnagiReader` folder where it is: the new version opens it. Keep the copy until you have checked your library in the new version. A backup is not a promise that the data can be converted back.
+
+If the app cannot open the library and you want to start again empty, rename the original `UnagiReader` folder in step 3 instead of copying it. The next start makes a new, empty library; the renamed folder keeps the old one.
 
 ## 3. Using the app
 
