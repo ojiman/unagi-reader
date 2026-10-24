@@ -257,6 +257,38 @@ import Carbon
         XCTAssertTrue(app.menuItems["Import OPML…"].exists)
         XCTAssertTrue(app.menuItems["Import OPML…"].isEnabled)
         app.windows.firstMatch.typeKey(.escape, modifierFlags: [])
+
+        // #427: direct store tests missed the disconnected context menu. Exercise cancel, confirm and relaunch.
+        let subscription = app.outlines.staticTexts[current]
+        subscription.click()
+        let table = app.tables["Article List"]
+        XCTAssertEqual(table.tableRows.count, 2)
+        table.tableRows.firstMatch.click()
+        waitForValue(app.textViews["Article Body"], containing: "情報を追いかける時間")
+        subscription.rightClick()
+        app.menuItems["Unsubscribe…"].click()
+        XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 5), "Unsubscribe must open a confirmation")
+        app.buttons["Cancel"].click()
+        XCTAssertTrue(subscription.exists)
+        XCTAssertEqual(table.tableRows.count, 2)
+
+        subscription.rightClick()
+        app.menuItems["Unsubscribe…"].click()
+        XCTAssertTrue(app.buttons["Unsubscribe"].waitForExistence(timeout: 5))
+        app.buttons["Unsubscribe"].click()
+        XCTAssertTrue(subscription.waitForNonExistence(timeout: 5))
+        XCTAssertEqual(table.tableRows.count, 6, "Removing the selected subscription returns to All Articles and keeps its articles")
+        XCTAssertTrue(app.outlines.staticTexts["テクノロジー"].exists)
+        XCTAssertTrue(app.outlines.staticTexts["週末の読み物"].exists)
+        table.tableRows.firstMatch.click()
+        waitForValue(app.textViews["Article Body"], containing: "情報を追いかける時間")
+
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.tables["Article List"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.outlines.staticTexts[current].exists)
+        XCTAssertTrue(app.outlines.staticTexts["テクノロジー"].exists)
+        XCTAssertEqual(app.tables["Article List"].tableRows.count, 6)
     }
 
     // #392: a fresh library does not reset the OS scene's full-screen state.

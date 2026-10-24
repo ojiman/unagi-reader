@@ -225,11 +225,26 @@ struct ReaderView: View {
         .background(WindowAnchor(reference: window))
     }
 
-    /// The subscription sheet.
+    /// The subscription sheet and unsubscribe confirmation.
     private var readerPresentations: some View {
         readerKeys
         .sheet(item: $addingTo) { target in
             SubscriptionSheet(store: store, folder: target.folder) { scope = .feed($0) }
+        }
+        .confirmationDialog(String(localized: "Unsubscribe?", bundle: ReaderLocalization.bundle),
+                            isPresented: Binding(get: { removingFeed != nil }, set: { if !$0 { removingFeed = nil } }),
+                            titleVisibility: .visible, presenting: removingFeed) { feed in
+            Button(String(localized: "Unsubscribe", bundle: ReaderLocalization.bundle), role: .destructive) {
+                let id = feed.id
+                perform {
+                    try store.unsubscribe(feed)
+                    if scope == .feed(id) { scope = .all }
+                }
+                removingFeed = nil
+            }
+            Button(String(localized: "Cancel", bundle: ReaderLocalization.bundle), role: .cancel) { removingFeed = nil }
+        } message: { _ in
+            Text(String(localized: "Articles and their content stay in the library.", bundle: ReaderLocalization.bundle))
         }
     }
 
