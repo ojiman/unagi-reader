@@ -307,6 +307,7 @@ The **note** is the app's **one** plain-text Markdown document ([decision 0049](
 ### 3.4 Favicons and images
 
 - A subscription's favicon and an article's image are different things.
+- A subscription's icon is the one its feed names. Without one, the app reads the site's home page once and uses the icon it names (`<link rel="icon">`, or `apple-touch-icon` when there is none), else the site's `/favicon.ico`. A page that cannot be read is tried again at the next refresh; a typed feed address gets its icon at its first refresh.
 - An article's image comes first from the RSS/Atom feed. For Hatena Bookmark, the article image metadata is used.
 - The list and the article show an image when there is one.
 - No image, a failed image or being offline never stops reading. A late image never changes a row height, the selection or the scroll position.

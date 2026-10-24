@@ -132,6 +132,8 @@ private actor StubFeeds: HTTPFetching {
     func release() { released = true; waiting.forEach { $0.resume() }; waiting = [] }
     func fetch(url: URL, headers: [String: String], maximumBytes: Int) async throws -> HTTPResponse {
         let host = url.host ?? ""
+        // A feed without an icon also asks for its home page (#441); it has none, and only the feeds are held.
+        if url.path == "/" { return HTTPResponse(data: Data(), finalURL: url, statusCode: 404, headers: [:]) }
         if host == held && !released { await withCheckedContinuation { waiting.append($0) } }
         if host == failing { return HTTPResponse(data: Data(), finalURL: url, statusCode: 500, headers: [:]) }
         if headers["If-None-Match"] == "v1" { return HTTPResponse(data: Data(), finalURL: url, statusCode: 304, headers: [:]) }

@@ -274,6 +274,40 @@ import Carbon
         XCTAssertTrue(app.outlines.staticTexts["Smoke local feed"].exists)
     }
 
+    // #441, review of #443: an icon found on the home page after a refresh reaches the selected sidebar row, as it reaches the article
+    // list. The packaged app showed it in the list while the selected row kept its fallback symbol until another subscription was chosen.
+    func testPageIconReachesTheSelectedSidebarRow() throws {
+        useNormalWindow()
+        let local = try XCTUnwrap(ProcessInfo.processInfo.environment["UNAGI_UI_SMOKE_FEED"])
+        try addFeed(local.replacingOccurrences(of: "/feed.xml", with: "/icon-feed.xml"), named: "Smoke icon feed")
+        let row = app.outlines.outlineRows.containing(.staticText, identifier: "Smoke icon feed").firstMatch
+        row.click()
+        selectFirst()
+        waitForValue(app.textViews["Article Body"], containing: "Smoke icon article body.")
+        XCTAssertFalse(showsIcon(row))
+        // The home page answers four seconds late (serve.py), after the refresh has returned; nothing is clicked from here on.
+        app.buttons["Refresh Subscriptions"].click()
+        let article = app.tables["Article List"].tableRows.firstMatch
+        XCTAssertTrue(eventually(15) { self.showsIcon(article) }, "the article list shows the page icon")
+        XCTAssertTrue(eventually(5) { self.showsIcon(row) }, "the selected sidebar row shows the page icon")
+    }
+
+    /// Whether the element's screenshot holds the magenta of the smoke server's page icon.
+    private func showsIcon(_ element: XCUIElement) -> Bool {
+        guard element.exists, let data = element.screenshot().image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: data) else { return false }
+        for x in stride(from: 0, to: bitmap.pixelsWide, by: 2) {
+            for y in stride(from: 0, to: bitmap.pixelsHigh, by: 2) {
+                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
+                if color.redComponent > 0.75 && color.blueComponent > 0.75 && color.greenComponent < 0.45 { return true }
+            }
+        }
+        return false
+    }
+
+    private func eventually(_ seconds: TimeInterval, _ condition: @escaping () -> Bool) -> Bool {
+        XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in condition() }, object: nil)], timeout: seconds) == .completed
+    }
+
     // Checks PRD-16 and PRD-15 with real events. 「名前を変更」 from the context menu puts the keyboard in the name field at once
     // (decision 0043): the person types without clicking it. Several renames, from an unselected and a selected row, because the
     // focus was lost only sometimes (#265).
@@ -488,7 +522,10 @@ import Carbon
     }
 
     private func addLocalFeed() throws {
-        let address = try XCTUnwrap(ProcessInfo.processInfo.environment["UNAGI_UI_SMOKE_FEED"])
+        try addFeed(try XCTUnwrap(ProcessInfo.processInfo.environment["UNAGI_UI_SMOKE_FEED"]), named: "Smoke local feed")
+    }
+
+    private func addFeed(_ address: String, named name: String) throws {
         XCTAssertTrue(address.hasPrefix("http://127.0.0.1:"))
         app.buttons["Add Subscription"].click()
         let field = app.textFields["Feed URL"]
@@ -500,6 +537,6 @@ import Carbon
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed)
         add.click()
         XCTAssertTrue(field.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(app.outlines.staticTexts["Smoke local feed"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.outlines.staticTexts[name].waitForExistence(timeout: 5))
     }
 }
