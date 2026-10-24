@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src="Assets/AppIcon.png" alt="" width="112" />
-
 # Unagi Reader
 
 **An RSS reader for the Mac with a note beside every article.**<br />
@@ -38,26 +36,16 @@ Unagi Reader keeps one loop in one window: **read → note → understand.** Pre
 
 ## Features
 
-| Feature | What it does |
-|---|---|
-| **Keyboard first** | `j` / `k` to move, `m` read or unread, `s` Star, `/` to narrow the list. Scrolling and typing never wait on a refresh or the network. |
-| **A note beside the article** | One plain Markdown note, one key away. Headings and lists are styled as you type; the saved text stays exactly what you typed. |
-| **Send to the note** | `i` adds the article's title and link, or the selected passage as a quotation with its link, where you are writing. |
-| **Bring your own AI, if you want** | The app has no AI of its own. **Copy Markdown** copies the note so you can paste it into any AI you choose, or use the system's Writing Tools. |
-| **Translate on your Mac** | `t` translates the open article with macOS's own translation; the text does not leave your Mac. |
-| **Subscriptions** | Add a feed or a site address, folders, OPML import and export. Refreshes every 30 minutes. |
-| **Comfortable to read** | Light, dark and sepia, five text sizes, the feed's own images and formatting. `v` opens the original page inside the app, `b` in your browser. |
-| **Your language** | The interface is in English, Japanese, Simplified Chinese, Traditional Chinese, Korean, Spanish and Brazilian Portuguese. |
+- **Keyboard first.** Move, mark, star and filter without the mouse. Nothing waits on a refresh or the network.
+- **A note beside the article.** Plain Markdown, one key away. What is saved is exactly what you typed.
+- **Translate on your Mac.** `t` uses macOS's own translation; the text never leaves your Mac.
+- **Simple on purpose.** No sync, no AI of its own, no tags or goals. [Why](docs/vision.md).
 
 All keys and settings are in the [user guide](docs/user-guide.md).
 
 <p align="center">
   <img src="docs/assets/note-beside-article.jpg" alt="An article on the left and a Markdown note on the right, with a link sent from the article" width="900" />
 </p>
-
-### Not in Unagi Reader, on purpose
-
-Sync and accounts, an AI of its own, fetching full pages on its own, tags and goals. The app shows the text the feed gives, and the original page is one key away. Fewer things to manage keeps the loop fast. The reasons are in the [vision](docs/vision.md).
 
 ## Install
 
