@@ -38,7 +38,7 @@ Unagi Reader keeps one loop in one window: **read → note → understand.** Pre
 
 ## Features
 
-| | |
+| Feature | What it does |
 |---|---|
 | **Keyboard first** | `j` / `k` to move, `m` read or unread, `s` Star, `/` to narrow the list. Scrolling and typing never wait on a refresh or the network. |
 | **A note beside the article** | One plain Markdown note, one key away. Headings and lists are styled as you type; the saved text stays exactly what you typed. |
