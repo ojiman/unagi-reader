@@ -1,7 +1,7 @@
 # Local UI smoke restoration (#392)
 
 PASS: the corrected fn-F fixture passed all five smoke cases, with zero failures/skips, on local macOS 27.0.1.
-OPEN: restored Sepia control-bar painting differs from ordinary entry; tracked in [#401](https://github.com/ojiman/unagi-reader/issues/401).
+NOT FIXED: restored Sepia control-bar painting differs from ordinary entry; [#401](https://github.com/ojiman/unagi-reader/issues/401) was closed as not planned.
 
 ## Scope and environment
 
