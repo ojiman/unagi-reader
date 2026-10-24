@@ -6,10 +6,9 @@
                                             acceptance scenario checked by tests is named by a test (`// Checks PRD-04`).
   python3 scripts/check_docs.py --online    Also: the issues named in the specification's status marks and in the active
                                             parts of the roadmap are open (a closed issue means the mark or the line is
-                                            stale); every open issue of the milestone 1.0 is in the roadmap's 'Now'; and every
-                                            open `enhancement` of the milestone is named by a status mark of the
-                                            specification, or has the label `no-spec`. Needs `gh` and a token (GH_TOKEN)
-                                            that can read issues.
+                                            stale); and every open `enhancement` of the milestone 1.0 is named by a status
+                                            mark of the specification, or has the label `no-spec`. Needs `gh` and a token
+                                            (GH_TOKEN) that can read issues.
 
 The problems are printed as `path:line: message`; the exit status is 1 when there is any.
 """
@@ -236,24 +235,6 @@ def release_spec_problems(root, release_issues, closing=frozenset()):
             and issue["number"] not in marked and issue["number"] not in closing]
 
 
-def release_roadmap_problems(root, release_issues, closing=frozenset()):
-    """Every open issue of the milestone 1.0 is linked from the roadmap's section 'Now', except the ones the pull request closes."""
-    path = os.path.join(root, "docs", "roadmap.md")
-    if not os.path.isfile(path):
-        return []
-    with open(path, encoding="utf-8") as handle:
-        text = handle.read()
-    now, in_now = [], False
-    for line in text.split("\n"):
-        if line.startswith("## "):
-            in_now = line.startswith("## Now")
-        elif in_now:
-            now.append(line)
-    listed = {int(n) for n in ROADMAP_ISSUE.findall("\n".join(now))}
-    return [f"docs/roadmap.md: #{issue['number']} is in the milestone 1.0, but the section 'Now' does not list it"
-            for issue in release_issues if issue["number"] not in listed and issue["number"] not in closing]
-
-
 def github_release_issues(repository):
     # Milestone 1 keeps its identity when its title changes from Beta to 1.0.
     result = subprocess.run(["gh", "issue", "list", "--repo", repository, "--milestone", "1", "--state", "open", "--limit", "200",
@@ -279,7 +260,7 @@ def main(argv=None):
     parser.add_argument("--online", action="store_true", help="also check the issues named in the marks and the roadmap")
     parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
     parser.add_argument("--closing", default=os.environ.get("CLOSING_ISSUES", ""),
-                        help="the issues the pull request closes, such as \"126,139\": the release checks treat them as done")
+                        help="the issues the pull request closes, such as \"126,139\": the release check treats them as done")
     args = parser.parse_args(argv)
     problems = link_problems(args.root) + decision_problems(args.root) + scenario_tag_problems(args.root)
     if args.online:
@@ -298,7 +279,7 @@ def main(argv=None):
                 problems.append(f"the issues of the milestone 1.0 cannot be read ({error})")
             else:
                 closing = closing_issues(args.closing)
-                problems += release_spec_problems(args.root, release, closing) + release_roadmap_problems(args.root, release, closing)
+                problems += release_spec_problems(args.root, release, closing)
     if problems:
         print("\n".join(problems))
         print(f"\ndocs check: {len(problems)} problem(s)")

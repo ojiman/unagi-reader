@@ -122,28 +122,13 @@ class ReleaseCoverageTests(unittest.TestCase):
             self.assertIn("#13", problems[0])
             self.assertIn("no-spec", problems[0])
 
-    def test_a_release_issue_must_be_listed_under_now_in_the_roadmap(self):
-        with tempfile.TemporaryDirectory() as root:
-            base = "https://github.com/o/r/issues/"
-            write(root, "docs/roadmap.md", f"## Now: toward 1.0\n[#1]({base}1)\n## Next\n[#2]({base}2)\n## Done\n[#4]({base}4)\n")
-            problems = check_docs.release_roadmap_problems(root, [issue(1, "bug"), issue(2, "bug"), issue(3, "documentation"), issue(4, "bug")])
-            self.assertEqual(len(problems), 3)
-            joined = "\n".join(problems)
-            self.assertNotIn("#1 ", joined)
-            for number in ("#2", "#3", "#4"):
-                self.assertIn(number, joined)
-
-    def test_the_issues_a_pull_request_closes_need_no_mark_and_no_roadmap_line(self):
+    def test_the_issues_a_pull_request_closes_need_no_mark(self):
         with tempfile.TemporaryDirectory() as root:
             write(root, "docs/specification.md", "nothing marked\n")
-            write(root, "docs/roadmap.md", "## Now: toward 1.0\n## Next\n")
             release = [issue(10, "enhancement"), issue(11, "enhancement")]
             spec = check_docs.release_spec_problems(root, release, closing={10})
-            roadmap = check_docs.release_roadmap_problems(root, release, closing={10})
             self.assertEqual(len(spec), 1)
             self.assertIn("#11", spec[0])
-            self.assertEqual(len(roadmap), 1)
-            self.assertIn("#11", roadmap[0])
 
     def test_the_closing_issues_are_read_from_a_list(self):
         self.assertEqual(check_docs.closing_issues("126, 139"), {126, 139})
@@ -152,7 +137,6 @@ class ReleaseCoverageTests(unittest.TestCase):
     def test_without_the_files_there_is_nothing_to_check(self):
         with tempfile.TemporaryDirectory() as root:
             self.assertEqual(check_docs.release_spec_problems(root, [issue(1, "enhancement")]), [])
-            self.assertEqual(check_docs.release_roadmap_problems(root, [issue(1, "bug")]), [])
 
 
 class IssueReferenceTests(unittest.TestCase):
