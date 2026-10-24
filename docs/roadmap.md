@@ -8,9 +8,9 @@ The owner already uses the beta daily and fixes problems found there. This is th
 
 The milestone [1.0](https://github.com/ojiman/unagi-reader/milestone/1) tracks required release work. **1.0 is ready when its milestone issues and the shipping conditions below are complete.** Next and Candidates are not automatically required for 1.0.
 
-1. **Real-device check by the owner:** [#145](https://github.com/ojiman/unagi-reader/issues/145) and a week of daily use. Bugs found here come before any polish.
+1. **Real-device check by the owner:** [#145](https://github.com/ojiman/unagi-reader/issues/145) and a week of daily use. Bugs found here come before any polish: [#401](https://github.com/ojiman/unagi-reader/issues/401), [#435](https://github.com/ojiman/unagi-reader/issues/435).
 2. **Shipping conditions:** [specification 7.1](specification.md#71-conditions-to-ship-10), including data preservation across updates from 1.0.
-3. **Distribution:** an ad hoc signed DMG on GitHub Releases, built by CI from a tag ([decision 0068](decisions/0068-an-ad-hoc-signed-dmg-on-github-releases.md)): the workflow [#432](https://github.com/ojiman/unagi-reader/issues/432), then the README, the user guide and SECURITY.md [#433](https://github.com/ojiman/unagi-reader/issues/433).
+3. **Distribution:** an ad hoc signed DMG on GitHub Releases, built by CI from a tag ([decision 0068](decisions/0068-an-ad-hoc-signed-dmg-on-github-releases.md)); then the README, the user guide and SECURITY.md [#433](https://github.com/ojiman/unagi-reader/issues/433).
 4. **Documents:** prune them before the release (the second pass was done on 2026-10-14).
 
 ## Next
