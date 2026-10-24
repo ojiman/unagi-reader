@@ -167,7 +167,8 @@ import Carbon
         editor.typeText("i")
         XCTAssertEqual(editor.value as? String, "i")
         editor.typeKey("k", modifierFlags: .command)
-        XCTAssertTrue(waitForCondition { (editor.value as? String)?.hasPrefix("i\n\n[") == true }, "note: \(String(describing: editor.value))")
+        // The demo articles have no URL, so the source line is the title alone (specification 3.3).
+        XCTAssertTrue(waitForCondition { ((editor.value as? String) ?? "").hasPrefix("i\n\n") && ((editor.value as? String) ?? "").count > 4 }, "note: \(String(describing: editor.value))")
         XCTAssertTrue(editor.exists)                                           // the keyboard stays: the note is still open
         app.windows.firstMatch.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(editor.waitForNonExistence(timeout: 5))
@@ -181,7 +182,7 @@ import Carbon
         body.typeKey("a", modifierFlags: .command)                             // select the whole article
         send.click()
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
-        XCTAssertTrue(waitForCondition { (editor.value as? String)?.contains("\n> — [") == true }, "note: \(String(describing: editor.value))")
+        XCTAssertTrue(waitForCondition { (editor.value as? String)?.contains("\n> — ") == true }, "note: \(String(describing: editor.value))")
     }
 
     // Checks PRD-04: layout changes keep the note, and committed typing survives a restart.
