@@ -378,7 +378,8 @@ extension SplitViewFoldTests {
             #expect(width >= NotePanelWidth.range.lowerBound - 40, "the note is \(width) pt wide")
         }
 
-        @Test func foldingBeforeTheWidthReportKeepsTheVisibleListWidth() async throws {
+        @Test(arguments: [false, true])
+        func foldingBeforeTheWidthReportKeepsTheVisibleListWidth(refoldWhileReturning: Bool) async throws {
             let h = try harness(width: 1_600)
             defer { finish(h) }
             try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
@@ -394,6 +395,10 @@ extension SplitViewFoldTests {
             h.host.layoutSubtreeIfNeeded()
             #expect(abs(probe.bounds.width - 280) < 1)
             probe.apply(collapsed: false, expanded: true, width: 280)
+            if refoldWhileReturning {
+                probe.apply(collapsed: true, expanded: false, width: 280)
+                probe.apply(collapsed: false, expanded: true, width: 280)
+            }
             try await settle(h) { abs((list.enclosingScrollView?.bounds.width ?? 0) - chosenWidth) < 1 }
         }
 
