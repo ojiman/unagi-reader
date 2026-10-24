@@ -65,11 +65,16 @@ struct ListColumnCollapse: ViewModifier, Animatable {
 
         private var restoring: Task<Void, Never>?
         private var widthToRestore: Double?
+        private var widthBeforeFold: Double?
         func apply(collapsed: Bool, expanded: Bool, width: Double) {
             if wanted != collapsed {
+                // The visible width can be ahead of its queued report to SwiftUI (#389).
+                if collapsed, self.expanded, bounds.width >= NotePanelWidth.listMinimum {
+                    widthBeforeFold = bounds.width
+                }
                 needsFocus = true
                 restoring?.cancel()
-                widthToRestore = wanted != nil && !collapsed ? width : nil
+                widthToRestore = wanted != nil && !collapsed ? (widthBeforeFold ?? width) : nil
             }
             wanted = collapsed
             self.expanded = expanded

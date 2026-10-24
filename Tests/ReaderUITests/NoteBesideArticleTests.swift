@@ -55,8 +55,12 @@ extension SplitViewFoldTests {
             }
             return search(h.host)
         }
-        /// The closed note stays in the view tree, outside the window on the right.
-        private func noteVisible(_ h: Harness) -> Bool { (x(editor(in: h)) ?? 99_999) < h.window.frame.width - 50 }
+        /// A closed note can keep its last in-window coordinates after the native item hides it.
+        private func noteVisible(_ h: Harness) -> Bool {
+            guard let note = editor(in: h), !note.isHiddenOrHasHiddenAncestor,
+                  SplitViewItemLookup(holding: note)?.item.isCollapsed != true else { return false }
+            return (x(note) ?? 99_999) < h.window.frame.width - 50
+        }
         private func table(in h: Harness) -> NativeArticleList.Table? { find(NativeArticleList.Table.self, in: h.host) }
         private func article(in h: Harness) -> ArticleTextView? { find(ArticleTextView.self, in: h.host) }
         private func x(_ view: NSView?) -> CGFloat? { view.map { $0.convert($0.bounds, to: nil).minX } }
@@ -65,15 +69,16 @@ extension SplitViewFoldTests {
             h.window.titlebarAccessoryViewControllers.contains { $0.view is NSHostingView<SidebarTitlebarControls.Buttons> }
         }
         private func state(_ h: Harness) -> String {
-            "[note hidden \(String(describing: editor(in: h)?.isHiddenOrHasHiddenAncestor)), note collapsed \(String(describing: editor(in: h).flatMap { SplitViewItemLookup(holding: $0)?.item.isCollapsed })), frame \(h.window.frame), list viewport \(String(describing: table(in: h)?.enclosingScrollView?.bounds)), list focused \(h.window.firstResponder === table(in: h)), note focused \(h.window.firstResponder === editor(in: h)), sidebar buttons \(sidebarButtonsMounted(h)), list x \(x(table(in: h)).map { "\($0)" } ?? "none"), article x \(x(article(in: h)).map { "\($0)" } ?? "none"), note x \(x(editor(in: h)).map { "\($0)" } ?? "none")]"
+            let anchor = find(SidebarTitlebarControls.Anchor.self, in: h.host)
+            return "[sidebar requested visible \(String(describing: anchor?.sidebarVisible)), sidebar native collapsed \(String(describing: anchor.flatMap { SplitViewItemLookup(holding: $0)?.item.isCollapsed })), note hidden \(String(describing: editor(in: h)?.isHiddenOrHasHiddenAncestor)), note collapsed \(String(describing: editor(in: h).flatMap { SplitViewItemLookup(holding: $0)?.item.isCollapsed })), frame \(h.window.frame), list viewport \(String(describing: table(in: h)?.enclosingScrollView?.bounds)), list focused \(h.window.firstResponder === table(in: h)), note focused \(h.window.firstResponder === editor(in: h)), sidebar buttons \(sidebarButtonsMounted(h)), list x \(x(table(in: h)).map { "\($0)" } ?? "none"), article x \(x(article(in: h)).map { "\($0)" } ?? "none"), note x \(x(editor(in: h)).map { "\($0)" } ?? "none")]"
         }
-        private func settle(_ h: Harness, line: Int = #line, until ready: () -> Bool) async throws {
+        private func settle(_ h: Harness, line: Int = #line, context: String = "", until ready: () -> Bool) async throws {
             for _ in 0..<250 {
                 h.host.layoutSubtreeIfNeeded()
                 if ready() { return }
                 try await Task.sleep(for: .milliseconds(20))
             }
-            #expect(ready(), "did not reach the expected state \(state(h))", sourceLocation: SourceLocation(fileID: #fileID, filePath: #filePath, line: line, column: 1))
+            #expect(ready(), "\(context) did not reach the expected state \(state(h))", sourceLocation: SourceLocation(fileID: #fileID, filePath: #filePath, line: line, column: 1))
         }
         private func press(_ key: String, in h: Harness) throws {
             let list = try #require(table(in: h))
@@ -373,6 +378,49 @@ extension SplitViewFoldTests {
             #expect(width >= NotePanelWidth.range.lowerBound - 40, "the note is \(width) pt wide")
         }
 
+        @Test func foldingBeforeTheWidthReportKeepsTheVisibleListWidth() async throws {
+            let h = try harness(width: 1_600)
+            defer { finish(h) }
+            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
+            let list = try #require(table(in: h))
+            let probe = try #require(find(ListColumnCollapse.Probe.self, in: h.host))
+            let found = try #require(SplitViewItemLookup(holding: probe))
+            let chosenWidth = try #require(list.enclosingScrollView).bounds.width
+            #expect(abs(chosenWidth - 400) < 1)
+            // The last report still holds a returning width when the visible list has already reached 400 pt.
+            probe.apply(collapsed: true, expanded: false, width: 280)
+            let right = found.item.viewController.view.convert(found.item.viewController.view.bounds, to: found.split).maxX
+            found.split.setPosition(right + 280 - chosenWidth, ofDividerAt: found.index)
+            h.host.layoutSubtreeIfNeeded()
+            #expect(abs(probe.bounds.width - 280) < 1)
+            probe.apply(collapsed: false, expanded: true, width: 280)
+            try await settle(h) { abs((list.enclosingScrollView?.bounds.width ?? 0) - chosenWidth) < 1 }
+        }
+
+        @Test func aLateSidebarFoldCannotOverrideClosingTheNote() async throws {
+            let h = try harness(width: 1_600)
+            defer { finish(h) }
+            try await settle(h) { table(in: h)?.numberOfRows == 3 && sidebarButtonsMounted(h) }
+            let list = try #require(table(in: h))
+            let sidebar = try #require(find(SidebarTitlebarControls.Anchor.self, in: h.host))
+            let item = try #require(SplitViewItemLookup(holding: sidebar)?.item)
+            list.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+            try await settle(h) { article(in: h) != nil }
+            let frame = h.window.frame
+            let listWidth = try #require(list.enclosingScrollView).bounds.width
+            try press("n", in: h)
+            try await settle(h) { noteVisible(h) }
+            try press("n", in: h)
+            try await settle(h) { !noteVisible(h) && sidebarButtonsMounted(h) }
+            item.isCollapsed = true
+            try await settle(h) {
+                !item.isCollapsed && sidebarButtonsMounted(h) && !noteVisible(h)
+                    && abs((list.enclosingScrollView?.bounds.width ?? 0) - listWidth) < 1
+            }
+            #expect(h.window.frame == frame)
+            #expect(h.window.firstResponder === list)
+        }
+
         /// Issue #371: closing an arriving note keeps the latest request and returns the list.
         @Test(arguments: [1_240.0, 1_600.0])
         func closingAnArrivingNoteReturnsTheList(width: Double) async throws {
@@ -384,15 +432,16 @@ extension SplitViewFoldTests {
             try await settle(h) { article(in: h) != nil }
             let frame = h.window.frame
             let listWidth = try #require(list.enclosingScrollView).bounds.width
-            for _ in 0..<5 {
+            for cycle in 1...5 {
+                let context = "window \(width) pt, cycle \(cycle), expected list width \(listWidth)"
                 try press("n", in: h)
-                try await settle(h) { noteVisible(h) }
+                try await settle(h, context: context) { noteVisible(h) }
                 try press("n", in: h)
-                try await settle(h) {
-                    !noteVisible(h) && sidebarButtonsMounted(h)
+                try await settle(h, context: context) {
+                    !noteVisible(h) && sidebarButtonsMounted(h) && h.window.firstResponder === list
                         && abs((list.enclosingScrollView?.bounds.width ?? 0) - listWidth) < 1
                 }
-                #expect(h.window.frame == frame)
+                #expect(h.window.frame == frame, "\(context)")
             }
         }
 

@@ -175,6 +175,11 @@ struct ReaderView: View {
                 }
         }
         .navigationSplitViewStyle(.balanced)
+        .onChange(of: columnVisibility) { _, visibility in
+            guard visibility != targetColumns(pageOpen: originalPage.url != nil) else { return }
+            // A late native fold must not override a newer note or page command (#389).
+            Task { @MainActor in columnVisibility = targetColumns(pageOpen: originalPage.url != nil) }
+        }
         .frame(minWidth: 960, minHeight: 600)
         .onGeometryChange(for: Double.self, of: { Double($0.size.width) }) { windowSpace.width = $0 }
         .tint(AppPalette.accentColor)
