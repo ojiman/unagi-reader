@@ -8,10 +8,11 @@ from serve import Handler
 
 
 class ResultTests(unittest.TestCase):
-    def test_only_a_complete_five_test_pass_is_accepted(self):
-        good = dict(result="Passed", totalTestCount=5, passedTests=5, failedTests=0, skippedTests=0)
+    def test_only_a_complete_six_test_pass_is_accepted(self):
+        good = dict(result="Passed", totalTestCount=6, passedTests=6, failedTests=0, skippedTests=0)
         check(good)
-        for changes in [dict(totalTestCount=0, passedTests=0), dict(passedTests=4),
+        for changes in [dict(totalTestCount=0, passedTests=0), dict(totalTestCount=5, passedTests=5),
+                        dict(totalTestCount=7, passedTests=7), dict(passedTests=5),
                         dict(skippedTests=1), dict(failedTests=1), dict(result="Failed")]:
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 check(good | changes)
