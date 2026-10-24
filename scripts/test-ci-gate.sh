@@ -27,6 +27,8 @@ expect_value "blank lines only never skip"  true  "$(classify $'\n\n')"
 
 packaging() { printf '%s' "$1" | bash "$gate" packaging; }
 expect_value "packaging: build script"       true  "$(packaging $'scripts/build-app.sh\n')"
+expect_value "packaging: DMG script"         true  "$(packaging $'scripts/make-dmg.sh\n')"
+expect_value "packaging: DMG script test"    true  "$(packaging $'scripts/test-make-dmg.sh\n')"
 expect_value "packaging: package manifest"   true  "$(packaging $'Package.swift\nSources/a.swift\n')"
 expect_value "packaging: workflow"           true  "$(packaging $'.github/workflows/ci.yml\n')"
 expect_value "packaging: app icon"           true  "$(packaging $'Assets/AppIcon.icns\n')"
