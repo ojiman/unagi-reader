@@ -147,7 +147,7 @@ normal                original page (v)     note beside article   note with the 
 |---|---|---|
 | sidebar | the window buttons | add subscription, refresh (as now) |
 | list | | the filter's magnifier, which opens into the system's search field across the band (List filter, below) |
-| article | the translation status as short text (3.6) | the note button, Star, translate, globe |
+| article | the translation status as short text (3.6) | the note button, send to the note (3.3), Star, translate, globe |
 | original page (in the article band, in place of the status; the band is then only as high as its controls and the page starts right below it) | ✕, the page's host name | |
 | note | ✕, the layout button | previous, next, copy |
 
@@ -158,7 +158,7 @@ normal                original page (v)     note beside article   note with the 
 
 **Headings**
 
-- Feeds, 「購読元」, the list's current scope and the article's publisher use a small 12 pt semibold heading. The top headings sit at the same visual height below the bands. When both lists are at the top, the first sidebar row and first article row's selection backgrounds start at the same height.
+- Feeds, 「購読元」, the list's current scope and the article's source name use a small 12 pt semibold heading. The top headings sit at the same visual height below the bands. When both lists are at the top, the first sidebar row and first article row's selection backgrounds start at the same height.
 
 **Sidebar**
 
@@ -167,7 +167,7 @@ normal                original page (v)     note beside article   note with the 
 - The rows and their scroll bar start below the sidebar's band: scrolled rows stop at its lower edge and never pass under the window buttons.
 - At the top right, right-aligned: add subscription, then refresh. While a refresh runs, the refresh arrow itself turns (not with Reduce Motion) and the button stays enabled (pressing it again does nothing).
 - A small orange ＋ appears at the right end of the 「購読元」 heading on mouse-over and adds a subscription. The heading stays in place however long the list is.
-- No Hide Sidebar button and no folder-management button.
+- No Hide Sidebar button and no folder-management button. The sidebar shows and folds only with the layout: a drag of its edge that folds it, or brings it out while it is folded, springs back at once (#389).
 
 **List**
 
@@ -193,13 +193,13 @@ normal                original page (v)     note beside article   note with the 
 
 **Article**
 
-- The publisher scrolls with the article. Its heading keeps the same size and starting position when the article text size changes. The title is 26 pt semibold. The buttons at the top: Star and the external browser (globe). The theme and the text size are in Settings (3.7).
+- Above the title, the article's source name (3.0), the same name its list row shows, as written (the site's address only when its subscription is gone). Below the title, the weekday, date and time of publication in the system's time zone and format, for example 「Friday, Oct 23, 2026 at 19:56」, or 「Publication date unknown」. The source name scrolls with the article and keeps the same size and starting position when the article text size changes. The title is 26 pt semibold. The buttons at the top: Star and the external browser (globe). The theme and the text size are in Settings (3.7).
 - Opening an article shows the feed's body (or the RSS summary) as it is; it never fetches the original page or swaps the text (RSS first, decision 0033). For more, `v` (in the app) or `b` (the browser).
 - The app never takes text from the original page (decision 0056): no full-text fetch, and no line under the article that says how much text there is.
 - Links and quotes of the feed's text are kept. A link opens in the default browser. Quotes look different from the text. A saved body without layout data is shown as plain text.
-- The feed's HTML is shown as the feed gives it, with no handling per site (decision 0066). Images appear where the feed puts them; an image in a link opens the link; the representative image is not shown a second time when the body holds it. A late, failed or offline image never moves the text being read. [not built #406]
-- Headings, lists (with bullets or numbers), code (monospaced), emphasis and simple tables keep their look; sizes follow the article text size. [not built #407]
-- The next article comes in from below, the previous from above, short and quick (following the list order). The text area does not change height when loading ends.
+- The feed's HTML is shown as the feed gives it, with no handling per site (decision 0066). Images appear where the feed puts them, at their own size and never wider than the text; an image whose block has no text stands on a line of its own, and images of separate blocks on separate lines; an image in a link opens the link. When the body has images, the representative image is not shown above it. A late image never moves the text being read; a failed or offline one gives back the space kept for it, and the text being read stays. A body of images only, such as a comic, is shown as its images. Selecting, copying and 「記事をノートに送る」 take the text without the images. A translated paragraph keeps its images at its start or end.
+- Headings are larger and semibold, and stay smaller than the title. List items keep their marker (「•」, 「◦」 inside another list, or their number) with a hanging indent per level. Code is monospaced; a code block keeps its line breaks and wraps a long line at the column. Bold and italic text keep their look; inline code has a light background. A table is one line per row with its cells at tab stops, and header cells bold. Every size follows the article text size. Copy keeps the markers, line breaks and tabs. A translated paragraph keeps its kind of block but not its bold, italic or code runs.
+- The next article comes in from below, the previous from above, short and quick (following the list order). The text area does not change height when loading ends. The scroll bar shows only for an article longer than the area: moving to an article that fits shows none.
 - An article becomes read when its body or RSS summary is actually shown in the article area. Scrolling the list or fetching the body does not mark it read. Receiving or showing it again does not change the first read time.
 
 **Note**
@@ -219,7 +219,8 @@ normal                original page (v)     note beside article   note with the 
 | `Esc` | Close the original page or the note and return to the same article at its reading position; with both open, the one that has the keyboard (3.1.3). While Japanese text is being composed, it cancels the composition first (decision 0050) |
 | `/` | Open the list filter and put the cursor in it, when no editable field is being typed in |
 | `t` | Translate the open article / show the original, when no editable field is being typed in |
-| `c` | Send the article to the note (3.3), when no editable field is being typed in |
+| `i` | Send the article to the note (3.3), when no editable field is being typed in |
+| `⌘K` | Send the article to the note (3.3) wherever the keyboard is, also in the note's editor. It is the key of 「記事 ▸ 記事をノートに送る」 |
 
 - `j`, `k`, `s` and `n` also work in the original page.
 - In text fields (the note editor too), during input-method composition and with modifier keys, typing and the standard actions come first.
@@ -269,11 +270,13 @@ The **note** is the app's **one** plain-text Markdown document ([decision 0049](
 
 **「記事をノートに送る」 (Send article to note)** ([decision 0059](decisions/0059-send-the-article-to-the-note.md))
 
-- One command that puts the open article's source into the note. It is run by `c` (3.1.5) or by 「記事 ▸ 記事をノートに送る」 in the menu bar. There is no button in a band.
+- One command that puts the open article's source into the note. It is run by `i` or `⌘K` (3.1.5), or by 「記事 ▸ 記事をノートに送る」 in the menu bar, which shows `⌘K`.
+- The article band has a button for it, beside the note button; its help names the keys. It is off when no article is open and while the original page is shown. Clicking it does not move the keyboard.
+- `⌘K` works wherever the keyboard is: in the list, in the article, in the note's editor (where a letter key would only be typed), in the filter field, and with the note closed. With the original page shown the command is off and the page keeps `⌘K`.
 - With no article chosen, it does nothing.
 - What it inserts, as plain text:
   - No text selected in the article: one line, `[Title](URL)`.
-  - Text selected in the article: the selection with `> ` at the start of each line, then the line `> — [Title](URL)`.
+  - Text selected in the article: the selection with `> ` at the start of each line, then the line `> — [Title](URL)`. The selection counts wherever the keyboard is: it stays in the article, shown in grey, when the keyboard moves to the note or elsewhere. A selection that belongs to another article never counts.
   - A title with `[` or `]` gets a backslash before each. With no title the line is the URL; with no URL it is the title.
   - A title on several lines becomes one line. A URL with a space or an unbalanced parenthesis is written inside `<` and `>`. Empty lines at either end of the selection are left out.
   - With a translation shown (3.6) it inserts the line `[Title](URL)` only, never the translated text.
@@ -343,9 +346,11 @@ The **note** is the app's **one** plain-text Markdown document ([decision 0049](
 **Managing subscriptions**
 
 - Right-click a subscription: refresh, rename (in the row itself), move to a folder, unsubscribe (decision 0043).
+- 「購読を解除…」 (Unsubscribe) asks 「購読を解除しますか？」 (Unsubscribe?), with 「購読を解除」 (Unsubscribe) and 「キャンセル」 (Cancel), and the message 「記事・本文はライブラリに残ります。」 (Articles and their content stay in the library). Cancel keeps the subscription. Confirm removes it; removing the selected subscription returns to 「すべての記事」 (All Articles).
 - A subscription moved to another folder moves smoothly to its new place, and the folder opens (not with Reduce Motion).
 - Two ways to move to a folder: 「フォルダへ移動…」 in the menu (a small chooser with a field: typing filters the folders; a new name offers 「作って移動」; ↑ ↓, Return, Esc; 「未分類」 too; a folder is made by moving its first subscription into it), and drag and drop in the sidebar.
-- A folder can be renamed (a name that already exists joins the two folders) and shows the articles of all its subscriptions. An article in several subscriptions and its unread state are counted once. No empty folders and no nesting: a folder disappears with its last subscription.
+- A folder can be renamed (a name that already exists joins the two folders) and shows the articles of all its subscriptions. No empty folders and no nesting: a folder disappears with its last subscription.
+- Each subscription's entries are its own articles (decision 0067). A page that two subscriptions carry, such as a social bookmark feed and the page's own site, is two articles, each with its own feed's title, date and text, and each read, starred and counted on its own. Subscribing again to an address finds the articles kept after unsubscribing.
 
 ### 3.6 Translation
 
@@ -439,7 +444,7 @@ The settings window (Unagi Reader ▸ 「設定…」, `⌘,`) has the panes bel
 **Text size**
 
 - 「文字サイズ」 is a slider with five steps: 14, 16 (standard), 18, 20 and 22 pt.
-- It sets the article's body. The title (26 pt at standard) and date line scale by the same ratio. The publisher keeps the heading size of the other reading areas (3.1.4).
+- It sets the article's body. The title (26 pt at standard) and date line scale by the same ratio. The source name keeps the heading size of the other reading areas (3.1.4).
 - The list, the sidebar and the note keep their sizes (decision 0028).
 - A change shows at once in the open article; the paragraph at the top of the article stays at the top.
 - Not now: `⌘+` / `⌘−` / `⌘0`, a size for the note or the list.
@@ -527,7 +532,7 @@ These are the conditions for passing, not a list of what has passed. "Where it i
 | PRD-16 | Manage subscriptions | Right-click: refresh, rename (in the row; Return on the selected row too), move to a folder, unsubscribe. Moving works with the chooser and with drag and drop | unit tests, real Mac (right-click, Return, drag) |
 | PRD-17 | Narrow the list with a keyword | As in 3.1.4: `/` or the icon opens the filter; typing narrows the list to the articles of the scope whose title or feed summary contains it; clearing restores it; it stays across scopes and not across launches; `j` / `k` walk the filtered list; composing Japanese does not change the list | `ArticleFilterTests`, `ArticleFilterStoreTests`, `ReaderWorkspaceTests`, `ListFilterTests`; real Mac (the owner, with a library of several thousand articles; a real input method) |
 | PRD-18 | Read an article in another language | As in 3.6: `t` or the button translates the open article and shows the progress and the result row; again shows the original; moving to another article shows the original; the text of the note, the list and the sidebar does not change; no text leaves the Mac | real Mac (the owner: a long English article into Japanese, a language pack download, a Mac without Apple Intelligence, VoiceOver); `ArticleTranslationTests`, `LanguageDecisionTests`, `TranslationTests`, `TranslationControllerTests` (a fake translator); the Settings target, Match System, the remembered choice, target help and a target change while a translation is shown: |
-| PRD-19 | Send an article to the note | As in 3.3: `c` or 「記事 ▸ 記事をノートに送る」 inserts `[Title](URL)`, or the selection as a quotation with its source link, after the note's caret (at the end of a note never used), opening a closed note first; the keyboard stays where it was; one undo removes it; nothing is inserted while Japanese text is being composed; a failed save is shown; sending twice inserts twice; nothing else in the note changes | unit tests (`NoteClipTests`); UI tests (`NoteInsertionTests`, `SendToNoteTests`); real Mac (Japanese input, undo, VoiceOver, a long note) |
+| PRD-19 | Send an article to the note | As in 3.3: `i`, `⌘K` (also with the keyboard in the note), the band button or 「記事 ▸ 記事をノートに送る」 inserts `[Title](URL)`, or the article's selection as a quotation with its source link wherever the keyboard is, after the note's caret (at the end of a note never used), opening a closed note first; the keyboard stays where it was; one undo removes it; nothing is inserted while Japanese text is being composed; a failed save is shown; sending twice inserts twice; nothing else in the note changes | unit tests (`NoteClipTests`); UI tests (`NoteInsertionTests`, `SendToNoteTests`); real Mac (Japanese input, undo, VoiceOver, a long note) |
 | PRD-20 | Choose the app language | As in 3.7: Match System and the bundled display languages are offered (all seven); Match System follows the Mac preferences or falls back to English; a choice applies at the next launch and matches System Settings; a manual choice survives restart; untranslated UI text falls back to English; article and note text stay unchanged; article translation keeps its own target | real Mac (menus, Settings, errors, shortcuts, accessibility labels and text expansion in each language; English and Japanese wording reviewed by the owner); `AppLanguageTests`, `CatalogTests` (temporary preferences, native matching, compiled resources and fallback) |
 
 ### 7.1 Conditions to ship 1.0

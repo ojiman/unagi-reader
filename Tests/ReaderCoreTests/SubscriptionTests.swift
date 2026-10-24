@@ -45,6 +45,7 @@ import Testing
             let article = try #require(store.articles.first { $0.originalURL != nil })
             let articleID = article.id
             try store.markDisplayed(articleID: article.id, at: Date(timeIntervalSince1970: 123))
+            try store.saveNote(text: "Keep my note when unsubscribing", at: Date(timeIntervalSince1970: 123))
             try store.updateSubscription(feed, title: "自分の名前", folder: "Engineering")
             _ = try store.importFeed(first, receivedAt: Date(timeIntervalSince1970: 123))
             #expect(store.articles.count == 1)
@@ -52,11 +53,13 @@ import Testing
             #expect(feed.title == "自分の名前")
             let second = try FeedParser.parse(Data(FeedParserTests.rss.utf8), sourceURL: URL(string: "https://aggregator.example/rss")!)
             let other = try store.importFeed(second, receivedAt: Date(timeIntervalSince1970: 123))
-            #expect(store.articles.count == 1)
+            // The aggregator's entry with the same link is its own article, unread (decision 0067).
+            #expect(store.articles.count == 2)
             let feedID = feed.id, otherID = other.id
             let isMember = { (id: UUID) in store.memberships.contains { $0.feedID == id && $0.articleID == articleID } }
             #expect(isMember(feedID))
-            #expect(isMember(otherID))
+            #expect(!isMember(otherID))
+            #expect(store.articles.first { $0.feedID == otherID }?.isRead == false)
             #expect(article.publisher == "publisher.example")
             #expect(article.isRead)
             try store.unsubscribe(feed)
@@ -71,6 +74,7 @@ import Testing
         let article = try #require(reopened.articles.first { $0.id == id })
         #expect(article.firstReadAt == Date(timeIntervalSince1970: 123))
         #expect(reopened.feeds.isEmpty)
+        #expect(reopened.note?.text == "Keep my note when unsubscribing")
         #expect(reopened.memberships.filter { $0.articleID == id }.isEmpty)
     }
 

@@ -24,6 +24,8 @@ struct ReaderView: View {
     @State private var saveError: String?
     /// How 「記事をノートに送る」 reaches the note's editor (specification 3.3).
     @State private var noteLink: NoteEditorLink
+    /// The reader's window, to see where the keyboard is when a menu key arrives (#315, #415).
+    @State private var window = WindowAnchor.Reference()
     @State private var loading: ArticleLoadingController
     private var displayedContent: ArticleContent? { loading.displayed }
     /// Set while the "add subscription" sheet is open: the folder the new subscription goes to.
@@ -137,7 +139,7 @@ struct ReaderView: View {
             .modifier(ArticleTranslationPresentation(controller: translation, articleID: selection, title: selectedArticle?.title,
                 content: displayedContent, keysEnabled: shortcutsEnabled, readerShown: originalPage.url == nil))
             .onKeyPress("/") { guard shortcutsEnabled else { return .ignored }; filterPresented = true; return .handled }
-            .onKeyPress("c") { guard shortcutsEnabled, originalPage.url == nil else { return .ignored }; sendToNote(); return .handled }
+            .onKeyPress("i") { guard shortcutsEnabled, originalPage.url == nil else { return .ignored }; sendToNote(); return .handled }
 
     }
 
@@ -175,6 +177,11 @@ struct ReaderView: View {
                 }
         }
         .navigationSplitViewStyle(.balanced)
+        .onChange(of: columnVisibility) { _, visibility in
+            guard visibility != targetColumns(pageOpen: originalPage.url != nil && !originalClosing) else { return }
+            // A late native fold must not override a newer note or page command (#389).
+            Task { @MainActor in columnVisibility = targetColumns(pageOpen: originalPage.url != nil && !originalClosing) }
+        }
         .frame(minWidth: 960, minHeight: 600)
         .onGeometryChange(for: Double.self, of: { Double($0.size.width) }) { windowSpace.width = $0 }
         .tint(AppPalette.accentColor)
@@ -215,13 +222,29 @@ struct ReaderView: View {
         .onKeyPress("s") { guard shortcutsEnabled else { return .ignored }; perform(.toggleStar); return .handled }
         .onKeyPress("v") { guard shortcutsEnabled else { return .ignored }; openOriginal(); return .handled }
         .onKeyPress("n") { guard shortcutsEnabled else { return .ignored }; toggleNote(); return .handled }
+        .background(WindowAnchor(reference: window))
     }
 
-    /// The subscription sheet.
+    /// The subscription sheet and unsubscribe confirmation.
     private var readerPresentations: some View {
         readerKeys
         .sheet(item: $addingTo) { target in
             SubscriptionSheet(store: store, folder: target.folder) { scope = .feed($0) }
+        }
+        .confirmationDialog(String(localized: "Unsubscribe?", bundle: ReaderLocalization.bundle),
+                            isPresented: Binding(get: { removingFeed != nil }, set: { if !$0 { removingFeed = nil } }),
+                            titleVisibility: .visible, presenting: removingFeed) { feed in
+            Button(String(localized: "Unsubscribe", bundle: ReaderLocalization.bundle), role: .destructive) {
+                let id = feed.id
+                perform {
+                    try store.unsubscribe(feed)
+                    if scope == .feed(id) { scope = .all }
+                }
+                removingFeed = nil
+            }
+            Button(String(localized: "Cancel", bundle: ReaderLocalization.bundle), role: .cancel) { removingFeed = nil }
+        } message: { _ in
+            Text(String(localized: "Articles and their content stay in the library.", bundle: ReaderLocalization.bundle))
         }
     }
 
@@ -368,7 +391,7 @@ struct ReaderView: View {
 
     private var articleList: some View {
         // Swift 6.3 crashes compiling an actor-isolated method reference as the setter.
-        NativeArticleList(ids: visibleArticleIDs, article: { store.article(id: $0) }, feedTitle: { store.feed(id: $0.feedID)?.displayTitle ?? $0.displayPublisher },
+        NativeArticleList(ids: visibleArticleIDs, article: { store.article(id: $0) }, feedTitle: { store.sourceName(of: $0) },
             selection: Binding(get: { selection }, set: { selectArticle($0) }), initialTop: scrollMemory.state.listScrollAnchor, focus: listFocused && originalPage.url == nil,
             shortcutsEnabled: shortcutsEnabled, onTop: { scrollMemory.state.listScrollAnchor = $0 },
             onKey: { key in
@@ -382,7 +405,7 @@ struct ReaderView: View {
                 case "n": toggleNote()
                 case "/": ReaderPerformance.motionBegan("filter-open", duration: 0.25); filterPresented = true
                 case "t": toggleTranslation()
-                case "c": sendToNote()
+                case "i": sendToNote()
                 default: break
                 }
             }, imageLoader: imageLoader, iconURL: { article in
@@ -452,6 +475,9 @@ struct ReaderView: View {
             buttons: [
                 BandButton(id: "note", symbol: "note.text", help: String(localized: "Open or Close Note (⌥⌘I)", bundle: ReaderLocalization.bundle),
                            label: noteOpen ? String(localized: "Close Note", bundle: ReaderLocalization.bundle) : String(localized: "Open Note", bundle: ReaderLocalization.bundle), action: toggleNote),
+                // 「記事をノートに送る」 (specification 3.3): off as the menu command is. A click leaves the keyboard and the article's selection where they are.
+                BandButton(id: "send-to-note", symbol: "text.append", help: String(localized: "Send Article to Note (i, ⌘K)", bundle: ReaderLocalization.bundle),
+                           label: String(localized: "Send Article to Note", bundle: ReaderLocalization.bundle), enabled: article != nil && originalPage.url == nil, action: sendToNote),
                 BandButton(id: "star", symbol: article?.starredAt == nil ? "star" : "star.fill", help: String(localized: "Toggle Star (s)", bundle: ReaderLocalization.bundle),
                            label: article?.starredAt == nil ? String(localized: "Add Star", bundle: ReaderLocalization.bundle) : String(localized: "Remove Star", bundle: ReaderLocalization.bundle), enabled: article != nil) { perform(.toggleStar) },
                 // `translate` has no filled form (specification 3.6).
@@ -506,7 +532,7 @@ struct ReaderView: View {
 
     @ViewBuilder private var detail: some View {
         if let article = selectedArticle {
-            ArticleDetailView(article: article, content: displayedContent?.articleID == article.id ? displayedContent : nil,
+            ArticleDetailView(article: article, source: store.sourceName(of: article), content: displayedContent?.articleID == article.id ? displayedContent : nil,
                 expiry: selectedExpiry, updateAvailable: loading.availableUpdate?.articleID == article.id,
                 error: loading.error, initialAnchor: scrollMemory.state.scrollAnchors[article.id], initialOffset: scrollMemory.state.scrollOffsets[article.id] ?? 0,
                 onScroll: { anchor, offset in scrollMemory.state.recordScroll(articleID: article.id, anchor: anchor, offset: offset) },
@@ -627,10 +653,12 @@ struct ReaderView: View {
         }
     }
     /// 「記事をノートに送る」 (specification 3.3): the article's link, or the text selected in it as a quotation, into the note. A closed note
-    /// opens first and takes the text at its end. The keyboard does not go into the note. Not from the original page.
+    /// opens first and takes the text at its end. The keyboard does not go into the note. Not from the original page, and not while
+    /// any field composes text: ⌘K is a menu key and reaches here from the filter field too (#415).
     private func sendToNote() {
-        guard originalPage.url == nil, let article = selectedArticle else { return }
-        let selected = translation.isOn(for: article.id) ? nil : ArticleTextView.selectedText(in: NSApp.keyWindow)
+        guard originalPage.url == nil, !ReaderKeyboardCommands.hasMarkedText((window.view?.window ?? NSApp.keyWindow)?.firstResponder),
+              let article = selectedArticle else { return }
+        let selected = translation.isOn(for: article.id) ? nil : ArticleTextView.selectedText(in: window.view?.window ?? NSApp.keyWindow)
         let url = article.originalURL.flatMap { ArticleURL.link($0) }?.absoluteString
         guard let text = NoteClip.text(title: article.displayTitle, url: url, selection: selected) else { return }
         if noteOpen, noteLink.insert(text) != .noEditor { return }

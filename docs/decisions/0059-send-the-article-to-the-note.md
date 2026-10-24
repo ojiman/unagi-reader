@@ -12,7 +12,7 @@ The loop is read → note → understand. To keep where a thought came from, the
 ## Decision
 
 1. **An AI summary will not be built.** 0049 point 9 left the door open ("if it comes back"). It is closed. A summary comes from the system's Writing Tools in the note, or from 「Markdownをコピー」 into an AI the person chooses (specification 5).
-2. **One command, 「記事をノートに送る」, writes into the note when the person runs it.** It inserts `[Title](URL)`, or the selected text as a quotation with its source link, at the note's caret, as one undo step. It is run by `c` or the menu 「記事 ▸ 記事をノートに送る」; there is no button in a band.
+2. **One command, 「記事をノートに送る」, writes into the note when the person runs it.** It inserts `[Title](URL)`, or the selected text as a quotation with its source link, at the note's caret, as one undo step. It is run by `c` or the menu 「記事 ▸ 記事をノートに送る」; there is no button in a band. (The key became `i`, with `⌘K` on the menu, on 2026-10-24: #415. The article band got a button for it the same day: #417.)
 3. **Nothing else changes.** The note stays one plain Markdown text. The app keeps no record, link or mark about the sent article, and opening the note still writes nothing. The rule "nothing writes into the note without the person" now reads: the person types, pastes, or runs this command.
 
 The behavior is in specification 3.3; this record does not repeat it.

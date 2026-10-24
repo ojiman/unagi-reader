@@ -194,6 +194,8 @@ import Carbon
     }
 
     // Checks PRD-04 and decision 0050: the panel's own close button and Esc close the note.
+    // Checks PRD-19 (#415): in the note's editor `i` is typed, and ⌘K, the menu's key, sends the article after it.
+    // Checks PRD-19 (#417): the band's button, right after the note button, quotes the article's selection into a closed note.
     func testNoteCloseButtonAndEscape() {
         useNormalWindow()
         selectFirst()
@@ -205,9 +207,25 @@ import Carbon
         app.windows.firstMatch.typeKey("n", modifierFlags: [])
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.click()
+        editor.typeText("i")
+        XCTAssertEqual(editor.value as? String, "i")
+        editor.typeKey("k", modifierFlags: .command)
+        // The demo articles have no URL, so the source line is the title alone (specification 3.3).
+        XCTAssertTrue(waitForCondition { ((editor.value as? String) ?? "").hasPrefix("i\n\n") && ((editor.value as? String) ?? "").count > 4 }, "note: \(String(describing: editor.value))")
+        XCTAssertTrue(editor.exists)                                           // the keyboard stays: the note is still open
         app.windows.firstMatch.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(editor.waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.tables["Article List"].tableRows.firstMatch.isHittable)
+        let send = app.buttons["Send Article to Note"]
+        XCTAssertTrue(send.waitForExistence(timeout: 5))
+        let note = app.buttons["Open Note"].frame, star = app.buttons["Add Star"].frame
+        XCTAssertTrue(note.maxX <= send.frame.minX + 1 && send.frame.maxX <= star.minX + 1, "note \(note), send \(send.frame), Star \(star)")
+        let body = app.textViews["Article Body"]
+        body.click()
+        body.typeKey("a", modifierFlags: .command)                             // select the whole article
+        send.click()
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForCondition { (editor.value as? String)?.contains("\n> — ") == true }, "note: \(String(describing: editor.value))")
     }
 
     // Checks PRD-04: layout changes keep the note, and committed typing survives a restart.
@@ -282,6 +300,39 @@ import Carbon
         XCTAssertTrue(app.menuItems["Import OPML…"].exists)
         XCTAssertTrue(app.menuItems["Import OPML…"].isEnabled)
         app.windows.firstMatch.typeKey(.escape, modifierFlags: [])
+
+        // #427: direct store tests missed the disconnected context menu. Exercise cancel, confirm and relaunch.
+        let subscription = app.outlines.staticTexts[current]
+        subscription.click()
+        let table = app.tables["Article List"]
+        XCTAssertEqual(table.tableRows.count, 2)
+        table.tableRows.firstMatch.click()
+        waitForValue(app.textViews["Article Body"], containing: "情報を追いかける時間")
+        subscription.rightClick()
+        app.menuItems["Unsubscribe…"].click()
+        let confirmation = app.sheets.firstMatch
+        XCTAssertTrue(confirmation.buttons["Cancel"].waitForExistence(timeout: 5), "Unsubscribe must open a confirmation")
+        confirmation.buttons["Cancel"].click()
+        XCTAssertTrue(subscription.exists)
+        XCTAssertEqual(table.tableRows.count, 2)
+
+        subscription.rightClick()
+        app.menuItems["Unsubscribe…"].click()
+        XCTAssertTrue(confirmation.buttons["Unsubscribe"].waitForExistence(timeout: 5))
+        confirmation.buttons["Unsubscribe"].click()
+        XCTAssertTrue(subscription.waitForNonExistence(timeout: 5))
+        XCTAssertEqual(table.tableRows.count, 6, "Removing the selected subscription returns to All Articles and keeps its articles")
+        XCTAssertTrue(app.outlines.staticTexts["テクノロジー"].exists)
+        XCTAssertTrue(app.outlines.staticTexts["週末の読み物"].exists)
+        table.tableRows.firstMatch.click()
+        waitForValue(app.textViews["Article Body"], containing: "情報を追いかける時間")
+
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.tables["Article List"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.outlines.staticTexts[current].exists)
+        XCTAssertTrue(app.outlines.staticTexts["テクノロジー"].exists)
+        XCTAssertEqual(app.tables["Article List"].tableRows.count, 6)
     }
 
     // #392: a fresh library does not reset the OS scene's full-screen state.

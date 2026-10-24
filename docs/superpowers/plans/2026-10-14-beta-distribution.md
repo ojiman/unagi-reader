@@ -1,6 +1,6 @@
 # Beta distribution: what signing, notarization and a release need
 
-- Status: research for the owner (issue #156). Nothing was signed, notarized, uploaded or published. Deleted when the release issues it proposes are closed.
+- Status: historical beta-distribution research for the owner (issue #156). The current release goal is product 1.0 ([roadmap](../../roadmap.md), the owner, 2026-10-24). The proposals below are not an approved release plan. Nothing was signed, notarized, uploaded or published. Deleted when the release issues it proposes are closed.
 - Date: 2026-10-14
 - Sources: Apple's pages read on 2026-10-14: [Notarizing macOS software before distribution](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution), [Developer ID](https://developer.apple.com/developer-id/), [Compare memberships](https://developer.apple.com/support/compare-memberships/). The body of the notarization page did not load in the reader used (only its title), so its steps (sections 2.3 to 2.6) are from general knowledge. Facts marked **(check)** were not read on Apple's pages today; check them before acting.
 
@@ -28,7 +28,7 @@
 - **Package:** a `.zip` of the stapled app, attached to a GitHub release marked as a pre-release. A `.dmg` is nicer to look at but is one more step to sign and notarize; the zip is enough for a few testers.
 - **First launch:** a notarized app downloaded from the internet still shows the system's one-time question ("downloaded from the Internet, are you sure you want to open it?") with Open and Cancel **(check)**. There is no trip to System Settings any more.
 - **Updates:** none in the beta. A new build is a new release; the tester downloads it and replaces the app. Beta data is not kept between betas (decision 0003), so the release notes must say so plainly.
-- **Who gets it:** the owner decides (roadmap, "What the beta is for"). A public release page or a private link is the owner's choice. GitHub release assets of a public repository are public.
+- **Who gets it:** the owner decides; see the [roadmap](../../roadmap.md) for the current release goal. A public release page or a private link is the owner's choice. GitHub release assets of a public repository are public.
 
 ## 4. Version and build numbers
 

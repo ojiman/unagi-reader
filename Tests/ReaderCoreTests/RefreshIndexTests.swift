@@ -150,11 +150,12 @@ import Testing
         try apply(store, b, [entry("shared-in-b", "shared", 20), entry("c", "c", 30)], title: "A")
         #expect(feedChanges.values == [true] && folderChanges.values == [true])
         try apply(store, a, [entry("a", "moved", 40, title: "Changed")], title: "Z")
-        #expect(store.articles.count == 3 && store.memberships.count == 4)
+        // B's entry with A's address is B's own article (decision 0067).
+        #expect(store.articles.count == 4 && store.memberships.count == 4)
         #expect(store.articleIDs.first == shared.id && store.articles.map(\.id) == store.articleIDs)
         #expect(store.filteredIDs(store.articleIDs, matching: "Changed") == [shared.id])
-        #expect(store.unreadCount == 2 && store.feedUnreadCounts[a.id] == 1 && store.feedUnreadCounts[b.id] == 1)
-        #expect(store.folderUnreadCount(folder: "Work") == 2 && store.folderArticleIDs(folder: "Work", keeping: nil).count == 3)
+        #expect(store.unreadCount == 3 && store.feedUnreadCounts[a.id] == 1 && store.feedUnreadCounts[b.id] == 2)
+        #expect(store.folderUnreadCount(folder: "Work") == 3 && store.folderArticleIDs(folder: "Work", keeping: nil).count == 4)
         #expect(store.starredArticleIDs(keeping: nil) == [shared.id] && shared.firstReadAt == at && shared.starredAt == at)
         #expect(store.note?.text == "Keep this note")
         #expect(store.feeds.map(\.title) == ["A", "Z"])
@@ -168,7 +169,7 @@ import Testing
         #expect(reopened.feedUnreadCounts == store.feedUnreadCounts && reopened.folderUnreadCounts == store.folderUnreadCounts)
     }
 
-    @Test func aNewMembershipNotifiesScopedListsWithoutMovingTheGlobalList() throws {
+    @Test func anotherFeedsEntryWithTheSameAddressIsANewArticleInItsLists() throws {   // decision 0067
         let library = try TestLibrary(); defer { library.cleanup() }
         let store = try ReaderStore(url: library.url)
         let ids = try store.importSubscriptions([
@@ -187,10 +188,11 @@ import Testing
             _ = store.folderArticleIDs(folder: "Other", keeping: nil)
         } onChange: { folderChanges.add(true) }
         try apply(store, b, [entry("b", "shared", 20)], title: "B")
-        #expect(globalChanges.values.isEmpty && feedChanges.values == [true] && folderChanges.values == [true])
-        #expect(store.articleIDs == [id] && store.visibleArticleIDs(feedID: b.id, unreadOnly: false, keeping: nil) == [id])
-        #expect(store.folderArticleIDs(folder: "Other", keeping: nil) == [id])
-        #expect(store.unreadCount == 1 && store.feedUnreadCounts == [a.id: 1, b.id: 1])
+        #expect(globalChanges.values == [true] && feedChanges.values == [true] && folderChanges.values == [true])
+        let own = try #require(store.visibleArticleIDs(feedID: b.id, unreadOnly: false, keeping: nil).first)
+        #expect(own != id && Set(store.articleIDs) == [id, own] && store.visibleArticleIDs(feedID: a.id, unreadOnly: false, keeping: nil) == [id])
+        #expect(store.folderArticleIDs(folder: "Other", keeping: nil) == [own])
+        #expect(store.unreadCount == 2 && store.feedUnreadCounts == [a.id: 1, b.id: 1])
         #expect(store.folderUnreadCounts == ["Work": 1, "Other": 1])
     }
 

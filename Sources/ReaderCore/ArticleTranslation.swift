@@ -34,10 +34,10 @@ public struct TranslationPlan: Sendable, Equatable {
     }
 
     /// The title and paragraphs to show: the translated text where there is one, the original elsewhere. Links are not kept in
-    /// translated text (their positions change); the quote depth is.
+    /// translated text (their positions change); the kind of block is, and images stay at the start or the end (`BodyParagraph.with(text:)`).
     public func apply(_ translated: [Int: String]) -> TranslatedArticle {
         TranslatedArticle(title: translated[Self.titleIndex] ?? title, paragraphs: paragraphs.enumerated().map { index, paragraph in
-            translated[index].map { BodyParagraph(text: $0, quoteDepth: paragraph.quoteDepth) } ?? paragraph
+            translated[index].map { paragraph.with(text: $0) } ?? paragraph
         })
     }
 }

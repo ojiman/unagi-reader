@@ -59,14 +59,14 @@ import Testing
         #expect(library.store.feeds.allSatisfy { $0.lastFetchedAt != first[$0.id] } && library.store.articles.count == 75)
         #expect(counter.saves == batches(25) && counter.publications == batches(25), "saves \(counter.saves), publications \(counter.publications)")   // was 25 each
     }
-    @Test func anArticleTwoFeedsCarryInOneBatchIsOneArticleInBoth() async throws {
+    @Test func anAddressTwoFeedsCarryInOneBatchIsAnArticleInEach() async throws {   // decision 0067
         let counter = Counter()
         let library = try library(feeds: 2, counter: counter); defer { try? FileManager.default.removeItem(at: library.directory) }
         let refresh = FeedRefreshController(store: library.store, client: FeedClient(http: StubFeeds(shared: true)), batchDelay: longDelay)
         await refresh.refresh(feedIDs: library.ids)
-        #expect(library.store.articles.count == 2 * 3 + 1)
-        let shared = try #require(library.store.articles.first { $0.originalURL == "https://shared.example/p" })
-        #expect(library.store.memberships.filter { $0.articleID == shared.id }.count == 2)
+        #expect(library.store.articles.count == 2 * 3 + 2)
+        let shared = library.store.articles.filter { $0.originalURL == "https://shared.example/p" }
+        #expect(Set(shared.map(\.feedID)) == Set(library.ids) && library.store.memberships.count == 2 * 3 + 2)
     }
     @Test func aBatchWhoseSaveFailsIsAppliedOneFeedAtATime() async throws {
         let counter = Counter()

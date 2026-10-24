@@ -43,10 +43,11 @@ extension ReaderStore {
         // Only the candidates' bodies are read (#250): every launch runs this, and most libraries have few or none.
         let candidateIDs = candidates.map(\.id)
         let snapshots = try context.fetch(FetchDescriptor<ContentSnapshot>(predicate: #Predicate { candidateIDs.contains($0.articleID) }))
-        let withBody = Set(snapshots.filter { !$0.text.isEmpty }.map(\.articleID))
+        // A body of images only has no text but has its format (#413).
+        let withBody = Set(snapshots.filter { !$0.text.isEmpty || $0.bodyFormatData != nil }.map(\.articleID))
         let selected = candidates.filter { !$0.summary.isEmpty || $0.imageURL != nil || withBody.contains($0.id) }
         let ids = Set(selected.map(\.id))
-        let bodies = snapshots.filter { ids.contains($0.articleID) && !$0.text.isEmpty }
+        let bodies = snapshots.filter { ids.contains($0.articleID) && (!$0.text.isEmpty || $0.bodyFormatData != nil) }
         let summaries = selected.filter { !$0.summary.isEmpty }
         return DeletionPreview(articleIDs: selected.map(\.id), bodyCount: bodies.count, summaryCount: summaries.count,
                                estimatedBytes: bodies.reduce(0) { $0 + $1.text.utf8.count } + summaries.reduce(0) { $0 + $1.summary.utf8.count })

@@ -36,8 +36,10 @@ struct ReaderMenuCommands: Commands {
         CommandMenu(String(localized: "Article", bundle: ReaderLocalization.bundle)) {
             Button(actions?.starred == true ? String(localized: "Remove Star", bundle: ReaderLocalization.bundle) : String(localized: "Add Star", bundle: ReaderLocalization.bundle)) { actions?.toggleStar() }
                 .disabled(actions?.canStar != true)
-            // 「記事をノートに送る」 (specification 3.3); its key `c` is a reading key, not shown here, as with the others in this menu.
+            // 「記事をノートに送る」 (specification 3.3). ⌘K works wherever the keyboard is, also in the note's editor; its reading key `i`
+            // is not shown here, as with the others in this menu.
             Button(String(localized: "Send Article to Note", bundle: ReaderLocalization.bundle)) { actions?.sendToNote() }
+                .keyboardShortcut("k", modifiers: .command)
                 .disabled(actions?.canSendToNote != true)
             Button(String(localized: "Open original page in browser", bundle: ReaderLocalization.bundle)) { actions?.openBrowser() }
                 .disabled(actions?.canOpenBrowser != true)
