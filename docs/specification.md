@@ -538,8 +538,8 @@ These are the conditions for passing, not a list of what has passed. "Where it i
 
 ### 7.1 Conditions to ship 1.0
 
-- The store schema is frozen as a `VersionedSchema`.
-- CI runs a required check from the 1.0 release tag: a synthetic store with subscriptions, articles, read times, Stars and the note is opened by the new version and reopened, and nothing is lost. A skipped or not-run check is never a pass. It stays for every later model change.
-- The Bundle ID, the store location, signing and the sandbox are fixed, and saving, restarting and updating are checked with them. Whether a beta store opens is checked; if it does not, the person is told how to keep it.
+- The store schema is frozen as a `VersionedSchema`. [not built #449]
+- CI runs a required check from the 1.0 release tag: a synthetic store with subscriptions, articles, read times, Stars and the note is opened by the new version and reopened, and nothing is lost. A skipped or not-run check is never a pass. It stays for every later model change. [not built #450]
+- The Bundle ID, the store location, signing and the sandbox are fixed, and saving, restarting and updating are checked with them. Whether a beta store opens is checked; if it does not, the person is told how to keep it. [not built #451]
 - The release is an ad hoc signed, not notarized DMG on GitHub Releases ([decision 0068](decisions/0068-an-ad-hoc-signed-dmg-on-github-releases.md)). A tag `vX.Y.Z` makes CI build it from that commit, with the version from the tag, its SHA-256 and a build provenance attestation, as a draft release. The owner checks that DMG on macOS 27 and publishes it; a published DMG is never replaced.
 - The release notes say what changed, that the app is not notarized and how to open it, how to check the DMG, and that the library is kept.
