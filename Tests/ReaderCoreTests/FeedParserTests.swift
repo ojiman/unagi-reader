@@ -112,6 +112,27 @@ struct FeedParserTests {
             }
         }
     }
+    @Test func aDoctypeInsideAnArticleIsNotADeclaration() throws {
+        // #440: the GitHub Blog puts a whole HTML document, with its DOCTYPE, in each item's CDATA.
+        let xml = """
+        <?xml version="1.0" encoding="UTF-8"?><!-- generator --><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>Blog</title>
+        <item><title>One</title><link>https://blog.example/1</link>
+        <content:encoded><![CDATA[<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"><html><body><p>Body</p></body></html>]]></content:encoded></item>
+        <item><title>Two &lt;!ENTITY&gt;</title><link>https://blog.example/2</link><description><![CDATA[<!ENTITY x "y">]]></description></item>
+        </channel></rss>
+        """
+        let result = try FeedParser.parse(Data(xml.utf8), sourceURL: URL(string: "https://blog.example/feed/")!)
+        #expect(result.entries.map(\.title) == ["One", "Two <!ENTITY>"])
+        #expect(result.entries.first?.body.contains("Body") == true)
+        // A DOCTYPE before the root element is still refused, also after a comment or the XML declaration.
+        for prolog in ["<!DOCTYPE rss>", "<?xml version=\"1.0\"?>\n<!-- x --> <!DOCTYPE rss SYSTEM \"rss.dtd\">"] {
+            #expect(throws: FeedImportError.entities, "\(prolog)") {
+                try FeedParser.parse(Data("\(prolog)<rss><channel><title>T</title></channel></rss>".utf8), sourceURL: URL(string: "https://blog.example/feed/")!)
+            }
+        }
+        let utf16 = try #require("<?xml version=\"1.0\" encoding=\"UTF-16\"?><!DOCTYPE rss><rss><channel><title>T</title></channel></rss>".data(using: .utf16))
+        #expect(throws: FeedImportError.entities) { try FeedParser.parse(utf16, sourceURL: URL(string: "https://blog.example/feed/")!) }
+    }
     @Test func anHTMLPageIsNamedAsAPageNotAsBrokenXML() {
         for page in ["<!doctype html><html><head><title>Home</title></head></html>", "\u{FEFF}  \n<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\"><html></html>", "<HTML><body>x</body></HTML>"] {
             #expect(throws: FeedImportError.htmlPage) { try FeedParser.parse(Data(page.utf8), sourceURL: URL(string: "https://feed.example/")!) }
