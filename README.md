@@ -33,7 +33,7 @@ Unagi Reader keeps one loop in one window: **read → note → understand.** Pre
 **No account. No server. Your data stays on your Mac.** Your subscriptions, what you have read and your note are saved only on your Mac. There is no sign-up, no server of ours and no tracking.
 
 <p align="center">
-  <img src="docs/assets/read-and-note.gif" alt="Opening the note beside an article, writing three points, and sending the article's link into the note" width="900" />
+  <img src="docs/assets/read-and-note.gif" alt="The note beside an article: writing three points, then sending the article's link into the note" width="900" />
 </p>
 
 ## Features
