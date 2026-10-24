@@ -1,6 +1,6 @@
 # 0068 Product 1.0 is an ad hoc signed DMG on GitHub Releases
 
-- Status: valid (approved when its PR is merged; workflow in #432, documents in #433)
+- Status: valid (workflow built in #432; documents in #433)
 - Date: 2026-10-24
 - Decider: the owner, in the chat: no paid Developer ID; people download the app from GitHub; the README must show why the app can be trusted.
 
