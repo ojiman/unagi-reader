@@ -346,6 +346,7 @@ The **note** is the app's **one** plain-text Markdown document ([decision 0049](
 **Managing subscriptions**
 
 - Right-click a subscription: refresh, rename (in the row itself), move to a folder, unsubscribe (decision 0043).
+- 「購読を解除…」 (Unsubscribe) asks 「購読を解除しますか？」 (Unsubscribe?), with 「購読を解除」 (Unsubscribe) and 「キャンセル」 (Cancel), and the message 「記事・本文はライブラリに残ります。」 (Articles and their content stay in the library). Cancel keeps the subscription. Confirm removes it; removing the selected subscription returns to 「すべての記事」 (All Articles).
 - A subscription moved to another folder moves smoothly to its new place, and the folder opens (not with Reduce Motion).
 - Two ways to move to a folder: 「フォルダへ移動…」 in the menu (a small chooser with a field: typing filters the folders; a new name offers 「作って移動」; ↑ ↓, Return, Esc; 「未分類」 too; a folder is made by moving its first subscription into it), and drag and drop in the sidebar.
 - A folder can be renamed (a name that already exists joins the two folders) and shows the articles of all its subscriptions. No empty folders and no nesting: a folder disappears with its last subscription.
