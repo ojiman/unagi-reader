@@ -60,11 +60,14 @@ expect_value "note selection routing stays in CI" false "$(local_only 'ReaderUIT
 expect_value "synthetic clock logic stays in CI" false "$(local_only 'ReaderUITests.ReaderPerformanceTests/theHeartbeatSubtractsItsExpectedTwentyMilliseconds()')"
 expect_value "Sepia restoration logic stays in CI" false "$(local_only 'ReaderUITests.SplitViewFoldTests/FullScreenSepiaTests/changingTheDetachedWindowRestoresThePreviousWindow()')"
 
+expect_value "late sidebar fold width is local" true "$(local_only 'ReaderUITests.SplitViewFoldTests/NoteBesideArticleTests/aLateSidebarFoldKeepsTheRestoredListWidth()')"
+
 # Mixed hosted suites must keep save, focus and command regressions in CI.
 while IFS= read -r test; do
   expect_value "hosted logic stays in CI: $test" false "$(local_only "ReaderUITests.$test")"
 done <<'TESTS'
 SplitViewFoldTests/NoteBesideArticleTests/openingTheNoteGivesTheKeyboardToTheEditor()
+SplitViewFoldTests/NoteBesideArticleTests/aLateSidebarFoldCannotOverrideClosingTheNote()
 SplitViewFoldTests/NoteBesideArticleTests/escapeFromTheEditorClosesTheNoteButNotWhileComposing()
 SplitViewFoldTests/NoteBesideArticleTests/escapeFromTheArticleClosesTheNote()
 SplitViewFoldTests/NoteBesideArticleTests/escapeInTheNoteGivesTheKeyboardToTheOriginalPage()

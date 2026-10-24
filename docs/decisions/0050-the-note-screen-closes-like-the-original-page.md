@@ -1,6 +1,6 @@
 # 0050 The note screen closes like the original page; a layout button; a wider note
 
-- Status: valid; the place of the layout button (point 4) is replaced by [0057](0057-each-column-has-its-own-band.md); where the keyboard goes when the note opens (point 1) is refined by [0064](0064-opening-the-note-gives-it-the-keyboard.md) (approved by the PdM when the PR that adds this record was merged).
+- Status: valid; the place of the layout button (point 4) is replaced by [0057](0057-each-column-has-its-own-band.md); where the keyboard goes when the note opens (point 1) is refined by [0064](0064-opening-the-note-gives-it-the-keyboard.md); the motion of closing (point 2) is replaced by [0070](0070-closing-the-note-has-no-reverse-motion.md) (approved by the PdM when the PR that adds this record was merged).
 - Date: 2026-10-13
 - Decider: the owner (PdM), after trying the build of PR #119 (the note beside the article), and in the chat that followed. The points come from the owner's answers; the wording and the proposal marked below are the Product Owner's.
 - Refines: [0049](0049-one-note-and-no-ai-of-its-own.md) points 4, 5 and 6 (how the note screen is left, the 「一覧」 button, the width of the note).
