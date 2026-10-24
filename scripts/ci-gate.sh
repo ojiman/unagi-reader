@@ -66,6 +66,7 @@ case "${1:-}" in
       'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/theNoteControlsSitInTheNoteBand' # Note control coordinates.
       'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/draggingTheNoteEdgeToTheRightNeverFoldsTheNote' # Native divider drag and minimum panel width.
       'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/closingAnArrivingNoteReturnsTheList' # Animated width restoration (#371).
+      'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/closingTheNoteDoesNotSqueezeTheArticleBeforeTheListReturns' # Article width sampled during the note close (#215).
       'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/theSplitViewStillHasTheShapeTheProbesAssume' # Native split-view structure and folded/restored widths.
       'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/theListStillFoldsWhenNoSplitViewItemCanBeFound' # Hosted fallback view widths.
       'ReaderUITests\.SplitViewFoldTests/NoteBesideArticleTests/theWindowKeepsItsWidthWhileTheListFoldsAndReturns' # Window/column geometry sampled during motion.

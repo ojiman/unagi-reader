@@ -133,7 +133,7 @@ normal                original page (v)     note beside article   note with the 
 | `⌥⌘↑` / `⌥⌘↓`, the arrows above the note | Change only the article, with the note still open | |
 
 - **The original page while it loads.** The page slides in at once, but its web view stays hidden behind the app's own dark surface, with a loading spinner in the middle of the column, until the page has painted its first content (or has finished loading). Then it is shown (a 0.15 s fade; none with Reduce Motion). A failed load shows its own sentence. The page itself (a white page, its own delay) is the page's business.
-- **Motion.** Folding, returning and sliding are one movement of about 0.3 s. In a window narrower than 1,400 pt the list folds and returns at once, without that motion (with it the app ended in an exception, #222); the sidebar, the note and the page keep theirs. With Reduce Motion nothing moves; the layout changes at once (decisions 0044, 0046, 0049).
+- **Motion.** Opening the note, switching its layout, and opening or closing the original page take about 0.3 s. Closing the note restores all columns at once, without animation. In a window narrower than 1,400 pt the list also folds and returns at once during the other layout changes (the animated fold ended the app in an exception, #222); the sidebar, the note and the page keep their motion. With Reduce Motion nothing moves; the layout changes at once (decisions 0044, 0046, 0049).
 - Opening or closing the note and switching its layout never change the window frame, the chosen article or the scroll position.
 
 #### 3.1.4 Rules per area

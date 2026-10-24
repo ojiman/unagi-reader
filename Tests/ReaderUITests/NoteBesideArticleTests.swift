@@ -426,6 +426,28 @@ extension SplitViewFoldTests {
             #expect(h.window.firstResponder === list)
         }
 
+        /// Checks PRD-04, #215: closing must not first squeeze the article below both settled widths.
+        @Test(arguments: [1_240.0, 1_600.0])
+        func closingTheNoteDoesNotSqueezeTheArticleBeforeTheListReturns(width: Double) async throws {
+            let h = try harness(width: width)
+            defer { finish(h) }
+            let list = try await openNote(h)
+            let reader = try #require(article(in: h))
+            let before = reader.frame.width
+            var widths = [before]
+            try press("n", in: h)
+            let end = ContinuousClock.now + .seconds(0.6)
+            while ContinuousClock.now < end {
+                h.host.layoutSubtreeIfNeeded()
+                widths.append(reader.frame.width)
+                try await Task.sleep(for: .milliseconds(5))
+            }
+            try await settle(h) { !noteVisible(h) && sidebarButtonsMounted(h) && h.window.firstResponder === list }
+            let after = reader.frame.width
+            #expect(try #require(widths.min()) >= min(before, after) - 2,
+                    "article width overshot its settled range: before \(before), after \(after), samples \(widths)")
+        }
+
         /// Issue #371: closing an arriving note keeps the latest request and returns the list.
         @Test(arguments: [1_240.0, 1_600.0])
         func closingAnArrivingNoteReturnsTheList(width: Double) async throws {
@@ -534,6 +556,7 @@ extension SplitViewFoldTests {
             try press("n", in: h)
             try await watch(for: 1)
             #expect(noteVisible(h))
+            #expect(h.window.frame == start, "the window changed while opening the note")
             try press("n", in: h)
             try await watch(for: 1)
             #expect(!noteVisible(h))
@@ -574,7 +597,7 @@ extension SplitViewFoldTests {
                 }
                 if folding { #expect((widths.max() ?? 0) <= starting + 1) }
                 // CI's macOS 26.6 hosted fold exposes only endpoints (39598530460); motion acceptance starts at macOS 27.
-                if ProcessInfo.processInfo.isOperatingSystemAtLeast(OperatingSystemVersion(majorVersion: 27, minorVersion: 0, patchVersion: 0)) {
+                if folding && ProcessInfo.processInfo.isOperatingSystemAtLeast(OperatingSystemVersion(majorVersion: 27, minorVersion: 0, patchVersion: 0)) {
                     #expect(widths.contains { $0 > 1 && $0 < starting - 1 },
                             "folding \(folding), widths \(widths), window \(h.window.frame), host \(h.host.bounds)")
                 }

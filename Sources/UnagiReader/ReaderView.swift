@@ -166,7 +166,7 @@ struct ReaderView: View {
             sidebar.navigationSplitViewColumnWidth(min: 185, ideal: 215, max: 320)
         } content: {
             articleList.id(scope).background(AppPalette.surfaceColor)
-                .modifier(ListColumnCollapse(collapsed: SidebarFold.listFolded(noteOpen: noteOpen, listShown: workspace.noteListShown), animated: !reduceMotion, space: windowSpace))
+                .modifier(ListColumnCollapse(collapsed: SidebarFold.listFolded(noteOpen: noteOpen, listShown: workspace.noteListShown), animated: !reduceMotion && noteOpen, space: windowSpace))
                 // The fold clips the column. Include its control band in that clip, above the title-bar safe area (#397).
                 .ignoresSafeArea(.container, edges: .top)
         } detail: {
@@ -175,6 +175,12 @@ struct ReaderView: View {
                 // The width goes on the panel's content. Put on the inspector itself it had no effect, and the panel stayed about 270 pt wide.
                 .inspector(isPresented: noteOpenBinding) {
                     NoteInspectorColumn(space: windowSpace, startingWidth: startingPanelWidth) { limit in notePanel(limit: limit) }
+                }
+                .transaction(value: noteOpen) { transaction in
+                    if !noteOpen {
+                        transaction.animation = nil
+                        transaction.disablesAnimations = true
+                    }
                 }
         }
         .navigationSplitViewStyle(.balanced)
@@ -627,7 +633,7 @@ struct ReaderView: View {
         moveNote()
         if focusEditor { noteLink.focusWhenShown() }
     }
-    /// The note's ✕, `Esc` and the note's toggle: close the note, the same move as opening it in reverse (decision 0050).
+    /// The note's ✕, `Esc` and the note's toggle restore the reading layout at once (specification 3.1.3).
     private func closeNote() {
         guard noteOpen else { return }
         noteLink.cancelFocus()
@@ -644,11 +650,12 @@ struct ReaderView: View {
         listFocused = false
         Task { @MainActor in listFocused = true }
     }
-    /// Opens or closes the note beside the article: the sidebar and the list fold away to the left and the note comes in from the right, as
-    /// one move (decision 0049), the same as the original page. The list is folded by `ListColumnCollapse`, in the same time.
+    /// Opens with the left columns folding away (decision 0049); closes all columns at once (#215).
     private func moveNote() {
         ReaderPerformance.motionBegan(noteOpen ? "note-close" : "note-open", duration: SidebarFold.motionDuration)
-        withAnimation(reduceMotion ? nil : .easeOut(duration: SidebarFold.motionDuration)) {
+        // Keep a split-view animation transaction: nil can widen a narrow window when the sidebar returns (#215).
+        let animation: Animation? = noteOpen ? .linear(duration: 0) : (reduceMotion ? nil : .easeOut(duration: SidebarFold.motionDuration))
+        withAnimation(animation) {
             workspace.noteOpen.toggle()
             columnVisibility = targetColumns(pageOpen: originalPage.url != nil)
         }
