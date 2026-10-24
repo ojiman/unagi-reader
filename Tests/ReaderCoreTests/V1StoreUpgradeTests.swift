@@ -31,7 +31,8 @@ import Testing
                 #expect(store.feeds.first?.title == "合成購読" && store.feeds.first?.folder == "技術")
                 #expect(article.id == expected.articleID && article.title == "合成記事")
                 #expect(article.firstReceivedAt == at && article.firstReadAt == Date(timeIntervalSince1970: expected.firstReadAt))
-                #expect(article.identityKey == "https://synthetic.example/article/1" && article.isRead)
+                // Decision 0067: the identity becomes the subscription's address and the link, so it is found again after resubscribing.
+                #expect(article.identityKey == "https://synthetic.example/rss https://synthetic.example/article/1" && article.isRead)
                 #expect(store.retentionDays == 90 && store.memberships.count == 1)
                 #expect(try store.content(articleID: article.id, at: at)?.text == "合成RSS要約")
                 // The old daily/weekly notes are intentionally not carried over (decision 0008); everything else is.
