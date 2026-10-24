@@ -41,7 +41,7 @@ import Carbon
     }
 
     // Issue #371: exercise the packaged hidden-title-bar window at the width that exposed #222.
-    private func checkNarrowWindowLayout(width: CGFloat) {
+    private func checkNarrowWindowLayout(width: CGFloat, dragTargets: [CGFloat] = []) {
         selectFirst()
         let window = app.windows.firstMatch
         let frame = window.frame
@@ -88,6 +88,44 @@ import Carbon
             XCTAssertEqual(window.frame.width, start.width, accuracy: 1)
             XCTAssertEqual(window.frame.minX, start.minX, accuracy: 1)
             XCTAssertEqual(app.state, .runningForeground)
+        }
+        // #381: after the no-drag baseline, try a newer choice in both directions.
+        for targetWidth in dragTargets {
+            // Follow the actual divider as the sidebar returns; a cached window offset can miss it.
+            let to = divider.withOffset(CGVector(dx: targetWidth - listWidth, dy: 0))
+            window.typeKey("n", modifierFlags: [])
+            let editor = app.textViews["Note"]
+            XCTAssertTrue(editor.waitForExistence(timeout: 5))
+            let closedAt = ProcessInfo.processInfo.systemUptime
+            window.typeKey(.escape, modifierFlags: [])
+            let dragRequestedAfter = ProcessInfo.processInfo.systemUptime - closedAt
+            divider.click(forDuration: 0.05, thenDragTo: to)
+            let elapsed = ProcessInfo.processInfo.systemUptime - closedAt
+            print("#381 window=\(width), target=\(targetWidth), close-to-drag-request=\(dragRequestedAfter)s, close-to-drag-complete=\(elapsed)s, actual=\(listViewport.frame.width)")
+            XCTAssertTrue(editor.waitForNonExistence(timeout: 5))
+            XCTAssertEqual(listViewport.frame.width, targetWidth, accuracy: 3)
+            // Observe beyond the restoration task's two-second limit, rather than accepting one matching frame.
+            let overridden = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                abs(listViewport.frame.width - targetWidth) > 3
+            }, object: nil)
+            overridden.isInverted = true
+            XCTAssertEqual(XCTWaiter.wait(for: [overridden], timeout: 2.2), .completed,
+                           "A newer divider choice must not be restored to the old width")
+            XCTAssertEqual(window.frame.width, start.width, accuracy: 1)
+            // A later fold must remember the new choice too.
+            window.typeKey("n", modifierFlags: [])
+            XCTAssertTrue(editor.waitForExistence(timeout: 5))
+            window.typeKey(.escape, modifierFlags: [])
+            XCTAssertTrue(editor.waitForNonExistence(timeout: 5))
+            XCTAssertEqual(listViewport.frame.width, targetWidth, accuracy: 3)
+            // Reset the baseline for the other direction.
+            let currentDivider = app.splitters.allElementsBoundByIndex.first {
+                abs($0.frame.minX - listViewport.frame.maxX) < 1
+            }
+            XCTAssertNotNil(currentDivider)
+            currentDivider?.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                .click(forDuration: 0.1, thenDragTo: listRight)
+            XCTAssertEqual(listViewport.frame.width, listWidth, accuracy: 3)
         }
     }
 
@@ -183,6 +221,12 @@ import Carbon
         send.click()
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         XCTAssertTrue(waitForCondition { (editor.value as? String)?.contains("\n> — ") == true }, "note: \(String(describing: editor.value))")
+    }
+
+    // #381: keep the input experiment separate from the note/restart case's 120-second limit.
+    func testDividerDragAfterClosingNote() {
+        useNormalWindow()
+        checkNarrowWindowLayout(width: 1170, dragTargets: [340, 460])
     }
 
     // Checks PRD-04: layout changes keep the note, and committed typing survives a restart.

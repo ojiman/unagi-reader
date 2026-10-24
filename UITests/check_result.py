@@ -5,14 +5,14 @@ import sys
 
 def check(summary):
     if not (summary.get("result") == "Passed"
-            and summary.get("totalTestCount") == 5
-            and summary.get("passedTests") == 5
+            and summary.get("totalTestCount") == 6
+            and summary.get("passedTests") == 6
             and summary.get("failedTests") == 0
             and summary.get("skippedTests") == 0):
-        raise ValueError("Expected all five UI smoke tests to finish and pass: " + str(summary))
+        raise ValueError("Expected all six UI smoke tests to finish and pass: " + str(summary))
 
 
 if __name__ == "__main__":
     with open(sys.argv[1]) as source:
         check(json.load(source))
-    print("All five UI smoke tests finished and passed.")
+    print("All six UI smoke tests finished and passed.")
