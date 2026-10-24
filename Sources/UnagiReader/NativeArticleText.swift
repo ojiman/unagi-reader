@@ -67,6 +67,7 @@ import ReaderCore
         paragraphRanges = []; paragraphYs = []; bodyRange = nil; quoteRanges = []
         imageTasks.forEach { $0.cancel() }; imageTasks = []
         var imageURLs: [String] = []
+        var quoted: [(range: NSRange, depth: Int)] = []
         let start = document.length
         for (index, paragraph) in paragraphs.enumerated() {
             var range = NSRange(location: document.length, length: (paragraph as NSString).length)
@@ -82,11 +83,12 @@ import ReaderCore
                       let url = ArticleURL.link(link.url) else { continue }
                 document.addAttributes([.link: url, .foregroundColor: NSColor.linkColor, .underlineStyle: NSUnderlineStyle.single.rawValue], range: NSRange(location: range.location + link.location, length: link.length))
             }
-            range.length += insertImages(block.images ?? [], into: document, paragraph: range, inset: indent ?? 0)
+            range.length += insertImages(block.images ?? [], into: document, paragraph: range)
             imageURLs += (block.images ?? []).map(\.url)
             paragraphRanges.append(range)
-            if let indent { quoteRanges.append((range, indent)) }
+            if indent != nil { quoted.append((range, min(block.quoteDepth, 3))) }
         }
+        quoteRanges = Self.quoteBars(quoted)
         if !paragraphs.isEmpty { bodyRange = NSRange(location: start, length: document.length - start) }
         if let unavailable { append(unavailable, size: 16, secondary: true) }
         textStorage?.setAttributedString(document)
@@ -145,14 +147,19 @@ import ReaderCore
 
     /// Inserts the paragraph's images at their places (decision 0066) and returns the length added. A block of images only is a paragraph
     /// of its own, so images of separate blocks stand on separate lines.
-    private func insertImages(_ images: [BodyImage], into document: NSMutableAttributedString, paragraph range: NSRange, inset: CGFloat) -> Int {
+    private func insertImages(_ images: [BodyImage], into document: NSMutableAttributedString, paragraph range: NSRange) -> Int {
         guard !images.isEmpty else { return 0 }
         let column = textContainer?.containerSize.width ?? 0
         let attributes = document.attributes(at: range.location, effectiveRange: nil).filter { [.font, .paragraphStyle].contains($0.key) }
+        // The paragraph's indent (a quote, a list item) narrows the column; a line of its text decides which images are tall.
+        let style = attributes[.paragraphStyle] as? NSParagraphStyle
+        let inset = max(style?.headIndent ?? 0, style?.firstLineHeadIndent ?? 0)
+        let font = attributes[.font] as? NSFont ?? NSFont.systemFont(ofSize: 16)
+        let lineHeight = (layoutManager?.defaultLineHeight(for: font) ?? font.pointSize * 1.2) + (style?.lineSpacing ?? 0)
         var added = 0
         // From the last to the first, so earlier offsets stay right and images at one offset keep their order.
         for image in images.enumerated().sorted(by: { ($0.element.location, $0.offset) > ($1.element.location, $1.offset) }).map(\.element) {
-            let cell = BodyImageCell(url: image.url, width: image.width, height: image.height, inset: inset)
+            let cell = BodyImageCell(url: image.url, width: image.width, height: image.height, inset: inset, lineHeight: lineHeight)
             cell.fit(to: column)
             let attachment = NSTextAttachment(); attachment.attachmentCell = cell
             let piece = NSMutableAttributedString(attachment: attachment)
@@ -275,20 +282,38 @@ import ReaderCore
     }
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-        if let manager = layoutManager, let container = textContainer {
-            NSColor.separatorColor.setFill()
-            for (range, indent) in quoteRanges {
-                let glyphs = manager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
-                let rect = manager.boundingRect(forGlyphRange: glyphs, in: container)
-                let line = NSRect(x: textContainerOrigin.x + indent - 12, y: textContainerOrigin.y + rect.minY, width: 2, height: rect.height)
-                if line.intersects(dirtyRect) { line.fill() }
-            }
-        }
+        NSColor.separatorColor.setFill()
+        for line in quoteBarRects() where line.intersects(dirtyRect) { line.fill() }
         guard !didDisplayBody, window != nil, hasVisibleBody else { return }
         didDisplayBody = true
         // SwiftUI state/storage writes happen after the native draw, never inside its update.
         let callback = onDisplayed
         DispatchQueue.main.async { callback?() }
+    }
+    /// One bar per quote and depth, along all its consecutive paragraphs (#429): the bar runs through the spacing between them, and a
+    /// quote inside a quote has its own bar while the outer one goes on. A paragraph outside the quote ends the bar.
+    static func quoteBars(_ paragraphs: [(range: NSRange, depth: Int)]) -> [(NSRange, CGFloat)] {
+        var bars: [(NSRange, CGFloat)] = []
+        var open: [Int: Int] = [:]                                   // depth → its bar
+        var end = -1
+        for paragraph in paragraphs {
+            if paragraph.range.location != end + 1 { open = [:] }  // not right after the previous quoted paragraph and its newline
+            for depth in 1...max(1, paragraph.depth) {
+                if let bar = open[depth] { bars[bar].0 = NSUnionRange(bars[bar].0, paragraph.range) }
+                else { open[depth] = bars.count; bars.append((paragraph.range, CGFloat(depth) * 20)) }
+            }
+            for depth in open.keys where depth > paragraph.depth { open[depth] = nil }
+            end = NSMaxRange(paragraph.range)
+        }
+        return bars
+    }
+    /// The quote bars, in the view's coordinates.
+    func quoteBarRects() -> [NSRect] {
+        guard let manager = layoutManager, let container = textContainer else { return [] }
+        return quoteRanges.map { range, indent in
+            let rect = manager.boundingRect(forGlyphRange: manager.glyphRange(forCharacterRange: range, actualCharacterRange: nil), in: container)
+            return NSRect(x: textContainerOrigin.x + indent - 12, y: textContainerOrigin.y + rect.minY, width: 2, height: rect.height)
+        }
     }
     override func mouseDown(with event: NSEvent) { onInteraction?(); super.mouseDown(with: event) }
     func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
