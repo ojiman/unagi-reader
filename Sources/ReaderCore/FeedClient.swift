@@ -26,7 +26,8 @@ public struct FeedClient: Sendable {
 
     /// For a new subscription: an address that is a Web page, not a feed, leads to the feed the page announces
     /// (one step: the announced address is read as a feed and is never searched again). A saved subscription is never
-    /// redirected this way, so `fetch` does not do it.
+    /// redirected this way, so `fetch` does not do it. The page found gives the feed its icon; a feed address typed as it is waits for its first
+    /// refresh, so the add sheet does not wait for another page.
     public func fetchOrDiscover(url: URL) async throws -> FeedFetchOutcome {
         let response = try await load(url: url, etag: nil, lastModified: nil)
         do {
@@ -36,9 +37,26 @@ public struct FeedClient: Sendable {
             guard let feedURL = FeedDiscovery.feedURL(inHTML: response.data, baseURL: response.finalURL) else { throw FeedImportError.noFeedInPage }
             do {
                 guard case .modified(let parsed, let etag, let modified) = try await fetch(url: feedURL) else { throw HTTPError.invalidResponse }
-                return FeedFetchOutcome(parsed: parsed, etag: etag, lastModified: modified, foundOnPage: url)
+                let icon = parsed.iconURL ?? Self.icon(onPage: response)
+                let found = ParsedFeed(title: parsed.title, sourceURL: parsed.sourceURL, entries: parsed.entries, skippedEntries: parsed.skippedEntries,
+                                       siteURL: parsed.siteURL, iconURL: icon)
+                return FeedFetchOutcome(parsed: found, etag: etag, lastModified: modified, foundOnPage: url)
             } catch FeedImportError.htmlPage { throw FeedImportError.noFeedInPage }
         }
+    }
+
+    /// The icon a feed's site names on its home page (`siteURL`, else the feed's origin), or that page's `/favicon.ico` when it names none,
+    /// so the page is not read again (#441). Nil when the page cannot be read. A refresh asks for it apart from the feed, so a slow page
+    /// never holds back the articles.
+    public func pageIcon(for feed: ParsedFeed) async -> URL? {
+        guard let home = feed.siteURL.map(ArticleURL.secured) ?? URL(string: "/", relativeTo: feed.sourceURL)?.absoluteURL,
+              let page = try? await http.fetch(url: home, headers: ["Accept": "text/html"], maximumBytes: 2 * 1024 * 1024) else { return nil }
+        return Self.icon(onPage: page)
+    }
+
+    private static func icon(onPage page: HTTPResponse) -> URL? {
+        guard page.statusCode == 200, let base = ArticleURL.validated(page.finalURL.absoluteString) else { return nil }
+        return FeedDiscovery.iconURL(inHTML: page.data, baseURL: base) ?? URL(string: "/favicon.ico", relativeTo: base)?.absoluteURL
     }
 
     private func load(url: URL, etag: String?, lastModified: String?) async throws -> HTTPResponse {

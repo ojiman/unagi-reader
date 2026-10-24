@@ -9,10 +9,13 @@ import Observation
     private let client: FeedClient
     private let batchDelay: Duration
     /// Tests pass a long `batchDelay` so that only the batch size and the end of the fetches decide the batches.
+    /// Subscriptions without an icon whose home page is still to be read, one at a time and apart from the feed requests (#441).
+    private var iconQueue: [(id: UUID, sourceURL: String, feed: ParsedFeed)] = []
+    private var iconTask: Task<Void, Never>?
     public init(store: ReaderStore, client: FeedClient = FeedClient(), batchDelay: Duration = .milliseconds(500)) {
         self.store = store; self.client = client; self.batchDelay = batchDelay
     }
-    private struct Request: Sendable { let id: UUID; let url: URL; let etag: String?; let modified: String? }
+    private struct Request: Sendable { let id: UUID; let url: URL; let etag: String?; let modified: String?; let findsIcon: Bool }
     private enum Event: Sendable { case fetched(Request, Result<FeedFetchResult, any Error>), due }
     /// Fetched feeds are applied together (one save, one list reload) when this many are in, or when the first of them
     /// has waited this long, or when the last fetch ends (#131). A slow feed does not hold back the others. One feed per main-actor
@@ -26,7 +29,7 @@ import Observation
         let feeds = store.feeds.compactMap { feed -> Request? in
             guard requested == nil || requested!.contains(feed.id), let source = feed.sourceURL,
                   let url = ArticleURL.validated(source) else { return nil }
-            return Request(id: feed.id, url: url, etag: feed.etag, modified: feed.lastModified)
+            return Request(id: feed.id, url: url, etag: feed.etag, modified: feed.lastModified, findsIcon: feed.iconURL == nil)
         }
         await withTaskGroup(of: Event.self) { group in
             var iterator = feeds.makeIterator()
@@ -53,6 +56,9 @@ import Observation
                     switch result {
                     case .success(let fetched):
                         pending.append(FetchedFeed(feedID: request.id, sourceURL: request.url.absoluteString, result: fetched))
+                        if request.findsIcon, case .modified(let parsed, _, _) = fetched, parsed.iconURL == nil {
+                            lookForIcon(feedID: request.id, sourceURL: request.url.absoluteString, feed: parsed)
+                        }
                     case .failure(let error):
                         if store.feeds.contains(where: { $0.id == request.id && $0.sourceURL == request.url.absoluteString }) { errors[request.id] = error.localizedDescription }
                     }
@@ -74,6 +80,27 @@ import Observation
         }
         errors = errors.filter { id, _ in store.feeds.contains { $0.id == id } }
     }
+
+    /// Reads the home page of a subscription that has no icon, after its feed is applied; the refresh does not wait for it. A page that
+    /// cannot be read changes nothing, and the next refresh asks again.
+    private func lookForIcon(feedID: UUID, sourceURL: String, feed: ParsedFeed) {
+        guard !iconQueue.contains(where: { $0.id == feedID }) else { return }
+        iconQueue.append((feedID, sourceURL, feed))
+        guard iconTask == nil else { return }
+        iconTask = Task { [weak self, client] in
+            while let next = self?.iconQueue.first {
+                let icon = await client.pageIcon(for: next.feed)
+                guard let self, !Task.isCancelled else { return }
+                // The icon is not something the person asked to save: a failed save leaves it empty, to be looked for again.
+                if let icon { try? store.setPageIcon(icon, feedID: next.id, sourceURL: next.sourceURL) }
+                iconQueue.removeFirst()
+            }
+            self?.iconTask = nil
+        }
+    }
+
+    /// For tests: waits until the queued icon lookups end.
+    func iconLookupsFinished() async { while let task = iconTask { await task.value } }
 }
 
 private extension Result where Failure == any Error {

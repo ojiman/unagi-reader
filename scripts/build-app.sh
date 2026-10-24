@@ -3,6 +3,17 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 configuration=${1:-debug}
 case "$configuration" in debug|release) ;; *) echo "Usage: build-app.sh [debug|release]" >&2; exit 2 ;; esac
+# A release (scripts/release-version.sh) sets UNAGI_READER_VERSION from its tag; any other build is 0.0.0.
+version=${UNAGI_READER_VERSION:-0.0.0}
+if ! [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "build-app.sh: UNAGI_READER_VERSION '$version' is not X.Y.Z" >&2; exit 2; fi
+# The build number is the count of commits, so it only grows. A shallow clone counts too few: a release refuses it.
+if [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = false ]; then
+    build_number=$(git rev-list --count HEAD)
+elif [ -n "${UNAGI_READER_VERSION:-}" ]; then
+    echo "build-app.sh: a release needs the whole Git history for its build number" >&2; exit 2
+else
+    build_number=0
+fi
 if [ "$configuration" = release ]; then build_dir=/private/tmp/unagi-reader-v1-release; else build_dir=/private/tmp/unagi-reader-debug; fi
 swift build -c "$configuration" --scratch-path "$build_dir"
 binary_dir=$(swift build -c "$configuration" --scratch-path "$build_dir" --show-bin-path)
@@ -32,23 +43,24 @@ cat > "$app_dir/Contents/Info.plist" <<'PLIST'
 <key>CFBundleDisplayName</key><string>Unagi Reader</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleVersion</key><string>2</string>
-<key>CFBundleShortVersionString</key><string>0.2.0</string>
 <key>LSMinimumSystemVersion</key><string>27.0</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 PLIST
-# macOS must know the app's languages, not just the package resource bundle's languages.
-python3 - "$app_dir/Contents/Info.plist" Sources/ReaderCore/Resources/Localizable.xcstrings <<'PYTHON'
+# macOS must know the app's languages, not just the package resource bundle's languages. The version goes in here too.
+python3 - "$app_dir/Contents/Info.plist" Sources/ReaderCore/Resources/Localizable.xcstrings "$version" "$build_number" <<'PYTHON'
 import json, plistlib, sys
 from pathlib import Path
 info = Path(sys.argv[1])
 catalog = json.loads(Path(sys.argv[2]).read_text())
+version, build_number = sys.argv[3:5]
 languages = {catalog["sourceLanguage"]}
 for entry in catalog["strings"].values():
     languages.update(entry.get("localizations", {}))
 plist = plistlib.loads(info.read_bytes())
 plist["CFBundleLocalizations"] = sorted(languages)
+plist["CFBundleShortVersionString"] = version
+plist["CFBundleVersion"] = build_number
 info.write_bytes(plistlib.dumps(plist))
 PYTHON
 codesign --force --sign - "$app_dir"

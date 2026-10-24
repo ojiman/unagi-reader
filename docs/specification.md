@@ -153,7 +153,7 @@ normal                original page (v)     note beside article   note with the 
 
 - One style: monochrome symbols of one size and one hit area; colour only for a state (a filled Star, a filled translate). No links and no accent-coloured symbols in a band.
 - Dragging an empty part of a band moves the window; a double-click does what the system setting says.
-- In full screen the bands stay at the top of the screen and the columns keep their places. When the pointer reveals the menu bar, the system's title bar comes down with it, over the top of the columns, with the window buttons, add subscription and refresh. This temporary bar uses the system appearance in light and dark themes; in Sepia its background blends with the paper colour. The green button, the system's full-screen shortcut and 「表示」 (View) ▸ 「フルスクリーンを終了」 (Exit Full Screen) leave full screen, and the window returns at its old size. If the displays change, the restored window stays accessible on a current screen.
+- In full screen the bands stay at the top of the screen and the columns keep their places. When the pointer reveals the menu bar, the system's title bar comes down with it, over the top of the columns, with the window buttons, add subscription and refresh. The bar is the system's compact height: it fits the window buttons, and the other two sit on their line. This temporary bar uses the system appearance in light and dark themes; in Sepia its background blends with the paper colour. The green button, the system's full-screen shortcut and 「表示」 (View) ▸ 「フルスクリーンを終了」 (Exit Full Screen) leave full screen, and the window returns at its old size. If the displays change, the restored window stays accessible on a current screen.
 - Every band control also has a menu bar command; the keys stay as they are (3.1.5).
 
 **Headings**
@@ -307,6 +307,7 @@ The **note** is the app's **one** plain-text Markdown document ([decision 0049](
 ### 3.4 Favicons and images
 
 - A subscription's favicon and an article's image are different things.
+- A subscription's icon is the one its feed names. Without one, the app reads the site's home page once and uses the icon it names (`<link rel="icon">`, or `apple-touch-icon` when there is none), else the site's `/favicon.ico`. A page that cannot be read is tried again at the next refresh; a typed feed address gets its icon at its first refresh.
 - An article's image comes first from the RSS/Atom feed. For Hatena Bookmark, the article image metadata is used.
 - The list and the article show an image when there is one.
 - No image, a failed image or being offline never stops reading. A late image never changes a row height, the selection or the scroll position.
@@ -540,5 +541,5 @@ These are the conditions for passing, not a list of what has passed. "Where it i
 - The store schema is frozen as a `VersionedSchema`.
 - CI runs a required check from the 1.0 release tag: a synthetic store with subscriptions, articles, read times, Stars and the note is opened by the new version and reopened, and nothing is lost. A skipped or not-run check is never a pass. It stays for every later model change.
 - The Bundle ID, the store location, signing and the sandbox are fixed, and saving, restarting and updating are checked with them. Whether a beta store opens is checked; if it does not, the person is told how to keep it.
-- The release is an ad hoc signed, not notarized DMG on GitHub Releases ([decision 0068](decisions/0068-an-ad-hoc-signed-dmg-on-github-releases.md)). A tag `vX.Y.Z` makes CI build it from that commit, with the version from the tag, its SHA-256 and a build provenance attestation, as a draft release. The owner checks that DMG on macOS 27 and publishes it; a published DMG is never replaced. [not built #432]
+- The release is an ad hoc signed, not notarized DMG on GitHub Releases ([decision 0068](decisions/0068-an-ad-hoc-signed-dmg-on-github-releases.md)). A tag `vX.Y.Z` makes CI build it from that commit, with the version from the tag, its SHA-256 and a build provenance attestation, as a draft release. The owner checks that DMG on macOS 27 and publishes it; a published DMG is never replaced.
 - The release notes say what changed, that the app is not notarized and how to open it, how to check the DMG, and that the library is kept.

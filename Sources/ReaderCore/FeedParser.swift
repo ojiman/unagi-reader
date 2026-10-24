@@ -88,9 +88,7 @@ public enum FeedParser {
     }
 
     private static func parseDocument(_ data: Data, source: URL, baseURL: URL?) throws -> ParsedFeed {
-        // Strip NULs only for declaration detection, including UTF-16/32 input. Never resolve a DTD.
-        let declarationScan = String(decoding: data, as: UTF8.self).replacingOccurrences(of: "\0", with: "")
-        guard !declarationScan.contains("<!DOCTYPE"), !declarationScan.contains("<!ENTITY") else { throw FeedImportError.entities }
+        guard !declaresDTD(data) else { throw FeedImportError.entities }
         let reader = FeedXMLReader(source: baseURL.flatMap { ArticleURL.validated($0.absoluteString) } ?? source)
         let parser = XMLParser(data: data)
         parser.shouldProcessNamespaces = true
@@ -105,14 +103,26 @@ public enum FeedParser {
     }
 
     /// The start of a document without the whitespace, comments and XML declaration that may come before the markup.
-    private static func markupStart(_ data: Data) -> Substring {
-        var head = Substring(String(decoding: data.prefix(1024), as: UTF8.self))
+    private static func markupStart(_ data: Data) -> Substring { skippingProlog(Substring(String(decoding: data.prefix(1024), as: UTF8.self))) }
+
+    private static func skippingProlog(_ text: Substring) -> Substring {
+        var head = text
         while true {
             head = head.drop { $0 == "\u{FEFF}" || $0.isWhitespace }
             if head.hasPrefix("<?"), let end = head.range(of: "?>") { head = head[end.upperBound...] }
             else if head.hasPrefix("<!--"), let end = head.range(of: "-->") { head = head[end.upperBound...] }
             else { return head }
         }
+    }
+
+    /// A DTD can stand only before the root element; an article's HTML in CDATA may carry its own `<!DOCTYPE html>` (#440).
+    /// The parser's declaration callbacks refuse an entity declaration that an encoding hides from this scan (#126).
+    private static func declaresDTD(_ data: Data) -> Bool {
+        // Strip NULs only for declaration detection, including UTF-16/32 input, whose byte order mark decodes to U+FFFD.
+        // Never resolve a DTD.
+        let text = String(decoding: data, as: UTF8.self).replacingOccurrences(of: "\0", with: "")
+        let declaration = skippingProlog(Substring(text).drop { $0 == "\u{FFFD}" })
+        return declaration.hasPrefix("<!DOCTYPE") || declaration.hasPrefix("<!ENTITY")
     }
 
     /// A web page (the address of a site, not of its feed) starts with an HTML doctype or tag.

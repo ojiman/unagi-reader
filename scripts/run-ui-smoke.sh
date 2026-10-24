@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs six real-app smoke tests. Build the app first; requires a logged-in macOS desktop and Xcode.
+# Runs seven real-app smoke tests. Build the app first; requires a logged-in macOS desktop and Xcode.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 [ "$#" -le 1 ] || { echo "Usage: run-ui-smoke.sh [APP]" >&2; exit 2; }
