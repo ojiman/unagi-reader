@@ -21,6 +21,16 @@ import Testing
 
     @Test func theNotesKeysAreListed() {
         let note = ReaderShortcuts.rows(in: .note).flatMap(\.keys)
-        #expect(note.contains("n") && note.contains("⌥⌘I") && note.contains("c") && note.contains("⌥⌘↑") && note.contains("Esc"))
+        #expect(note.contains("n") && note.contains("⌥⌘I") && note.contains("i") && note.contains("⌘K") && note.contains("⌥⌘↑") && note.contains("Esc"))
+    }
+
+    // #415: `i` replaces `c`; `⌘K` also works while typing in the note, so its row names no limit.
+    @Test func sendingToTheNoteIsIAndCommandK() {
+        #expect(ReaderShortcuts.readingLetters.contains("i") && !ReaderShortcuts.readingLetters.contains("c"))
+        #expect(!ReaderShortcuts.rows.flatMap(\.keys).contains("c"))
+        let letter = ReaderShortcuts.rows.first { $0.keys == ["i"] }
+        let command = ReaderShortcuts.rows.first { $0.keys == ["⌘K"] }
+        #expect(letter?.group == .note && letter?.limit == "Unavailable while typing")
+        #expect(command?.group == .note && command?.limit == nil && command?.action == letter?.action)
     }
 }

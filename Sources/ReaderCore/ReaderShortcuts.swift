@@ -26,9 +26,10 @@ public enum ReaderShortcuts {
     }
 
     /// The single letters the reader handles without a modifier key, from the list or the article, when no text is being typed.
-    public static let readingLetters: [String] = ["j", "k", "m", "s", "t", "b", "v", "n", "c", "/"]
+    public static let readingLetters: [String] = ["j", "k", "m", "s", "t", "b", "v", "n", "i", "/"]
 
     static let whileTyping = String(localized: "Unavailable while typing", bundle: ReaderLocalization.bundle)
+    static let sendToNote = String(localized: "Send article to note (selected text becomes a quotation)", bundle: ReaderLocalization.bundle)
 
     public static let rows: [Row] = [
         Row(group: .reading, keys: ["j", "k"], action: String(localized: "Next or previous article", bundle: ReaderLocalization.bundle), limit: whileTyping),
@@ -41,7 +42,9 @@ public enum ReaderShortcuts {
         Row(group: .original, keys: ["Esc"], action: String(localized: "Close original page and return to article", bundle: ReaderLocalization.bundle), limit: nil),
         Row(group: .original, keys: ["j", "k", "s", "n"], action: String(localized: "Also available while the original page is open", bundle: ReaderLocalization.bundle), limit: nil),
         Row(group: .note, keys: ["n", "⌥⌘I"], action: String(localized: "Open or close note", bundle: ReaderLocalization.bundle), limit: String(localized: "n is unavailable while typing", bundle: ReaderLocalization.bundle)),
-        Row(group: .note, keys: ["c"], action: String(localized: "Send article to note (selected text becomes a quotation)", bundle: ReaderLocalization.bundle), limit: whileTyping),
+        Row(group: .note, keys: ["i"], action: sendToNote, limit: whileTyping),
+        // The menu's key: it works wherever the keyboard is, also while typing in the note (#415).
+        Row(group: .note, keys: ["⌘K"], action: sendToNote, limit: nil),
         Row(group: .note, keys: ["⌥⌘↑", "⌥⌘↓"], action: String(localized: "Previous or next article with the note open", bundle: ReaderLocalization.bundle), limit: nil),
         Row(group: .note, keys: ["Esc"], action: String(localized: "Close note and return to article", bundle: ReaderLocalization.bundle), limit: String(localized: "While composing text, cancel composition first", bundle: ReaderLocalization.bundle)),
     ]
