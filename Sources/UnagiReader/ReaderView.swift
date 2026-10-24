@@ -137,7 +137,7 @@ struct ReaderView: View {
             .modifier(ArticleTranslationPresentation(controller: translation, articleID: selection, title: selectedArticle?.title,
                 content: displayedContent, keysEnabled: shortcutsEnabled, readerShown: originalPage.url == nil))
             .onKeyPress("/") { guard shortcutsEnabled else { return .ignored }; filterPresented = true; return .handled }
-            .onKeyPress("c") { guard shortcutsEnabled, originalPage.url == nil else { return .ignored }; sendToNote(); return .handled }
+            .onKeyPress("i") { guard shortcutsEnabled, originalPage.url == nil else { return .ignored }; sendToNote(); return .handled }
 
     }
 
@@ -382,7 +382,7 @@ struct ReaderView: View {
                 case "n": toggleNote()
                 case "/": ReaderPerformance.motionBegan("filter-open", duration: 0.25); filterPresented = true
                 case "t": toggleTranslation()
-                case "c": sendToNote()
+                case "i": sendToNote()
                 default: break
                 }
             }, imageLoader: imageLoader, iconURL: { article in

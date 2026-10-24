@@ -151,6 +151,7 @@ import Carbon
     }
 
     // Checks PRD-04 and decision 0050: the panel's own close button and Esc close the note.
+    // Checks PRD-19 (#415): in the note's editor `i` is typed, and ⌘K, the menu's key, sends the article after it.
     func testNoteCloseButtonAndEscape() {
         useNormalWindow()
         selectFirst()
@@ -162,6 +163,11 @@ import Carbon
         app.windows.firstMatch.typeKey("n", modifierFlags: [])
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.click()
+        editor.typeText("i")
+        XCTAssertEqual(editor.value as? String, "i")
+        editor.typeKey("k", modifierFlags: .command)
+        XCTAssertTrue(waitForCondition { (editor.value as? String)?.hasPrefix("i\n\n[") == true }, "note: \(String(describing: editor.value))")
+        XCTAssertTrue(editor.exists)                                           // the keyboard stays: the note is still open
         app.windows.firstMatch.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(editor.waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.tables["Article List"].tableRows.firstMatch.isHittable)

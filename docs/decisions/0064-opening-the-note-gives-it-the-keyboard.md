@@ -18,7 +18,7 @@ The note is opened to write in it. After `n` the keyboard stayed in the article,
 ## Decision
 
 1. **`n`, the note button and `⌥⌘I` open the note with the keyboard in its editor.** The caret is where the person left it; in a note they have not placed it in, at the end.
-2. **「記事をノートに送る」 (`c`) does not move the keyboard** (specification 3.3, unchanged): the person is still reading.
+2. **「記事をノートに送る」 (`c`, now `i` and `⌘K`: #415) does not move the keyboard** (specification 3.3, unchanged): the person is still reading.
 3. **`j` / `k` keep the rule of 0050 point 1**: what they do depends on where the keyboard is. Right after the note opens they are letters in the note. To move the article, the person clicks the article or the list, or uses `⌥⌘↑` / `⌥⌘↓` and the arrows above the note.
 4. Closing the note gives the keyboard back as before: to the list, or to the original page when it is still open (specification 3.1.3).
 

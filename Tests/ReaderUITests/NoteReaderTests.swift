@@ -297,7 +297,7 @@ extension SplitViewFoldTests {
         }
     }
 
-    /// 「記事をノートに送る」 from the list's key handler, as the app's `c` reaches it (specification 3.3). Checks PRD-19.
+    /// 「記事をノートに送る」 from the list's key handler, as the app's `i` reaches it (specification 3.3). Checks PRD-19.
     @Suite(EnglishLanguage(), .serialized) @MainActor struct SendToNoteTests {
         private let t = NoteReaderTests()
 
@@ -316,7 +316,7 @@ extension SplitViewFoldTests {
             defer { t.finish(h) }
             try await choose(0, in: h)
             h.window.makeFirstResponder(try table(h))
-            #expect(try table(h).keyHandler?("c") == true)
+            #expect(try table(h).keyHandler?("i") == true)
             try await t.settle(h.host) { noteText(h) != "メモ" }
             #expect(noteText(h).hasPrefix("メモ\n\n[合成記事 0](") && noteText(h).hasSuffix(")\n"), "note: \(noteText(h).debugDescription)")
             try await t.settle(h.host) { t.containsText(noteText(h), in: h.host) }              // the note panel is open and shows it
@@ -330,11 +330,11 @@ extension SplitViewFoldTests {
             try await t.settle(h.host) { t.containsText("メモ", in: h.host) }
             try await choose(1, in: h)
             h.window.makeFirstResponder(try table(h))
-            #expect(try table(h).keyHandler?("c") == true)
+            #expect(try table(h).keyHandler?("i") == true)
             try await t.settle(h.host) { noteText(h).contains("[合成記事 1](") }
             #expect(h.window.firstResponder === (try table(h)))                                  // with the note open, the list keeps the keyboard
             try await choose(2, in: h)
-            #expect(try table(h).keyHandler?("c") == true)
+            #expect(try table(h).keyHandler?("i") == true)
             try await t.settle(h.host) { noteText(h).contains("[合成記事 2](") }
             let paragraphs = noteText(h).components(separatedBy: "\n\n")
             #expect(paragraphs.count == 3 && paragraphs[0] == "メモ" && paragraphs[1].hasPrefix("[合成記事 1](") && paragraphs[2].hasPrefix("[合成記事 2](")
@@ -342,11 +342,22 @@ extension SplitViewFoldTests {
                     "note: \(noteText(h).debugDescription)")
         }
 
+        // #415: `c` was the key before `i`; it no longer sends.
+        @Test func cNoLongerSends() async throws {
+            let h = try t.harness(scope: { _ in .all }, noteOpen: true) { store in try store.saveNote(text: "メモ", at: .now) }
+            defer { t.finish(h) }
+            try await choose(0, in: h)
+            h.window.makeFirstResponder(try table(h))
+            _ = try table(h).keyHandler?("c")
+            pumpRunLoop(0.4)
+            #expect(noteText(h) == "メモ")
+        }
+
         @Test func withNoArticleChosenNothingHappens() async throws {
             let h = try t.harness(scope: { _ in .all }) { store in try store.saveNote(text: "メモ", at: .now) }
             defer { t.finish(h) }
             try await t.settle(h.host) { t.find(NativeArticleList.Table.self, in: h.host)?.numberOfRows == 4 }
-            #expect(try table(h).keyHandler?("c") == true)
+            #expect(try table(h).keyHandler?("i") == true)
             pumpRunLoop(0.4)
             #expect(noteText(h) == "メモ")
             #expect(!t.containsText("メモ", in: h.host))                                        // the note did not open
