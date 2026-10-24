@@ -8,6 +8,8 @@ import SwiftData
     public private(set) var contentRevision = 0
     /// Changes after a read mark saved through a small context: the shown article took the values by a refetch, which does not notify it.
     public private(set) var readRevision = 0
+    /// Changes when a page icon is saved (#441): the sidebar rows take icon addresses as values, and the save gives no new list of feeds.
+    public private(set) var iconRevision = 0
     public private(set) var settings: ReaderSettings?
     public var retentionDays: Int { settings?.retentionDays ?? 30 }
     public private(set) var memberships: [FeedMembership] = []
@@ -379,6 +381,7 @@ import SwiftData
         guard let feed = feed(id: feedID), feed.sourceURL == sourceURL, feed.iconURL == nil else { return }
         feed.iconURL = icon.absoluteString
         try save()
+        iconRevision += 1
     }
 
     public func unsubscribe(_ feed: Feed) throws {
