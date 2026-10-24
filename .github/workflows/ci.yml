@@ -64,7 +64,7 @@ jobs:
     if: needs.changes.outputs.code == 'true'
     # No macOS 27 runner exists yet: this verifies the build floor (26.6), not the support floor (27.0). See docs/architecture.md#5-build-and-ci.
     runs-on: macos-26
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       CI_RESULTS: ${{ github.workspace }}/ci-results
@@ -86,6 +86,15 @@ jobs:
           } | tee "$CI_RESULTS/environment.txt"
       - name: Check synthetic startup isolation
         run: bash scripts/test-synthetic-startup.sh | tee "$CI_RESULTS/synthetic-startup.log"
+      # From 1.0 nothing is lost (specification 7.1): the tests open a library written by the v1.0.0 source (ReleaseStoreTests).
+      - name: Make the 1.0 store
+        run: |
+          git fetch --no-tags --depth=1 origin tag v1.0.0
+          bash scripts/test-make-release-store.sh
+          store=/private/tmp/unagi-reader-release-store-ci
+          { time bash scripts/make-release-store.sh "$store"; } > "$CI_RESULTS/release-store.log" 2>&1 || { cat "$CI_RESULTS/release-store.log"; exit 1; }
+          tail -n 1 "$CI_RESULTS/release-store.log"
+          echo "UNAGI_READER_RELEASE_STORE_DIR=$store" >> "$GITHUB_ENV"
       - name: Run tests
         run: |
           # The log can lose the end lines of fast tests (#186), so Swift Testing also writes its own xUnit record
@@ -97,6 +106,9 @@ jobs:
       # A test process can end early with exit code 0 and no summary line; `swift test` then looks like a pass.
       - name: Check that the test run finished
         run: bash scripts/check-test-log.sh "$CI_RESULTS/tests.log" "$CI_RESULTS/tests-swift-testing.xml"
+      # A skipped or not-run check is never a pass (specification 7.1).
+      - name: Check that the 1.0 store test ran
+        run: bash scripts/check-test-ran.sh "$CI_RESULTS/tests-swift-testing.xml" ReaderCoreTests.ReleaseStoreTests 'aLibraryWrittenByTheReleaseOpensAndKeepsEverything()'
       - name: Save logs and artifacts
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -177,6 +189,8 @@ jobs:
         run: bash scripts/test-ci-gate.sh
       - name: Test the test-log check script
         run: bash scripts/test-check-test-log.sh
+      - name: Test the check that a test ran
+        run: bash scripts/test-check-test-ran.sh
       - name: Test the UI smoke support
         run: bash scripts/test-run-ui-smoke.sh
       - name: Test the release tag check
