@@ -42,8 +42,8 @@ A decision record says who decided what, when and why. It is not where the curre
 | [0046](0046-fold-the-sidebar-for-the-original-page-and-note.md) | Fold the sidebar for the original page and the note | valid for the original page (point 4: 0047; note parts: 0049, 0050) |
 | [0047](0047-the-way-back-is-a-cross-in-the-right-column.md) | The way back is a ✕ at the top left of the right column | valid for the original page (note parts: 0049, 0050; the ✕ in the band: 0057) |
 | [0048](0048-the-list-title-sits-below-the-band.md) | The list title sits below the toolbar band, level with the ✕ | the title stays below the band; layout replaced by specification 3.1.4 (2026-10-20) |
-| [0049](0049-one-note-and-no-ai-of-its-own.md) | One note, written beside the article; no hand-off and no AI of its own | valid (points 3 and 9 in part: 0059) |
-| [0050](0050-the-note-screen-closes-like-the-original-page.md) | The note screen closes like the original page; a layout button; a wider note | valid (point 4's place: 0057; the keyboard on opening: 0064) |
+| [0049](0049-one-note-and-no-ai-of-its-own.md) | One note, written beside the article; no hand-off and no AI of its own | valid (points 3 and 9 in part: 0059; point 4's close: 0070) |
+| [0050](0050-the-note-screen-closes-like-the-original-page.md) | The note screen closes like the original page; a layout button; a wider note | valid (point 4's place: 0057; the keyboard on opening: 0064; point 2's motion: 0070) |
 | [0051](0051-app-name-and-eel-icon.md) | App bundle filename matches Unagi Reader; orange eel icon | valid |
 | [0052](0052-the-reading-screen-is-four-areas.md) | The vision describes the screen as four areas, not "three columns" | valid |
 | [0053](0053-plain-http-feeds-are-not-supported.md) | Plain `http://` feeds are not supported; the sentence when the https form fails | valid |
@@ -63,6 +63,7 @@ A decision record says who decided what, when and why. It is not where the curre
 | [0067](0067-an-article-belongs-to-one-subscription.md) | An article belongs to one subscription | valid (built) |
 | [0068](0068-an-ad-hoc-signed-dmg-on-github-releases.md) | Product 1.0 is an ad hoc signed DMG on GitHub Releases, built by CI from a tag | valid (workflow built) |
 | [0069](0069-vision-wording-for-1-0.md) | The vision's wording for 1.0 | valid |
+| [0070](0070-the-note-closes-at-once.md) | The note closes at once | valid |
 
 ## Removed from the working tree
 
