@@ -16,6 +16,7 @@
   - **MAJOR** (2.0.0): a break, for example a higher macOS floor or a feature taken away.
 - In every case the library is kept across the update (specification 7.1, decision 0003). No version may break that.
 - Each release has a GitHub milestone named by its version. The owner creates it when it is needed and is the only one who adds issues to it. A release is ready when its milestone has no open issue and the conditions of specification 7.1 hold.
+- The milestone is the only list of a release's issues. The roadmap points to the milestones and does not repeat their issues (the owner, #456).
 - The documents check applies to every open milestone: an open `enhancement` in one needs a status mark in the specification, or the label `no-spec`.
 
 ## Does not include
