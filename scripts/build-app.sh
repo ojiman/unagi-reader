@@ -44,6 +44,8 @@ cat > "$app_dir/Contents/Info.plist" <<'PLIST'
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>LSMinimumSystemVersion</key><string>27.0</string>
+<key>LSApplicationCategoryType</key><string>public.app-category.news</string>
+<key>NSHumanReadableCopyright</key><string>Copyright © 2026 Unagi Reader contributors</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 PLIST
