@@ -8,6 +8,8 @@
 
 1.0.0 was published on 2026-10-25. Until then one milestone, "1.0", listed the required work, and the rules and the documents check named it. A person who sees a new version should be able to tell what kind of change it is, and the owner needs one place per release that says what it must contain.
 
+That place is the milestone, not the roadmap. Urgent work, such as a security fix, often appears without notice; editing the roadmap first would make the document the goal. Issues and milestones can be rearranged quickly and still leave a record of what was done and why (the owner, 2026-10-25).
+
 ## Decision
 
 - A version is `MAJOR.MINOR.PATCH` ([semantic versioning](https://semver.org/)), and the tag is `vMAJOR.MINOR.PATCH` (decision 0068).
