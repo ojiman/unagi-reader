@@ -18,7 +18,7 @@ To look around without your real library, run `bash scripts/make-synthetic-copy.
 
 ### Back up the library by hand
 
-Do this before you update from a beta. These steps have not been tried on a real Mac yet.
+Do this before you update from a beta.
 
 1. Quit Unagi Reader (⌘Q).
 2. In Finder choose Go ▸ Go to Folder and open `~/Library/Application Support/`.
