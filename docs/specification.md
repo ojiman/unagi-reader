@@ -10,7 +10,7 @@ What V1 is and is not, as the person sees it. Why the product exists is in the [
 - The value, the user and the questions to ask when in doubt are in the [vision](vision.md): read → note → understand, in one app, with no waiting.
 - V1 runs on the person's own Mac. No backend, no account, no sync.
 - A new library starts empty; there is no migration from the prototype ([decision 0001](decisions/0001-fresh-library-no-prototype-migration.md)).
-- Data between beta versions is not guaranteed; saves and restarts within one version are. From 1.0, data is kept across updates (7.1). If the library cannot be opened, the app shows an error and never deletes or recreates it (how SwiftData behaves with an incompatible store is not verified). Beta release notes state this limit ([decision 0003](decisions/0003-beta-data-compatibility.md)).
+- From 1.0, data is kept across updates (7.1). The betas before 1.0 promised no compatibility between versions, only across saves and restarts of one version ([decision 0003](decisions/0003-beta-data-compatibility.md)). If the library cannot be opened, the app shows an error and never deletes or recreates it (how SwiftData behaves with an incompatible store is not verified).
 
 ## 2. Promises
 
@@ -537,6 +537,8 @@ These are the conditions for passing, not a list of what has passed. "Where it i
 | PRD-20 | Choose the app language | As in 3.7: Match System and the bundled display languages are offered (all seven); Match System follows the Mac preferences or falls back to English; a choice applies at the next launch and matches System Settings; a manual choice survives restart; untranslated UI text falls back to English; article and note text stay unchanged; article translation keeps its own target | real Mac (menus, Settings, errors, shortcuts, accessibility labels and text expansion in each language; English and Japanese wording reviewed by the owner); `AppLanguageTests`, `CatalogTests` (temporary preferences, native matching, compiled resources and fallback) |
 
 ### 7.1 Conditions to ship 1.0
+
+All were met for 1.0.0, published on 2026-10-25. Every later release keeps them: the CI check and the release steps below apply to each version ([decision 0071](decisions/0071-semantic-versions-and-a-milestone-per-release.md)).
 
 - The store schema is frozen as a `VersionedSchema` (architecture 3).
 - CI runs a required check from the 1.0 release tag: a synthetic store with subscriptions, articles, read times, Stars and the note is opened by the new version and reopened, and nothing is lost. A skipped or not-run check is never a pass. It stays for every later model change (architecture 5).

@@ -64,6 +64,7 @@ A decision record says who decided what, when and why. It is not where the curre
 | [0068](0068-an-ad-hoc-signed-dmg-on-github-releases.md) | Product 1.0 is an ad hoc signed DMG on GitHub Releases, built by CI from a tag | valid (workflow built) |
 | [0069](0069-vision-wording-for-1-0.md) | The vision's wording for 1.0 | valid |
 | [0070](0070-closing-the-note-has-no-reverse-motion.md) | Closing the note has no reverse motion | valid |
+| [0071](0071-semantic-versions-and-a-milestone-per-release.md) | Semantic versions, and a milestone per release | valid (approved when its PR is merged) |
 
 ## Removed from the working tree
 

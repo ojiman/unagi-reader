@@ -26,4 +26,4 @@ The release conditions live in [specification 7.1](../specification.md#71-condit
 
 ## Limits
 
-Not checked yet: the first-launch dialog of an ad hoc signed app from a DMG on macOS 27; that an update asks for 「このまま開く」 again; `gh attestation verify` on the first release.
+Checked on 2026-10-25, for 1.0.0: `gh attestation verify` on the released DMG passed (`release.yml` at the tag `v1.0.0`, commit 644a805); the owner installed the draft DMG on macOS 27 through the first-launch dialog and Open Anyway, installed a newer build over it, and the library was kept ([#451](https://github.com/ojiman/unagi-reader/issues/451)). Whether macOS asks again after every update was not recorded.
