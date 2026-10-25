@@ -4,7 +4,7 @@ The **order** of the work after 1.0, and why. The units of work are [GitHub issu
 
 ## Now: after 1.0.0
 
-1.0.0 was published on 2026-10-25 on [GitHub Releases](https://github.com/ojiman/unagi-reader/releases/tag/v1.0.0) (tag `v1.0.0`, commit 644a805). The owner uses it every day; problems found in real use come before any polish and ship as 1.0.x releases.
+1.0.0 was published on 2026-10-25 on [GitHub Releases](https://github.com/ojiman/unagi-reader/releases/tag/v1.0.0) (tag `v1.0.0`, commit 644a805). The owner uses it every day; problems found in real use come before any polish. Bug fixes ship as 1.0.x and features as 1.1.0 and later, each with a milestone named by its version that the owner creates when it is needed ([decision 0071](decisions/0071-semantic-versions-and-a-milestone-per-release.md)).
 
 From 1.0, an update keeps the person's library: CI opens a library written by `v1.0.0` on every code change ([specification 7.1](specification.md#71-conditions-to-ship-10)). A release is a tag `vX.Y.Z` on `main`, built by CI as a draft that the owner checks and publishes ([decision 0068](decisions/0068-an-ad-hoc-signed-dmg-on-github-releases.md)).
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Tests for scripts/check_docs.py. Needs only Python 3 (no network: the issue states are given by hand)."""
+import json
 import os
 import sys
 import tempfile
@@ -137,6 +138,47 @@ class ReleaseCoverageTests(unittest.TestCase):
     def test_without_the_files_there_is_nothing_to_check(self):
         with tempfile.TemporaryDirectory() as root:
             self.assertEqual(check_docs.release_spec_problems(root, [issue(1, "enhancement")]), [])
+
+    def test_the_message_names_the_milestone(self):
+        with tempfile.TemporaryDirectory() as root:
+            write(root, "docs/specification.md", "nothing marked\n")
+            unmarked = dict(issue(20, "enhancement"), milestone={"number": 3, "title": "1.1.0"})
+            problems = check_docs.release_spec_problems(root, [unmarked])
+            self.assertEqual(len(problems), 1)
+            self.assertIn("milestone 1.1.0", problems[0])
+
+    @staticmethod
+    def fake_gh(answers, calls):
+        """A stand-in for subprocess.run that answers `gh` calls from a dictionary keyed by the call's arguments."""
+        class Result:
+            def __init__(self, returncode, stdout, stderr=""):
+                self.returncode, self.stdout, self.stderr = returncode, stdout, stderr
+        def run(command, **_):
+            calls.append(command)
+            key = " ".join(command[1:3]) if command[1] == "api" else "issues " + command[command.index("--milestone") + 1]
+            answer = answers.get(key)
+            return Result(1, "", "not found") if answer is None else Result(0, json.dumps(answer))
+        return run
+
+    def test_every_open_milestone_is_read(self):
+        calls = []
+        answers = {
+            "api repos/o/r/milestones?state=open&per_page=100": [{"number": 2, "title": "1.0.1"}, {"number": 3, "title": "1.1.0"}],
+            "issues 2": [dict(issue(30, "bug"), milestone={"number": 2, "title": "1.0.1"})],
+            "issues 3": [dict(issue(31, "enhancement"), milestone={"number": 3, "title": "1.1.0"})],
+        }
+        found = check_docs.github_release_issues("o/r", run=self.fake_gh(answers, calls))
+        self.assertEqual(sorted(i["number"] for i in found), [30, 31])
+        self.assertEqual(len(calls), 3)
+
+    def test_no_open_milestone_means_no_release_issues(self):
+        answers = {"api repos/o/r/milestones?state=open&per_page=100": []}
+        self.assertEqual(check_docs.github_release_issues("o/r", run=self.fake_gh(answers, [])), [])
+
+    def test_a_failed_gh_call_is_an_error_not_an_empty_list(self):
+        answers = {"api repos/o/r/milestones?state=open&per_page=100": [{"number": 2, "title": "1.0.1"}]}
+        with self.assertRaises(LookupError):
+            check_docs.github_release_issues("o/r", run=self.fake_gh(answers, []))
 
 
 class IssueReferenceTests(unittest.TestCase):

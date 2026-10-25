@@ -6,9 +6,9 @@
                                             acceptance scenario checked by tests is named by a test (`// Checks PRD-04`).
   python3 scripts/check_docs.py --online    Also: the issues named in the specification's status marks and in the active
                                             parts of the roadmap are open (a closed issue means the mark or the line is
-                                            stale); and every open `enhancement` of the milestone 1.0 is named by a status
-                                            mark of the specification, or has the label `no-spec`. Needs `gh` and a token
-                                            (GH_TOKEN) that can read issues.
+                                            stale); and every open `enhancement` of an open milestone (one per release,
+                                            decision 0071) is named by a status mark of the specification, or has the label
+                                            `no-spec`. Needs `gh` and a token (GH_TOKEN) that can read issues.
 
 The problems are printed as `path:line: message`; the exit status is 1 when there is any.
 """
@@ -220,7 +220,7 @@ def closing_issues(text):
 
 
 def release_spec_problems(root, release_issues, closing=frozenset()):
-    """Every open `enhancement` issue of the milestone 1.0 is named by a status mark of the specification
+    """Every open `enhancement` issue of an open release milestone is named by a status mark of the specification
     (`[not built #n]`), unless it has the label `no-spec` (it changes nothing the person sees). An issue the pull request
     closes is done: its mark goes away in that pull request."""
     path = os.path.join(root, "docs", "specification.md")
@@ -228,20 +228,29 @@ def release_spec_problems(root, release_issues, closing=frozenset()):
         return []
     with open(path, encoding="utf-8") as handle:
         marked = {number for number, _ in status_mark_issues(handle.read())}
-    return [f"docs/specification.md: #{issue['number']} is a 1.0 enhancement, but no status mark names it: write the behavior in the "
-            f"specification with `[not built #{issue['number']}]`, or give the issue the label `no-spec`"
+    return [f"docs/specification.md: #{issue['number']} is an enhancement of the milestone {milestone_title(issue)}, but no status mark "
+            f"names it: write the behavior in the specification with `[not built #{issue['number']}]`, or give the issue the label `no-spec`"
             for issue in release_issues
             if "enhancement" in label_names(issue) and "no-spec" not in label_names(issue)
             and issue["number"] not in marked and issue["number"] not in closing]
 
 
-def github_release_issues(repository):
-    # Milestone 1 keeps its identity when its title changes from Beta to 1.0.
-    result = subprocess.run(["gh", "issue", "list", "--repo", repository, "--milestone", "1", "--state", "open", "--limit", "200",
-                             "--json", "number,labels"], capture_output=True, text=True, check=False)
-    if result.returncode != 0:
-        raise LookupError(result.stderr.strip() or "gh failed")
-    return json.loads(result.stdout)
+def milestone_title(issue):
+    return (issue.get("milestone") or {}).get("title") or "?"
+
+
+def github_release_issues(repository, run=subprocess.run):
+    """The open issues of every open milestone: each release has one, named by its version (decision 0071)."""
+    def gh(arguments):
+        result = run(["gh", *arguments], capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            raise LookupError(result.stderr.strip() or "gh failed")
+        return json.loads(result.stdout)
+    issues = []
+    for milestone in gh(["api", f"repos/{repository}/milestones?state=open&per_page=100"]):
+        issues += gh(["issue", "list", "--repo", repository, "--milestone", str(milestone["number"]), "--state", "open",
+                      "--limit", "200", "--json", "number,labels,milestone"])
+    return issues
 
 
 def github_state(repository):
@@ -276,7 +285,7 @@ def main(argv=None):
             try:
                 release = github_release_issues(repository)
             except (LookupError, ValueError) as error:
-                problems.append(f"the issues of the milestone 1.0 cannot be read ({error})")
+                problems.append(f"the issues of the open milestones cannot be read ({error})")
             else:
                 closing = closing_issues(args.closing)
                 problems += release_spec_problems(args.root, release, closing)
