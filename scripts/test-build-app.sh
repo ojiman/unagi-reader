@@ -15,6 +15,8 @@ expected_version = os.environ.get("UNAGI_READER_VERSION") or "0.0.0"
 assert info["CFBundleShortVersionString"] == expected_version, ("version", info["CFBundleShortVersionString"], expected_version)
 assert info["CFBundleVersion"].isdigit(), ("build number", info["CFBundleVersion"])
 assert expected_version == "0.0.0" or int(info["CFBundleVersion"]) > 0, "a release has a build number"
+assert info.get("NSHumanReadableCopyright") == "Copyright © 2026 Unagi Reader contributors", ("copyright", info.get("NSHumanReadableCopyright"))
+assert info.get("LSApplicationCategoryType") == "public.app-category.news", ("category", info.get("LSApplicationCategoryType"))
 assert set(info["CFBundleLocalizations"]) == languages
 bundle = app / "Contents/Resources/UnagiReader_ReaderCore.bundle"
 resources = bundle / "Contents/Resources" if (bundle / "Contents").exists() else bundle
@@ -26,7 +28,7 @@ for language in languages:
         if path.exists():
             keys.update(plistlib.loads(path.read_bytes()))
     assert keys == set(catalog["strings"]), (language, "missing keys", set(catalog["strings"]) - keys)
-print("Packaged UI languages, catalog coverage and version: OK")
+print("Packaged UI languages, catalog coverage, version, copyright and category: OK")
 PY
 # The CI artifact must keep its resources and signature after downloading and extracting it.
 roundtrip=$(mktemp -d /private/tmp/unagi-language-package.XXXXXX)

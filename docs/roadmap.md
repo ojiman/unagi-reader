@@ -8,9 +8,8 @@ The owner uses the app daily and fixes problems found there. The `v1.0.0` tag ha
 
 The milestone [1.0](https://github.com/ojiman/unagi-reader/milestone/1) tracks required release work. **1.0 is ready when its milestone issues and the shipping conditions below are complete.** Next and Candidates are not automatically required for 1.0.
 
-1. **Daily use by the owner:** a week of daily use. Bugs found here come before any polish.
-2. **Shipping conditions:** [specification 7.1](specification.md#71-conditions-to-ship-10), including data preservation across updates from 1.0. Before the owner publishes the draft of `v1.0.0`: the owner's install, restart and update check with the draft's DMG [#451](https://github.com/ojiman/unagi-reader/issues/451).
-3. **Distribution:** an ad hoc signed DMG on GitHub Releases, built by CI from a tag ([decision 0068](decisions/0068-an-ad-hoc-signed-dmg-on-github-releases.md)). The owner publishes the `v1.0.0` draft after the checks above.
+1. **Shipping conditions:** [specification 7.1](specification.md#71-conditions-to-ship-10), including data preservation across updates from 1.0. Before the owner publishes the draft of `v1.0.0`: the owner's install, restart and update check with the draft's DMG [#451](https://github.com/ojiman/unagi-reader/issues/451).
+2. **Distribution:** an ad hoc signed DMG on GitHub Releases, built by CI from a tag ([decision 0068](decisions/0068-an-ad-hoc-signed-dmg-on-github-releases.md)). The owner publishes the `v1.0.0` draft after the checks above.
 
 ## Next
 
