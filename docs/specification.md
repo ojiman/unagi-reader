@@ -179,7 +179,7 @@ normal                original page (v)     note beside article   note with the 
 - When a refresh brings new articles and the list is at the top, each new row slides in at its place in the order and pushes the rows below it down, with no limit on the number (the system's table motion, as in Mail). With Reduce Motion the new rows fade in instead. When the list is not at the top, the article being read does not move; new rows inside the visible part fade in. The selected article stays selected. Manual and automatic refreshes behave the same.
 - Publication time: the time for today, date and time for earlier days, the year too for other years. An unknown time is "—"; the received time is never used instead.
 - Order: the newest publication time first; an unknown time goes last.
-- A publication time later than the moment the article was first received orders as that moment, so a feed that dates an article in the future cannot hold the top of the list. The row and the article still show the feed's time. [not built #464]
+- A publication time later than the moment the article was first received orders as that moment, so a feed that dates an article in the future cannot hold the top of the list. The row and the article still show the feed's time.
 - Unread: the source name in the accent colour and brighter text. Read: the whole row a calm grey. A long source name ends in "…". The selected row keeps readable contrast.
 
 **List filter** (decision 0055)
