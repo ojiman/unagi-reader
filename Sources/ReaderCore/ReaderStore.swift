@@ -18,7 +18,8 @@ import SwiftData
     /// The title and summary of each article, for the list filter (`filteredIDs`). Dropped on each reload.
     @ObservationIgnored var searchTexts: [UUID: String] = [:]
     @ObservationIgnored private var feedIndex: [UUID: Feed] = [:]
-    @ObservationIgnored private var publishedDates: [UUID: Date] = [:]
+    /// The time each article is ordered by (`orderDate`), so a refresh can place rows without reading every model again.
+    @ObservationIgnored private var orderDates: [UUID: Date] = [:]
     @ObservationIgnored var refreshEntryIndex: EntryIndex?
     @ObservationIgnored private var articleFeeds: [UUID: Set<UUID>] = [:]
     public private(set) var articleIDs: [UUID] = []
@@ -79,6 +80,14 @@ import SwiftData
         contentRevision += 1
         settings = try context.fetch(FetchDescriptor<ReaderSettings>()).first
         articles = try context.fetch(FetchDescriptor<Article>(sortBy: [SortDescriptor(\.publishedAt, order: .reverse)]))
+        orderDates = Dictionary(uniqueKeysWithValues: articles.map { ($0.id, Self.orderDate($0)) })
+        if articles.contains(where: { orderDates[$0.id] != $0.publishedAt }) {
+            // Only a future publication time moves; ties keep the fetched order.
+            articles = articles.enumerated().sorted {
+                let a = orderDates[$0.element.id, default: .distantPast], b = orderDates[$1.element.id, default: .distantPast]
+                return a == b ? $0.offset < $1.offset : a > b
+            }.map(\.element)
+        }
         feeds = try context.fetch(FetchDescriptor<Feed>(sortBy: [SortDescriptor(\.title)]))
         memberships = try context.fetch(FetchDescriptor<FeedMembership>())
         // Ties on the timestamp break by a stable key, so equal times never reorder between launches.
@@ -95,7 +104,6 @@ import SwiftData
             for feedID in articleFeeds[article.id] ?? [] { feedArticles[feedID, default: []].append(article) }
         }
         articleIDs = articles.map(\.id)
-        publishedDates = Dictionary(uniqueKeysWithValues: articles.map { ($0.id, $0.publishedAt) })
         feedArticleIDs = feedArticles.mapValues { $0.map(\.id) }
         folderIndex = [:]
         for article in articles {
@@ -145,9 +153,9 @@ import SwiftData
         var feedUpdates: [UUID: [UUID]] = [:], folderUpdates: [String: [UUID]] = [:]
         for (id, article) in index.changedArticles {
             let isNew = articleIndex[id] == nil
-            let date = article.publishedAt
-            let moved = isNew || publishedDates[id] != date
-            publishedDates[id] = date
+            let date = Self.orderDate(article)
+            let moved = isNew || orderDates[id] != date
+            orderDates[id] = date
             articleIndex[id] = article
             searchTexts[id] = nil
             if moved { reordered.append(id) }
@@ -185,18 +193,22 @@ import SwiftData
     private func orderedIDs(_ ids: [UUID], updating: [UUID]) -> [UUID] {
         let changed = Set(updating)
         let kept = ids.filter { !changed.contains($0) }
-        let added = updating.sorted { publishedDates[$0, default: .distantPast] > publishedDates[$1, default: .distantPast] }
+        let added = updating.sorted { orderDates[$0, default: .distantPast] > orderDates[$1, default: .distantPast] }
         var result: [UUID] = []
         result.reserveCapacity(kept.count + added.count)
         var i = 0, j = 0
         while i < kept.count && j < added.count {
-            if publishedDates[kept[i], default: .distantPast] >= publishedDates[added[j], default: .distantPast] {
+            if orderDates[kept[i], default: .distantPast] >= orderDates[added[j], default: .distantPast] {
                 result.append(kept[i]); i += 1
             } else { result.append(added[j]); j += 1 }
         }
         result.append(contentsOf: kept[i...]); result.append(contentsOf: added[j...])
         return result
     }
+
+    /// The publication time, or the first receipt when the feed dates the article later than that (specification 3.0, #464).
+    /// Only the order uses it; the list and the article show the feed's time.
+    static func orderDate(_ article: Article) -> Date { min(article.publishedAt, article.firstReceivedAt) }
 
     func reloadIfNeeded() throws {
         if needsReload { try reload() }
