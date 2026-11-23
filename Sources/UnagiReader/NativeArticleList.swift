@@ -20,6 +20,8 @@ struct NativeArticleList: NSViewRepresentable {
     /// Room above the first row: the band and the title block (`ListHeader`), from the top of the column. It does not depend on the
     /// window's title bar or detached full-screen controls (#373).
     var headerInset: CGFloat = 0
+    /// Where the scroll bar starts, from the top of the column: below the opaque list title, which hid the top of a short knob (#468).
+    var scrollerTop: CGFloat = 0
 
     /// The list is drawn on the same surface as the article and the note.
     static func applySurface(scroll: NSScrollView, table: NSTableView) {
@@ -55,7 +57,7 @@ struct NativeArticleList: NSViewRepresentable {
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
         scroll.automaticallyAdjustsContentInsets = false
-        scroll.contentInsets = NSEdgeInsets(top: headerInset, left: 0, bottom: 0, right: 0)
+        applyInsets(scroll)
         context.coordinator.table = table
         context.coordinator.scroll = scroll
         scroll.contentView.postsBoundsChangedNotifications = true
@@ -70,8 +72,14 @@ struct NativeArticleList: NSViewRepresentable {
             context.coordinator.sepia = ThemeState.shared.sepia
             scroll.needsDisplay = true; context.coordinator.table?.redrawAll()
         }
-        if scroll.contentInsets.top != headerInset { scroll.contentInsets = NSEdgeInsets(top: headerInset, left: 0, bottom: 0, right: 0) }
+        applyInsets(scroll)
         context.coordinator.update(self)
+    }
+    /// AppKit insets the scrollers by the content insets too; the scroller insets add the rest of the title's height.
+    private func applyInsets(_ scroll: NSScrollView) {
+        if scroll.contentInsets.top != headerInset { scroll.contentInsets = NSEdgeInsets(top: headerInset, left: 0, bottom: 0, right: 0) }
+        let scrollerInset = max(0, scrollerTop - headerInset)
+        if scroll.scrollerInsets.top != scrollerInset { scroll.scrollerInsets = NSEdgeInsets(top: scrollerInset, left: 0, bottom: 0, right: 0) }
     }
     static func dismantleNSView(_ scroll: NSScrollView, coordinator: Coordinator) {
         if let observer = coordinator.observer { NotificationCenter.default.removeObserver(observer) }
