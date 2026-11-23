@@ -79,6 +79,43 @@ import ReaderCore
         #expect(abs((table.bounds.width - timeRect.maxX) - NativeArticleList.Metrics.contentMargin) < 0.5)   // the right edge
     }
 
+    /// The title is drawn over the list with an opaque background, so the list's scroll bar must start below it. In a long list the knob
+    /// is short, and at the top of the list the title hid most of it (issue #468). The first row keeps its place.
+    @Test func theTitleDoesNotHideTheTopOfTheScrollBar() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = try ReaderStore(url: directory.appendingPathComponent("Reader.store"))
+        let entries = (0..<40).map { index in
+            ParsedEntry(sourceID: "s\(index)", title: "合成記事 \(index)", url: URL(string: "http://127.0.0.1:1/article/\(index)"), summary: "合成要約",
+                        body: "合成本文", coverage: .feedProvided, publishedAt: .now.addingTimeInterval(Double(-index)))
+        }
+        _ = try store.importFeed(ParsedFeed(title: "合成購読", sourceURL: URL(string: "http://127.0.0.1:1/feed")!, entries: entries, skippedEntries: 0), receivedAt: .now)
+        let host = NSHostingView(rootView: ReaderView(store: store, refresh: FeedRefreshController(store: store),
+            imageLoader: ReaderImageLoader(directory: directory.appendingPathComponent("Images"))))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1240, height: 800), styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.titlebarAppearsTransparent = true; window.titleVisibility = .hidden
+        window.contentView = host
+        window.orderFront(nil)
+        defer { window.close() }
+        func find<T: NSView>(_ type: T.Type, in view: NSView) -> T? {
+            if let result = view as? T { return result }
+            return view.subviews.lazy.compactMap { find(type, in: $0) }.first
+        }
+        for _ in 0..<250 where find(NativeArticleList.Table.self, in: host)?.numberOfRows != 40 {
+            host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(20))
+        }
+        let scroll = try #require(find(NativeArticleList.ScrollView.self, in: host))
+        for style in [NSScroller.Style.overlay, .legacy] {
+            scroll.scrollerStyle = style
+            scroll.tile()
+            let scroller = try #require(scroll.verticalScroller)
+            let top = 800 - scroller.convert(scroller.bounds, to: nil).maxY                    // from the top of the window (AppKit counts y from the bottom)
+            #expect(top >= ListHeader.bandHeight + ListHeader.height - 0.5, "\(style.rawValue): the scroller starts \(top) pt from the top")
+            #expect(scroll.contentInsets.top == ListHeader.listTopInset)                       // the first row stays level with the sidebar's
+        }
+    }
+
     @Test func theNormalHeadingDoesNotRepeatTheSidebarCount() throws {
         let one = try inkRange(title: "S", width: 280, count: 1)
         let many = try inkRange(title: "S", width: 280, count: 999999)

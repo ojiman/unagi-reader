@@ -172,6 +172,7 @@ normal                original page (v)     note beside article   note with the 
 **List**
 
 - The list title is one line. It keeps the scope name visible when the sidebar folds. Counts stay in the sidebar; only a nonempty keyword filter adds its result count on the heading line. A long scope name ends with an ellipsis inside its column, leaving room for that count.
+- The list's scroll bar starts below the list title, so the title never covers the knob, however long the list is.
 - A row: source name on the left and publication time on the right of the top line; title, summary and article image below. The title is the largest (14 pt); the summary (11 pt) and the source name and time (10 pt) are smaller, because the title and the favicon decide interest.
 - The column's edge can be dragged wider.
 - The reading surfaces (list, article, note) are one dark colour, with no separate grey bars or lines in the bands; only the sidebar is slightly lighter.

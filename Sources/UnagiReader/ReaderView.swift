@@ -420,7 +420,7 @@ struct ReaderView: View {
                 return ImageMetadata.favicon(iconURL: feed?.iconURL, siteURL: feed?.siteURL, sourceURL: feed?.sourceURL)
             }, initialTopOffset: scrollMemory.state.listScrollOffset,
             onTopOffset: { id, offset in scrollMemory.state.listScrollAnchor = id; scrollMemory.state.listScrollOffset = offset },
-            headerInset: ListHeader.listTopInset)
+            headerInset: ListHeader.listTopInset, scrollerTop: ListHeader.bandHeight + ListHeader.height)
         .ignoresSafeArea(.container, edges: .top)
         .focused($listFocused)
         // The list's band: its empty part moves the window (decision 0057).
